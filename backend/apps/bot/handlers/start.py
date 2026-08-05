@@ -5,7 +5,7 @@ from aiogram.filters import CommandStart
 from aiogram.types import Message
 
 from apps.bot import texts
-from apps.bot.keyboards import open_app
+from apps.bot.keyboards import admin_menu, open_app
 from apps.bot.permissions import is_admin
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ async def handle_start(message: Message) -> None:
     logger.info("/start от %s (@%s)", user.id, user.username)
 
     if is_admin(user.id):
-        await message.answer(texts.ADMIN_WELCOME)
+        await message.answer(texts.ADMIN_WELCOME, reply_markup=admin_menu())
         return
 
     keyboard = open_app()
