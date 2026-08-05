@@ -10,7 +10,6 @@ class Entry(models.Model):
     arabic = models.TextField("Арабское", help_text="С огласовками")
     translation_ru = models.TextField("Перевод")
     transliteration = models.TextField("Транслитерация", blank=True, default="")
-    topic = models.TextField("Тема", blank=True, default="", db_index=True)
     image = models.ImageField("Картинка", upload_to="entries/", blank=True, null=True)
     created_at = models.DateTimeField("Добавлено", auto_now_add=True, db_index=True)
 

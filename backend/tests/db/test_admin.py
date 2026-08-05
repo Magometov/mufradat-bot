@@ -37,7 +37,6 @@ def test_word_is_added_through_admin(staff_client) -> None:
             "arabic": "كِتَاب",
             "translation_ru": "книга",
             "transliteration": "kitab",
-            "topic": "учёба",
         },
     )
 
