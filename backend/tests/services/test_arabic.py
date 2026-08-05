@@ -1,4 +1,14 @@
-from apps.vocabulary.services.arabic import normalize_arabic
+from apps.vocabulary.services.arabic import match_entries_in_sentence, normalize_arabic
+
+# arabic_norm -> id единицы
+KNOWN = {
+    "كتاب": 1,
+    "بيت": 2,
+    "قمر": 3,
+    "مدرسة": 4,
+    "مدرس": 5,
+    "كبير": 6,
+}
 
 
 def test_strips_diacritics() -> None:
@@ -58,3 +68,40 @@ def test_gender_pairs_collapse_and_that_is_expected() -> None:
     """
     assert normalize_arabic("مَا اسْمُكَ؟") == normalize_arabic("مَا اسْمُكِ؟")
     assert normalize_arabic("كَتَبْتَ") == normalize_arabic("كَتَبْتِ")
+
+
+def test_matches_bare_word() -> None:
+    assert match_entries_in_sentence("هَذَا بَيْتٌ", KNOWN) == {2}
+
+
+def test_matches_word_with_definite_article() -> None:
+    assert match_entries_in_sentence("الْكِتَابُ هُنَا", KNOWN) == {1}
+
+
+def test_matches_word_with_conjunction_and_article() -> None:
+    assert match_entries_in_sentence("وَالْقَمَرُ", KNOWN) == {3}
+
+
+def test_matches_several_words_in_one_sentence() -> None:
+    assert match_entries_in_sentence("الْمُدَرِّسُ فِي الْمَدْرَسَةِ", KNOWN) == {4, 5}
+
+
+def test_full_form_wins_over_stripped_prefix() -> None:
+    """بيت должно совпасть целиком, а не разобраться как ب + يت."""
+    assert match_entries_in_sentence("بَيْت", KNOWN) == {2}
+
+
+def test_unknown_words_are_ignored() -> None:
+    assert match_entries_in_sentence("هَذَا شَيْءٌ غَرِيبٌ", KNOWN) == set()
+
+
+def test_punctuation_does_not_break_matching() -> None:
+    assert match_entries_in_sentence("هَذَا بَيْتٌ كَبِيرٌ.", KNOWN) == {2, 6}
+
+
+def test_empty_sentence() -> None:
+    assert match_entries_in_sentence("", KNOWN) == set()
+
+
+def test_empty_dictionary() -> None:
+    assert match_entries_in_sentence("الْكِتَابُ", {}) == set()
