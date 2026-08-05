@@ -6,8 +6,6 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# .env лежит в корне репозитория, на уровень выше backend/.
-# Уже заданные переменные не перезаписываются: в Docker побеждает реальное окружение.
 load_dotenv(BASE_DIR.parent / ".env")
 
 SECRET_KEY = getenv("DJANGO_SECRET_KEY")
@@ -55,7 +53,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-# Те же переменные читает docker-compose, поэтому данные БД живут только в .env.
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",

@@ -196,7 +196,7 @@ def normalize_arabic(text: str) -> str:
 - [ ] **Step 4: Убедиться, что тесты проходят**
 
 Run: `uv run pytest backend/tests/services/test_arabic.py -q 2>&1 | tail -3`
-Expected: 13 passed.
+Expected: 12 passed.
 
 - [ ] **Step 5: Закоммитить**
 
@@ -205,7 +205,7 @@ git add backend/apps/vocabulary/services tests/services
 git commit -m "feat: normalize Arabic text for near-duplicate lookup"
 ```
 
-**Проверка задачи для владельца:** 13 тестов зелёные, включая тот, что фиксирует слепоту нормализации к роду.
+**Проверка задачи для владельца:** 12 тестов зелёных, включая тот, что фиксирует слепоту нормализации к роду.
 
 ---
 
@@ -336,7 +336,7 @@ def match_entries_in_sentence(sentence: str, known: dict[str, int]) -> set[int]:
 - [ ] **Step 4: Прогнать тесты файла**
 
 Run: `uv run pytest backend/tests/services/test_arabic.py -q 2>&1 | tail -3`
-Expected: 22 passed (13 из задачи 2 + 9 новых).
+Expected: 21 passed (12 из задачи 2 + 9 новых).
 
 - [ ] **Step 5: Закоммитить**
 
@@ -345,7 +345,7 @@ git add backend/apps/vocabulary/services/arabic.py tests/services/test_arabic.py
 git commit -m "feat: match sentence tokens to dictionary entries through proclitics"
 ```
 
-**Проверка задачи для владельца:** 22 теста зелёные; `وَالْقَمَرُ` находит `قمر`, а `بَيْت` не разваливается на `ب` + `يت`.
+**Проверка задачи для владельца:** 21 тест зелёный; `وَالْقَمَرُ` находит `قمر`, а `بَيْت` не разваливается на `ب` + `يت`.
 
 ---
 
@@ -746,7 +746,7 @@ def test_sentence_links_to_entry() -> None:
 - [ ] **Step 5: Прогнать тесты**
 
 Run: `uv run pytest -q 2>&1 | tail -3`
-Expected: 45 passed (14 конфигурация + 22 арабский + 9 модели).
+Expected: 30 passed (21 арабский + 9 модели).
 
 - [ ] **Step 6: Проверить, что модели и миграция не расходятся**
 
@@ -886,7 +886,7 @@ def test_telegram_user_changelist_opens(staff_client) -> None:
 - [ ] **Step 3: Прогнать проверку Django и тесты**
 
 Run: `uv run python backend/manage.py check && uv run pytest -q 2>&1 | tail -3`
-Expected: проверка без замечаний, 49 passed.
+Expected: проверка без замечаний, 34 passed.
 
 - [ ] **Step 4: Создать суперпользователя для ручного захода**
 
@@ -1700,7 +1700,7 @@ uv run pytest backend/tests/services/test_curriculum.py -q
 - [ ] **Step 6: Прогнать весь набор и линтер**
 
 Run: `uv run pytest -q 2>&1 | tail -3 && uv run ruff format . && uv run ruff check .`
-Expected: 66 passed, линтер без ошибок.
+Expected: 51 passed, линтер без ошибок.
 
 - [ ] **Step 7: Закоммитить**
 
