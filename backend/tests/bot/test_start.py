@@ -12,6 +12,7 @@ APP_URL = "https://example.test/app"
 @dataclass
 class FakeUser:
     id: int
+    username: str = "tester"
 
 
 @dataclass
@@ -68,16 +69,6 @@ async def test_user_is_invited_to_the_app(settings) -> None:
     text, keyboard = message.answers[0]
     assert texts.USER_WELCOME in text
     assert keyboard is not None
-
-
-async def test_user_sees_own_id_for_bootstrapping_admin(settings) -> None:
-    """Первый запуск: список админов пуст, и владелец узнаёт свой ID отсюда."""
-    settings.ADMIN_TELEGRAM_IDS = []
-    message = FakeMessage(from_user=FakeUser(id=333))
-
-    await handle_start(message)
-
-    assert "333" in message.answers[0][0]
 
 
 async def test_without_webapp_url_user_is_told_to_wait(settings) -> None:

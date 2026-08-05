@@ -24,8 +24,3 @@ USER_WELCOME = """Салам! Здесь живёт наша общая коло
 APP_NOT_READY = "Приложение ещё готовится — загляни чуть позже."
 
 OPEN_APP_BUTTON = "Открыть карточки"
-
-
-def your_id(telegram_id: int) -> str:
-    """Показывается не-админу: по этому номеру его добавляют в список админов."""
-    return f"\n\nТвой Telegram ID: <code>{telegram_id}</code>"

@@ -16,7 +16,9 @@ class Command(BaseCommand):
         if not settings.BOT_TOKEN:
             raise CommandError("BOT_TOKEN не задан. Создай бота у @BotFather и впиши токен в .env")
         if not settings.ADMIN_TELEGRAM_IDS:
-            self.stdout.write("ADMIN_TELEGRAM_IDS пуст: пришли боту /start, он покажет твой ID.")
+            self.stdout.write(
+                "ADMIN_TELEGRAM_IDS пуст: узнай свой ID у @userinfobot или посмотри в логе ниже."
+            )
 
         asyncio.run(self._run())
 
