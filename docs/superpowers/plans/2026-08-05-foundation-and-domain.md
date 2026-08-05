@@ -1,63 +1,61 @@
-# Mufradat Bot — план 1: фундамент и домен
+# Mufradat Bot — план 1: каркас и домен (Django)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Поднять каркас проекта с рабочей БД, схемой данных и протестированной логикой обработки арабского текста — фундамент, на который встанут бот, API и Mini App.
+**Goal:** Поднять Django-проект с рабочей БД, схемой данных, админкой, протестированной логикой обработки арабского и редактируемым файлом поведения ИИ — фундамент, на который встанут бот, API и Mini App.
 
-**Architecture:** Один Python-пакет `app/` с чётким разделением: `config.py` (настройки из `.env`), `db/` (модели и сессии), `services/` (чистая логика домена). Никакого бота и API на этом плане — только то, от чего они зависят. Логика обработки арабского живёт в `services/arabic.py` как чистые функции без БД, поэтому тестируется быстро и полностью. Всё, что требует БД, тестируется на реальном Postgres 16 в Docker с откатом транзакции после каждого теста.
+**Architecture:** Проект Django `mufradat/` (настройки, конфиг) плюс приложение `vocabulary/` (модели, админка, домен). Настройки читаются один раз через `pydantic-settings`, `settings.py` собирает из них `DATABASES` — параметры БД не дублируются между `docker-compose.yml` и приложением. Логика обработки арабского живёт в `vocabulary/services/arabic.py` как чистые функции без БД и тестируется полностью; всё, что требует БД, тестируется на реальном Postgres 16 через `pytest-django`, который сам создаёт и удаляет тестовую базу.
 
-**Tech Stack:** Python 3.12, SQLAlchemy 2.0 (async) + asyncpg, Alembic, pydantic-settings, pytest + pytest-asyncio, Postgres 16 в Docker, uv для зависимостей.
+**Tech Stack:** Python 3.12, Django 6.0, psycopg 3.3, Postgres 16 в Docker, pydantic-settings, PyYAML, Pillow, pytest + pytest-django, uv.
 
-Покрывает этапы 1–2 спеки `docs/superpowers/specs/2026-08-05-mufradat-bot-design.md`.
+Покрывает этапы 1–2 спеки `docs/superpowers/specs/2026-08-05-mufradat-bot-design.md` (ревизия 3).
 
 ## Global Constraints
 
-- Python 3.12 (`requires-python = ">=3.12,<3.13"`). Зависимости ставятся через `uv sync`.
-- Идентификаторы и комментарии в коде — на английском. Текст, который видит пользователь (сообщения бота, интерфейс) — на русском. В этом плане пользовательского текста нет, кроме данных сидера.
+- Python 3.12 (`requires-python = ">=3.12,<3.13"`). Зависимости — через `uv sync`.
+- Идентификаторы и комментарии в коде — на английском. Всё, что видит пользователь
+  (админка, данные сидера) — на русском.
 - Локальный Postgres 14 не трогаем: контейнер слушает **порт 5433**.
-- Никаких секретов в коде. `.env` в `.gitignore`, рядом `.env.example`.
-- Версии зависимостей (проверены на PyPI 2026-08-05): `sqlalchemy>=2.0.51,<2.1`, `alembic>=1.19,<2`, `asyncpg>=0.31,<0.32`, `pydantic-settings>=2.14,<3`, `pytest>=9.1,<10`, `pytest-asyncio>=1.4,<2`, `ruff>=0.16,<0.17`. Зависимости для бота, API и ИИ добавляются в своих планах, не здесь.
-- Все временные метки в БД — `TIMESTAMPTZ` (`DateTime(timezone=True)`).
+- Никаких секретов в коде. `.env` в `.gitignore`; `.env.example` — только имена и
+  комментарии, без значений.
+- Версии (проверены на PyPI 2026-08-05): `django>=6.0,<6.1`,
+  `psycopg[binary]>=3.3,<3.4`, `pydantic-settings>=2.14,<3`, `pillow>=12.3,<13`,
+  `pyyaml>=6,<7`, `pytest>=9.1,<10`, `pytest-django>=4.12,<5`, `ruff>=0.16,<0.17`.
+  DRF, aiogram, fsrs и anthropic добавляются в своих планах, не здесь.
+- Django 6: у `CheckConstraint` аргумент называется `condition`, а не `check`
+  (`check` удалён в 6.0).
+- `USE_TZ = True`, все временные метки — `TIMESTAMPTZ`.
 - Арабский в тестах и сидере — реальный, с огласовками.
-- Каждая задача заканчивается коммитом. После каждой задачи — стоп и одобрение владельца.
+- Каждая задача заканчивается коммитом, затем остановка и одобрение владельца.
 
 ---
 
-### Task 1: Каркас проекта, конфигурация и соединение с БД
+### Task 1: Каркас Django, конфигурация, БД
 
 **Files:**
-- Create: `pyproject.toml`
-- Create: `docker-compose.yml`
-- Create: `docker/init-test-db.sql`
-- Create: `.gitignore`
-- Create: `.env.example`
-- Create: `app/__init__.py`, `app/config.py`
-- Create: `app/db/__init__.py`, `app/db/base.py`, `app/db/session.py`
-- Create: `scripts/check_db.py`
-- Test: `tests/__init__.py`, `tests/test_config.py`
+- Modify: `pyproject.toml` (переписать под Django), `docker-compose.yml`, `.env`, `.env.example`, `.gitignore`
+- Delete: `docker/init-test-db.sql`, каталог `app/` (артефакты стека SQLAlchemy)
+- Create: `manage.py`, `mufradat/{__init__,settings,urls,asgi,wsgi}.py` (генерируются), `mufradat/config.py`
+- Create: `vocabulary/` (генерируется `startapp`)
+- Test: `tests/test_config.py` (переписать)
 
 **Interfaces:**
-- Consumes: ничего (первая задача).
+- Consumes: ничего.
 - Produces:
-  - `app.config.Settings` — pydantic-модель настроек с полями `database_url: str`, `test_database_url: str`, `bot_token: SecretStr | None`, `anthropic_api_key: SecretStr | None`, `ai_model: str`, `webapp_url: str | None`, `admin_telegram_ids: list[int]`.
-  - `app.config.get_settings() -> Settings` — кэширующий геттер (`lru_cache`), в тестах сбрасывается через `get_settings.cache_clear()`.
-  - `app.db.base.Base` — декларативная база SQLAlchemy, `Base.metadata` используется Alembic и тестами.
-  - `app.db.session.get_engine() -> AsyncEngine` и `app.db.session.get_sessionmaker() -> async_sessionmaker[AsyncSession]`.
+  - `mufradat.config.Settings` — поля `postgres_user: str`, `postgres_password: SecretStr`, `postgres_db: str`, `postgres_host: str`, `postgres_port: int`, `django_secret_key: SecretStr`, `django_debug: bool`, `bot_token: SecretStr | None`, `admin_telegram_ids: list[int]`, `anthropic_api_key: SecretStr | None`, `ai_model: str`, `webapp_url: str | None`; метод `is_admin(telegram_id: int) -> bool`.
+  - `mufradat.config.DEV_SECRET_KEY` — строка-заглушка для разработки.
+  - `mufradat.config.get_settings() -> Settings` — кэширующий геттер.
+  - `mufradat.settings` — модуль настроек Django (`DJANGO_SETTINGS_MODULE`).
 
-- [ ] **Step 1: Запустить Docker Desktop**
+- [ ] **Step 1: Убрать артефакты старого стека**
 
-Docker-демон сейчас не поднят. Запустить Docker Desktop и дождаться готовности:
+Каталог `app/` и init-скрипт тестовой базы относились к SQLAlchemy. `pytest-django`
+создаёт тестовую базу сам, поэтому отдельная `mufradat_test` больше не нужна.
 
-Run: `docker info --format '{{.ServerVersion}}'`
-Expected: печатает версию сервера (не пусто и не ошибка).
+Run: `rm -rf app docker/init-test-db.sql && docker compose exec db dropdb -U mufradat --if-exists mufradat_test && echo cleaned`
+Expected: `cleaned`.
 
-- [ ] **Step 2: Создать `pyproject.toml` и пустые пакеты**
-
-Пакеты создаются сразу: `uv sync` собирает `app` как editable-пакет и упадёт с
-`Unable to determine which files to ship`, если каталога ещё нет.
-
-Run: `mkdir -p app/db app/services scripts tests/db tests/services docker && touch app/__init__.py app/db/__init__.py app/services/__init__.py tests/__init__.py tests/db/__init__.py tests/services/__init__.py`
-Expected: каталоги и пустые `__init__.py` созданы.
+- [ ] **Step 2: Переписать `pyproject.toml`**
 
 ```toml
 [project]
@@ -66,17 +64,22 @@ version = "0.1.0"
 description = "Telegram Mini App for learning Arabic vocabulary with spaced repetition"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "sqlalchemy[asyncio]>=2.0.51,<2.1",
-    "alembic>=1.19,<2",
-    "asyncpg>=0.31,<0.32",
+    "django>=6.0,<6.1",
+    "psycopg[binary]>=3.3,<3.4",
     "pydantic-settings>=2.14,<3",
+    "pillow>=12.3,<13",
+    "pyyaml>=6,<7",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=9.1,<10",
-    "pytest-asyncio>=1.4,<2",
+    "pytest-django>=4.12,<5",
     "ruff>=0.16,<0.17",
+]
+# Fallback diacritizer: pulls torch (~1-2 GB), so it stays out of the default set.
+tashkeel = [
+    "arabic-diacritizer>=1.0,<2",
 ]
 
 [build-system]
@@ -84,11 +87,10 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["app"]
+packages = ["mufradat", "vocabulary"]
 
 [tool.pytest.ini_options]
-asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope = "session"
+DJANGO_SETTINGS_MODULE = "mufradat.settings"
 testpaths = ["tests"]
 
 [tool.ruff]
@@ -97,141 +99,160 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# Django migrations are generated code.
+"*/migrations/*" = ["E501"]
 ```
 
-- [ ] **Step 3: Создать `.gitignore` и `.env.example`**
+- [ ] **Step 3: Убрать монтирование init-скрипта из `docker-compose.yml`**
 
-`.gitignore`:
-
-```
-.venv/
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.ruff_cache/
-.env
-node_modules/
-dist/
-```
-
-`.env.example`:
-
-```
-# Postgres в Docker слушает 5433, чтобы не конфликтовать с локальным Postgres 14
-DATABASE_URL=postgresql+asyncpg://mufradat:mufradat@localhost:5433/mufradat
-
-# Заполняется на этапе бота: /start печатает твой Telegram ID
-BOT_TOKEN=
-ADMIN_TELEGRAM_IDS=
-
-# Заполняется на этапе импорта по фото
-ANTHROPIC_API_KEY=
-AI_MODEL=claude-sonnet-5
-
-# HTTPS-адрес Mini App (в разработке — туннель cloudflared)
-WEBAPP_URL=
-```
-
-- [ ] **Step 4: Создать `docker-compose.yml` и init-скрипт тестовой БД**
-
-`docker-compose.yml`:
+Удалить из `volumes` сервиса `db` строку:
 
 ```yaml
-services:
-  db:
-    image: postgres:16-alpine
-    container_name: mufradat-db
-    environment:
-      POSTGRES_USER: mufradat
-      POSTGRES_PASSWORD: mufradat
-      POSTGRES_DB: mufradat
-    ports:
-      - "5433:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
       - ./docker/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mufradat -d mufradat"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
-volumes:
-  pgdata:
 ```
 
-`docker/init-test-db.sql`:
+Остальное (подстановка `${POSTGRES_*}`, порт `5433`, healthcheck) не трогать.
 
-```sql
--- Separate database for the test suite; created once on first container start.
-CREATE DATABASE mufradat_test OWNER mufradat;
+Run: `docker compose config --quiet && echo "compose ok"`
+Expected: `compose ok`.
+
+- [ ] **Step 4: Обновить `.env.example` и `.env`**
+
+Из обоих файлов убрать `DATABASE_URL`: Django принимает параметры БД по частям, и
+готовый DSN ему не нужен.
+
+Добавить в `.env.example` после блока базы данных:
+
+```
+# --- Django ------------------------------------------------------------------
+# Обязателен, когда DJANGO_DEBUG=false. Сгенерировать:
+#   uv run python -c "import secrets; print(secrets.token_urlsafe(50))"
+DJANGO_SECRET_KEY=
+DJANGO_DEBUG=
 ```
 
-- [ ] **Step 5: Поднять контейнер и проверить готовность**
+В `.env` — те же две строки: `DJANGO_DEBUG=true`, `DJANGO_SECRET_KEY` оставить
+пустым (для разработки подставится значение по умолчанию).
 
-Run: `cp .env.example .env && docker compose up -d && docker compose ps`
-Expected: сервис `db` в состоянии `running (healthy)` (healthy появляется через ~5-10 секунд, при необходимости повторить `docker compose ps`).
+- [ ] **Step 5: Установить зависимости**
 
-- [ ] **Step 6: Написать падающий тест конфигурации**
+Run: `uv sync --extra dev 2>&1 | tail -6`
+Expected: среди установленного есть `django`, `psycopg`, `pytest-django`.
 
-`tests/test_config.py`:
+- [ ] **Step 6: Создать проект и приложение Django**
+
+Run: `uv run django-admin startproject mufradat . && uv run python manage.py startapp vocabulary && ls mufradat vocabulary`
+Expected: в `mufradat/` появились `settings.py`, `urls.py`, `wsgi.py`, `asgi.py`; в `vocabulary/` — `models.py`, `admin.py`, `apps.py`, `migrations/`.
+
+- [ ] **Step 7: Написать падающие тесты конфигурации**
+
+Заменить содержимое `tests/test_config.py`:
 
 ```python
-from app.config import Settings
+import pytest
+from pydantic import ValidationError
 
-DSN = "postgresql+asyncpg://u:p@localhost:5433/mufradat"
+from mufradat.config import DEV_SECRET_KEY, Settings
+
+ENV_VARS = (
+    "POSTGRES_USER",
+    "POSTGRES_PASSWORD",
+    "POSTGRES_DB",
+    "POSTGRES_HOST",
+    "POSTGRES_PORT",
+    "DJANGO_SECRET_KEY",
+    "DJANGO_DEBUG",
+    "BOT_TOKEN",
+    "ADMIN_TELEGRAM_IDS",
+    "ANTHROPIC_API_KEY",
+    "AI_MODEL",
+    "WEBAPP_URL",
+)
+
+
+@pytest.fixture(autouse=True)
+def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep these tests independent of whatever the developer exported."""
+    for name in ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+
+
+def test_database_defaults() -> None:
+    settings = Settings(_env_file=None)
+
+    assert settings.postgres_user == "mufradat"
+    assert settings.postgres_db == "mufradat"
+    assert settings.postgres_host == "localhost"
+    assert settings.postgres_port == 5433
+
+
+def test_blank_env_value_falls_back_to_default() -> None:
+    # A .env copied from .env.example holds VAR= everywhere; an empty string must
+    # not overwrite the declared default.
+    settings = Settings(postgres_user="", postgres_host="   ", ai_model="", _env_file=None)
+
+    assert settings.postgres_user == "mufradat"
+    assert settings.postgres_host == "localhost"
+    assert settings.ai_model == "claude-sonnet-5"
 
 
 def test_admin_ids_parsed_from_comma_separated_string() -> None:
-    settings = Settings(database_url=DSN, admin_telegram_ids="111,222", _env_file=None)
+    settings = Settings(admin_telegram_ids="111,222", _env_file=None)
 
     assert settings.admin_telegram_ids == [111, 222]
 
 
 def test_admin_ids_tolerate_spaces_and_trailing_comma() -> None:
-    settings = Settings(database_url=DSN, admin_telegram_ids=" 111 , 222 , ", _env_file=None)
+    settings = Settings(admin_telegram_ids=" 111 , 222 , ", _env_file=None)
 
     assert settings.admin_telegram_ids == [111, 222]
 
 
-def test_admin_ids_empty_string_gives_empty_list() -> None:
-    settings = Settings(database_url=DSN, admin_telegram_ids="", _env_file=None)
-
-    assert settings.admin_telegram_ids == []
+def test_admin_ids_absent_gives_empty_list() -> None:
+    assert Settings(_env_file=None).admin_telegram_ids == []
 
 
-def test_test_database_url_derived_from_database_url() -> None:
-    settings = Settings(database_url=DSN, _env_file=None)
+def test_is_admin() -> None:
+    settings = Settings(admin_telegram_ids="111", _env_file=None)
 
-    assert settings.test_database_url == DSN + "_test"
-
-
-def test_explicit_test_database_url_wins() -> None:
-    settings = Settings(database_url=DSN, test_database_url="postgresql+asyncpg://x/y", _env_file=None)
-
-    assert settings.test_database_url == "postgresql+asyncpg://x/y"
+    assert settings.is_admin(111) is True
+    assert settings.is_admin(222) is False
 
 
-def test_ai_model_has_default() -> None:
-    settings = Settings(database_url=DSN, _env_file=None)
+def test_dev_secret_key_is_allowed_while_debugging() -> None:
+    settings = Settings(django_debug=True, _env_file=None)
 
-    assert settings.ai_model == "claude-sonnet-5"
+    assert settings.django_secret_key.get_secret_value() == DEV_SECRET_KEY
 
 
-def test_secrets_are_not_exposed_in_repr() -> None:
-    settings = Settings(database_url=DSN, bot_token="123:secret", _env_file=None)
+def test_dev_secret_key_is_rejected_with_debug_off() -> None:
+    # Shipping the placeholder key to a real deployment must fail loudly.
+    with pytest.raises(ValidationError, match="DJANGO_SECRET_KEY"):
+        Settings(django_debug=False, _env_file=None)
+
+
+def test_explicit_secret_key_with_debug_off_is_fine() -> None:
+    settings = Settings(django_debug=False, django_secret_key="real-key", _env_file=None)
+
+    assert settings.django_secret_key.get_secret_value() == "real-key"
+
+
+def test_secrets_are_hidden_in_repr() -> None:
+    settings = Settings(bot_token="123:secret", postgres_password="pw-secret", _env_file=None)
 
     assert "secret" not in repr(settings)
     assert settings.bot_token is not None
     assert settings.bot_token.get_secret_value() == "123:secret"
 ```
 
-- [ ] **Step 7: Установить зависимости и убедиться, что тест падает**
+- [ ] **Step 8: Убедиться, что тесты падают**
 
-Run: `uv sync --extra dev && uv run pytest tests/test_config.py -v`
-Expected: FAIL с `ModuleNotFoundError: No module named 'app.config'` (или `ImportError`).
+Run: `uv run pytest tests/test_config.py -q 2>&1 | tail -5`
+Expected: FAIL — `ModuleNotFoundError: No module named 'mufradat.config'`.
 
-- [ ] **Step 8: Реализовать `app/config.py`**
+- [ ] **Step 9: Реализовать `mufradat/config.py`**
 
 ```python
 from functools import lru_cache
@@ -239,9 +260,12 @@ from functools import lru_cache
 from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Placeholder for local development only; rejected when DEBUG is off.
+DEV_SECRET_KEY = "dev-insecure-do-not-use-in-production"
+
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables and .env."""
+    """Settings loaded from environment variables and .env, shared by web and bot."""
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -249,9 +273,16 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    database_url: str
-    # Defaults to database_url + "_test" (see _derive_test_database_url).
-    test_database_url: str = ""
+    # Read by docker-compose.yml as well, so credentials live in exactly one place.
+    postgres_user: str = "mufradat"
+    postgres_password: SecretStr = SecretStr("mufradat")
+    postgres_db: str = "mufradat"
+    postgres_host: str = "localhost"
+    # Not 5432: a local Postgres install must keep working untouched.
+    postgres_port: int = 5433
+
+    django_secret_key: SecretStr = SecretStr(DEV_SECRET_KEY)
+    django_debug: bool = True
 
     bot_token: SecretStr | None = None
     admin_telegram_ids: list[int] = []
@@ -261,18 +292,34 @@ class Settings(BaseSettings):
 
     webapp_url: str | None = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def _ignore_blank_values(cls, data: object) -> object:
+        """Treat `VAR=` as absent so the declared default still applies.
+
+        A .env copied from .env.example holds an empty value for every key; without
+        this, each empty string would overwrite its default.
+        """
+        if isinstance(data, dict):
+            return {
+                key: value
+                for key, value in data.items()
+                if not (isinstance(value, str) and not value.strip())
+            }
+        return data
+
     @field_validator("admin_telegram_ids", mode="before")
     @classmethod
     def _parse_admin_ids(cls, value: object) -> object:
-        """Accept a comma-separated string, since .env cannot hold a JSON list comfortably."""
+        """Accept a comma-separated string, since .env cannot hold a JSON list."""
         if isinstance(value, str):
             return [int(part) for part in value.split(",") if part.strip()]
         return value
 
     @model_validator(mode="after")
-    def _derive_test_database_url(self) -> "Settings":
-        if not self.test_database_url:
-            self.test_database_url = f"{self.database_url}_test"
+    def _reject_dev_secret_key_outside_debug(self) -> "Settings":
+        if not self.django_debug and self.django_secret_key.get_secret_value() == DEV_SECRET_KEY:
+            raise ValueError("DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is off")
         return self
 
     def is_admin(self, telegram_id: int) -> bool:
@@ -282,117 +329,119 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()  # type: ignore[call-arg]  # values come from env / .env
+    return Settings()
 ```
 
-- [ ] **Step 9: Убедиться, что тесты конфигурации проходят**
+- [ ] **Step 10: Убедиться, что тесты проходят**
 
-Run: `uv run pytest tests/test_config.py -v`
-Expected: PASS, 7 тестов.
+Run: `uv run pytest tests/test_config.py -q 2>&1 | tail -3`
+Expected: 10 passed.
 
-- [ ] **Step 10: Создать базу SQLAlchemy и фабрику сессий**
+- [ ] **Step 11: Подключить настройки к Django**
 
-`app/db/base.py`:
+Правки в `mufradat/settings.py` точечные — сгенерированный файл не переписывать.
+
+**11.1.** После существующих импортов добавить:
 
 ```python
-from sqlalchemy.orm import DeclarativeBase
+from mufradat.config import get_settings
 
-
-class Base(DeclarativeBase):
-    """Declarative base. Base.metadata is the single source of truth for Alembic."""
+config = get_settings()
 ```
 
-`app/db/session.py`:
+**11.2.** Заменить строки `SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`:
 
 ```python
-from functools import lru_cache
-
-from sqlalchemy.ext.asyncio import (
-    AsyncEngine,
-    AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
-)
-
-from app.config import get_settings
-
-
-@lru_cache
-def get_engine() -> AsyncEngine:
-    return create_async_engine(get_settings().database_url, pool_pre_ping=True)
-
-
-@lru_cache
-def get_sessionmaker() -> async_sessionmaker[AsyncSession]:
-    return async_sessionmaker(get_engine(), expire_on_commit=False)
+SECRET_KEY = config.django_secret_key.get_secret_value()
+DEBUG = config.django_debug
+ALLOWED_HOSTS: list[str] = ["localhost", "127.0.0.1"]
 ```
 
-- [ ] **Step 11: Написать скрипт проверки соединения**
-
-`scripts/check_db.py`:
+**11.3.** В `INSTALLED_APPS` добавить последним элементом:
 
 ```python
-"""Smoke check: connect to the database and print its version."""
-
-import asyncio
-
-from sqlalchemy import text
-
-from app.db.session import get_engine
-
-
-async def main() -> None:
-    engine = get_engine()
-    async with engine.connect() as connection:
-        version = (await connection.execute(text("select version()"))).scalar_one()
-    print(version)
-    await engine.dispose()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    "vocabulary",
 ```
 
-- [ ] **Step 12: Проверить соединение с обеими базами**
+**11.4.** Заменить блок `DATABASES` целиком:
 
-Run: `uv run python scripts/check_db.py`
-Expected: печатает строку вида `PostgreSQL 16.x ...`.
+```python
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": config.postgres_db,
+        "USER": config.postgres_user,
+        "PASSWORD": config.postgres_password.get_secret_value(),
+        "HOST": config.postgres_host,
+        "PORT": str(config.postgres_port),
+    }
+}
+```
 
-Run: `docker compose exec db psql -U mufradat -lqt | cut -d'|' -f1 | grep -E 'mufradat(_test)?'`
-Expected: в списке есть и `mufradat`, и `mufradat_test`.
+**11.5.** Заменить локаль и часовой пояс:
 
-- [ ] **Step 13: Проверить линтер и закоммитить**
+```python
+LANGUAGE_CODE = "ru-ru"
+TIME_ZONE = "UTC"
+USE_I18N = True
+USE_TZ = True
+```
 
-Run: `uv run ruff check . && uv run ruff format --check .`
-Expected: без ошибок (при необходимости выполнить `uv run ruff format .`).
+**11.6.** В конец файла добавить настройки медиа:
+
+```python
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+```
+
+- [ ] **Step 12: Проверить, что Django поднимается и миграции применяются**
+
+Run: `uv run python manage.py check`
+Expected: `System check identified no issues (0 silenced).`
+
+Run: `uv run python manage.py migrate 2>&1 | tail -6`
+Expected: применяются миграции `contenttypes`, `auth`, `admin`, `sessions` без ошибок.
+
+Run: `docker compose exec db psql -U mufradat -d mufradat -c '\dt' | head -12`
+Expected: в списке есть `auth_user`, `django_migrations`, `django_content_type`.
+
+- [ ] **Step 13: Добавить `media/` в `.gitignore`, проверить линтер, закоммитить**
+
+Дописать в `.gitignore` строку `media/`.
+
+Run: `uv run ruff format . && uv run ruff check .`
+Expected: линтер без ошибок.
 
 ```bash
-git add pyproject.toml uv.lock docker-compose.yml docker/ .gitignore .env.example app/ scripts/ tests/
-git commit -m "feat: project skeleton with settings, async DB session and Postgres 16 container"
+git add -A
+git commit -m "feat: Django project skeleton with settings sourced from one config"
 ```
 
-**Проверка задачи для владельца:** `docker compose ps` показывает healthy, `uv run python scripts/check_db.py` печатает версию Postgres 16, `uv run pytest` — зелёный.
+**Проверка задачи для владельца:** `manage.py check` без замечаний, `manage.py migrate` прошёл, `uv run pytest` зелёный (10 тестов).
 
 ---
 
 ### Task 2: Нормализация арабского текста
 
-Основа дедупликации: одно и то же слово, распознанное с разной расстановкой харакат, должно приводиться к одной форме.
+Основа поиска похожих записей: одно и то же слово, распознанное с разной
+расстановкой харакат, должно приводиться к одной форме.
 
 **Files:**
-- Create: `app/services/arabic.py`
-- Test: `tests/services/test_arabic.py`
+- Create: `vocabulary/services/__init__.py`, `vocabulary/services/arabic.py`
+- Test: `tests/services/__init__.py`, `tests/services/test_arabic.py`
 
 **Interfaces:**
 - Consumes: ничего (чистая логика, без БД и настроек).
-- Produces: `app.services.arabic.normalize_arabic(text: str) -> str`.
+- Produces: `vocabulary.services.arabic.normalize_arabic(text: str) -> str`.
 
 - [ ] **Step 1: Написать падающие тесты**
+
+Создать `vocabulary/services/__init__.py` и `tests/services/__init__.py` пустыми.
 
 `tests/services/test_arabic.py`:
 
 ```python
-from app.services.arabic import normalize_arabic
+from vocabulary.services.arabic import normalize_arabic
 
 
 def test_strips_diacritics() -> None:
@@ -442,16 +491,27 @@ def test_empty_string() -> None:
 
 def test_non_arabic_passes_through() -> None:
     assert normalize_arabic("hello") == "hello"
+
+
+def test_gender_pairs_collapse_and_that_is_expected() -> None:
+    """Documents the blind spot the data model works around (spec 4.1).
+
+    Masculine and feminine address differ only by the final harakat, which
+    normalization strips. Uniqueness is therefore enforced on the exact `arabic`,
+    and the pair is distinguished structurally by Entry.person.
+    """
+    assert normalize_arabic("مَا اسْمُكَ؟") == normalize_arabic("مَا اسْمُكِ؟")
+    assert normalize_arabic("كَتَبْتَ") == normalize_arabic("كَتَبْتِ")
 ```
 
 - [ ] **Step 2: Убедиться, что тесты падают**
 
-Run: `uv run pytest tests/services/test_arabic.py -v`
-Expected: FAIL с `ModuleNotFoundError: No module named 'app.services'`.
+Run: `uv run pytest tests/services/test_arabic.py -q 2>&1 | tail -5`
+Expected: FAIL — `ModuleNotFoundError: No module named 'vocabulary.services.arabic'`.
 
 - [ ] **Step 3: Реализовать нормализацию**
 
-`app/services/arabic.py`:
+`vocabulary/services/arabic.py`:
 
 ```python
 """Pure text helpers for Arabic. No database, no settings — trivially testable."""
@@ -460,29 +520,33 @@ import re
 import unicodedata
 
 # Harakat, tanwin, shadda, sukun, superscript alef and Quranic marks.
-_DIACRITICS = re.compile(r"[\u064B-\u065F\u0670\u06D6-\u06ED]")
+_DIACRITICS = re.compile(r"[ً-ٰٟۖ-ۭ]")
 
-_TATWEEL = "\u0640"  # tatweel, a purely decorative letter-stretching mark
+_TATWEEL = "ـ"  # decorative letter-stretching mark, carries no meaning
 
 # Alef variants collapse to bare alef; alef maqsura collapses to ya.
-# ta marbuta (ة) is deliberately NOT merged into ha (ه): it changes meaning.
+# Ta marbuta is deliberately NOT merged into ha: it changes meaning.
 _LETTER_FOLDING = str.maketrans(
     {
-        "\u0623": "\u0627",  # alef with hamza above -> alef
-        "\u0625": "\u0627",  # alef with hamza below -> alef
-        "\u0622": "\u0627",  # alef with madda above -> alef
-        "\u0671": "\u0627",  # alef wasla -> alef
-        "\u0649": "\u064A",  # alef maqsura -> ya
+        "أ": "ا",  # alef with hamza above -> alef
+        "إ": "ا",  # alef with hamza below -> alef
+        "آ": "ا",  # alef with madda above -> alef
+        "ٱ": "ا",  # alef wasla -> alef
+        "ى": "ي",  # alef maqsura -> ya
     }
 )
 
 
 def normalize_arabic(text: str) -> str:
-    """Reduce an Arabic string to a comparison key.
+    """Reduce an Arabic string to a lookup key for finding near-duplicates.
 
     Diacritics are how the textbook teaches pronunciation, so they are stored as
-    recognised — but they must not participate in duplicate detection: the vision
-    model may return the same word with slightly different harakat.
+    recognised — but they must not participate in the lookup: the vision model may
+    return the same word with slightly different harakat.
+
+    Note the deliberate blind spot: masculine and feminine forms that differ only by
+    the final harakat map to the same key. See spec 4.1 — uniqueness is enforced on
+    the exact `arabic`, not on this key.
     """
     text = unicodedata.normalize("NFC", text)
     text = _DIACRITICS.sub("", text)
@@ -493,40 +557,38 @@ def normalize_arabic(text: str) -> str:
 
 - [ ] **Step 4: Убедиться, что тесты проходят**
 
-Run: `uv run pytest tests/services/test_arabic.py -v`
-Expected: PASS, 12 тестов.
+Run: `uv run pytest tests/services/test_arabic.py -q 2>&1 | tail -3`
+Expected: 13 passed.
 
 - [ ] **Step 5: Закоммитить**
 
 ```bash
-git add app/services/ tests/services/
-git commit -m "feat: normalize Arabic text for duplicate detection"
+git add vocabulary/services tests/services
+git commit -m "feat: normalize Arabic text for near-duplicate lookup"
 ```
 
-**Проверка задачи для владельца:** `uv run pytest tests/services/test_arabic.py -v` — зелёный, все 12 кейсов.
+**Проверка задачи для владельца:** 13 тестов зелёные, включая тот, что фиксирует слепоту нормализации к роду.
 
 ---
 
 ### Task 3: Сопоставление слов предложения со словарём
 
-Нужно, чтобы связать `sentences` с `words` через `sentence_words`. Наивное сравнение не работает: в тексте слово идёт с артиклем `ال` и слитными предлогами/союзами (`و`, `ف`, `ب`, `ل`, `ك`), поэтому `الْكِتَابُ` не совпадёт с `كِتَاب`.
-
 **Files:**
-- Modify: `app/services/arabic.py` (дописать в конец файла)
-- Modify: `tests/services/test_arabic.py` (дописать в конец файла)
+- Modify: `vocabulary/services/arabic.py` (дописать в конец)
+- Modify: `tests/services/test_arabic.py` (дописать в конец)
 
 **Interfaces:**
-- Consumes: `app.services.arabic.normalize_arabic`.
-- Produces: `app.services.arabic.match_words_in_sentence(sentence: str, known: dict[str, int]) -> set[int]`, где `known` — отображение `arabic_norm -> word_id`.
+- Consumes: `normalize_arabic`.
+- Produces: `vocabulary.services.arabic.match_entries_in_sentence(sentence: str, known: dict[str, int]) -> set[int]`, где `known` — отображение `arabic_norm -> entry_id`.
 
 - [ ] **Step 1: Написать падающие тесты**
 
 Дописать в конец `tests/services/test_arabic.py`:
 
 ```python
-from app.services.arabic import match_words_in_sentence
+from vocabulary.services.arabic import match_entries_in_sentence
 
-# arabic_norm -> word_id
+# arabic_norm -> entry id
 KNOWN = {
     "كتاب": 1,
     "بيت": 2,
@@ -538,66 +600,65 @@ KNOWN = {
 
 
 def test_matches_bare_word() -> None:
-    assert match_words_in_sentence("هَذَا بَيْتٌ", KNOWN) == {2}
+    assert match_entries_in_sentence("هَذَا بَيْتٌ", KNOWN) == {2}
 
 
 def test_matches_word_with_definite_article() -> None:
-    assert match_words_in_sentence("الْكِتَابُ هُنَا", KNOWN) == {1}
+    assert match_entries_in_sentence("الْكِتَابُ هُنَا", KNOWN) == {1}
 
 
 def test_matches_word_with_conjunction_and_article() -> None:
-    assert match_words_in_sentence("وَالْقَمَرُ", KNOWN) == {3}
+    assert match_entries_in_sentence("وَالْقَمَرُ", KNOWN) == {3}
 
 
 def test_matches_several_words_in_one_sentence() -> None:
-    assert match_words_in_sentence("الْمُدَرِّسُ فِي الْمَدْرَسَةِ", KNOWN) == {4, 5}
+    assert match_entries_in_sentence("الْمُدَرِّسُ فِي الْمَدْرَسَةِ", KNOWN) == {4, 5}
 
 
 def test_full_form_wins_over_stripped_prefix() -> None:
     # بيت must match as a whole; it must not be read as ب + يت.
-    assert match_words_in_sentence("بَيْت", KNOWN) == {2}
+    assert match_entries_in_sentence("بَيْت", KNOWN) == {2}
 
 
 def test_unknown_words_are_ignored() -> None:
-    assert match_words_in_sentence("هَذَا شَيْءٌ غَرِيبٌ", KNOWN) == set()
+    assert match_entries_in_sentence("هَذَا شَيْءٌ غَرِيبٌ", KNOWN) == set()
 
 
 def test_punctuation_does_not_break_matching() -> None:
-    assert match_words_in_sentence("هَذَا بَيْتٌ كَبِيرٌ.", KNOWN) == {2, 6}
+    assert match_entries_in_sentence("هَذَا بَيْتٌ كَبِيرٌ.", KNOWN) == {2, 6}
 
 
 def test_empty_sentence() -> None:
-    assert match_words_in_sentence("", KNOWN) == set()
+    assert match_entries_in_sentence("", KNOWN) == set()
 
 
 def test_empty_dictionary() -> None:
-    assert match_words_in_sentence("الْكِتَابُ", {}) == set()
+    assert match_entries_in_sentence("الْكِتَابُ", {}) == set()
 ```
 
 - [ ] **Step 2: Убедиться, что тесты падают**
 
-Run: `uv run pytest tests/services/test_arabic.py -v`
-Expected: FAIL с `ImportError: cannot import name 'match_words_in_sentence'`.
+Run: `uv run pytest tests/services/test_arabic.py -q 2>&1 | tail -5`
+Expected: FAIL — `ImportError: cannot import name 'match_entries_in_sentence'`.
 
 - [ ] **Step 3: Реализовать сопоставление**
 
-Дописать в конец `app/services/arabic.py`:
+Дописать в конец `vocabulary/services/arabic.py`:
 
 ```python
-_ARABIC_LETTERS = re.compile(r"[\u0621-\u064A]+")
+_ARABIC_LETTERS = re.compile(r"[ء-ي]+")
 
-_DEFINITE_ARTICLE = "\u0627\u0644"  # al-
+_DEFINITE_ARTICLE = "ال"  # al-
 
 # Single-letter proclitics that attach to the following word: wa, fa, bi, li, ka.
-_PROCLITICS = ("\u0648", "\u0641", "\u0628", "\u0644", "\u0643")  # wa, fa, bi, li, ka
+_PROCLITICS = ("و", "ف", "ب", "ل", "ك")
 
 
 def _candidate_forms(token: str) -> list[str]:
     """Forms to try for one normalized token, most specific first.
 
-    The full form is tried first on purpose: stripping a leading letter from a
-    word that simply starts with it (بيت -> يت) must never win over an exact
-    dictionary hit.
+    The full form comes first on purpose: stripping a leading letter from a word
+    that simply starts with it must never win over an exact dictionary hit.
     """
     forms = [token]
 
@@ -614,10 +675,12 @@ def _candidate_forms(token: str) -> list[str]:
     return forms
 
 
-def match_words_in_sentence(sentence: str, known: dict[str, int]) -> set[int]:
-    """Find which dictionary words a sentence uses.
+def match_entries_in_sentence(sentence: str, known: dict[str, int]) -> set[int]:
+    """Find which dictionary entries a sentence uses.
 
-    `known` maps a word's normalized form (Word.arabic_norm) to its id.
+    `known` maps an entry's normalized form (Entry.arabic_norm) to its id. Needed
+    because in running text a word carries the definite article and clitic
+    prepositions, so a plain comparison would miss it.
     """
     if not known:
         return set()
@@ -625,647 +688,1185 @@ def match_words_in_sentence(sentence: str, known: dict[str, int]) -> set[int]:
     matched: set[int] = set()
     for token in _ARABIC_LETTERS.findall(normalize_arabic(sentence)):
         for form in _candidate_forms(token):
-            word_id = known.get(form)
-            if word_id is not None:
-                matched.add(word_id)
+            entry_id = known.get(form)
+            if entry_id is not None:
+                matched.add(entry_id)
                 break
 
     return matched
 ```
 
-- [ ] **Step 4: Убедиться, что все тесты файла проходят**
+- [ ] **Step 4: Прогнать тесты файла**
 
-Run: `uv run pytest tests/services/test_arabic.py -v`
-Expected: PASS, 21 тест (12 из задачи 2 + 9 новых).
+Run: `uv run pytest tests/services/test_arabic.py -q 2>&1 | tail -3`
+Expected: 22 passed (13 из задачи 2 + 9 новых).
 
 - [ ] **Step 5: Закоммитить**
 
 ```bash
-git add app/services/arabic.py tests/services/test_arabic.py
-git commit -m "feat: match sentence tokens to dictionary words through proclitics"
+git add vocabulary/services/arabic.py tests/services/test_arabic.py
+git commit -m "feat: match sentence tokens to dictionary entries through proclitics"
 ```
 
-**Проверка задачи для владельца:** `uv run pytest tests/services/test_arabic.py -v` — 21 тест зелёный; `وَالْقَمَرُ` находит слово `قمر`, а `بَيْت` не разваливается на `ب` + `يت`.
+**Проверка задачи для владельца:** 22 теста зелёные; `وَالْقَمَرُ` находит `قمر`, а `بَيْت` не разваливается на `ب` + `يت`.
 
 ---
 
 ### Task 4: Модели данных и первая миграция
 
 **Files:**
-- Create: `app/db/enums.py`, `app/db/models.py`
-- Create: `alembic.ini`, `alembic/env.py`, `alembic/script.py.mako`, `alembic/versions/` (генерируются `alembic init`)
-- Modify: `alembic/env.py` (подключить настройки и `Base.metadata`)
-- Test: `tests/conftest.py`, `tests/db/test_models.py`
+- Create: `vocabulary/enums.py`
+- Modify: `vocabulary/models.py`
+- Create: `vocabulary/migrations/0001_initial.py` (генерируется)
+- Test: `tests/db/__init__.py`, `tests/db/test_models.py`
 
 **Interfaces:**
-- Consumes: `app.db.base.Base`, `app.config.get_settings`, `app.services.arabic.normalize_arabic`.
+- Consumes: `normalize_arabic`.
 - Produces:
-  - `app.db.enums.Direction` (`AR_RU = "ar_ru"`, `RU_AR = "ru_ar"`), `app.db.enums.ContentSource` (`TEXTBOOK = "textbook"`, `AI_GENERATED = "ai_generated"`).
-  - `app.db.models.User`, `Word`, `Sentence`, `SentenceWord`, `UserProgress`, `ReviewLog`.
-  - Фикстура `session` в `tests/conftest.py` — `AsyncSession` на тестовой БД с откатом транзакции после теста.
+  - `vocabulary.enums`: `Kind` (`WORD`/`PHRASE`/`FORM`), `Pos` (`NOUN`/`VERB`), `Person` (`ANA`/`HUWA`/`HIYA`/`ANTA`/`ANTI`/`NAHNU`), `Tense` (`PAST`/`PRESENT`), `Direction` (`AR_RU`/`RU_AR`), `Source` (`TEXTBOOK`/`MANUAL`/`AI_GENERATED`).
+  - `vocabulary.models`: `Entry` (свойства `display_image`, `display_attribution`, related_name `forms`), `TelegramUser`, `Sentence`, `SentenceEntry`, `UserProgress`, `ReviewLog`.
 
 - [ ] **Step 1: Создать перечисления**
 
-`app/db/enums.py`:
+`vocabulary/enums.py`:
 
 ```python
-from enum import StrEnum
+from django.db import models
 
 
-class Direction(StrEnum):
-    """A word yields two independent SRS cards."""
+class Kind(models.TextChoices):
+    WORD = "word", "слово"
+    PHRASE = "phrase", "фраза"
+    FORM = "form", "форма"
 
-    AR_RU = "ar_ru"
-    RU_AR = "ru_ar"
+
+class Pos(models.TextChoices):
+    """Part of speech. Only needed to decide which forms make sense."""
+
+    NOUN = "noun", "существительное"
+    VERB = "verb", "глагол"
 
 
-class ContentSource(StrEnum):
-    TEXTBOOK = "textbook"
-    AI_GENERATED = "ai_generated"
+class Person(models.TextChoices):
+    ANA = "ana", "أنا (я)"
+    HUWA = "huwa", "هو (он)"
+    HIYA = "hiya", "هي (она)"
+    ANTA = "anta", "أنتَ (ты, м)"
+    ANTI = "anti", "أنتِ (ты, ж)"
+    NAHNU = "nahnu", "نحن (мы)"
+
+
+class Tense(models.TextChoices):
+    PAST = "past", "прошедшее"
+    PRESENT = "present", "настоящее"
+
+
+class Direction(models.TextChoices):
+    """Every entry yields two independent SRS cards."""
+
+    AR_RU = "ar_ru", "арабское → русский"
+    RU_AR = "ru_ar", "русское → арабский"
+
+
+class Source(models.TextChoices):
+    TEXTBOOK = "textbook", "учебник"
+    MANUAL = "manual", "вручную"
+    AI_GENERATED = "ai_generated", "сгенерировано ИИ"
 ```
 
-- [ ] **Step 2: Создать модели**
+- [ ] **Step 2: Написать модели**
 
-`app/db/models.py`:
+Заменить содержимое `vocabulary/models.py`:
 
 ```python
-from datetime import datetime
-from enum import StrEnum
+from django.db import models
+from django.db.models import Q
 
-from sqlalchemy import (
-    BigInteger,
-    DateTime,
-)
-from sqlalchemy import Enum as SAEnum
-from sqlalchemy import (
-    ForeignKey,
-    Index,
-    SmallInteger,
-    Text,
-    UniqueConstraint,
-    func,
-)
-from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from app.db.base import Base
-from app.db.enums import ContentSource, Direction
+from vocabulary.enums import Direction, Kind, Person, Pos, Source, Tense
+from vocabulary.services.arabic import normalize_arabic
 
 
-def _enum_column(enum_cls: type[StrEnum], length: int) -> SAEnum:
-    """VARCHAR column holding an enum's *value*.
+class TelegramUser(models.Model):
+    """A learner. Separate from Django's auth user: no password, Telegram id as pk."""
 
-    Two non-obvious settings. Without values_callable SQLAlchemy stores the member
-    NAME ("TEXTBOOK") instead of the value ("textbook") the spec fixes. With
-    native_enum=True it would create a Postgres ENUM type, which turns every future
-    value into a migration; a plain VARCHAR keeps that cheap.
+    telegram_id = models.BigIntegerField(primary_key=True)
+    username = models.TextField(blank=True, default="")
+    first_name = models.TextField(blank=True, default="")
+    new_per_day = models.PositiveIntegerField(default=5, help_text="Лимит новых карточек в день")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "ученик"
+        verbose_name_plural = "ученики"
+
+    def __str__(self) -> str:
+        return self.username or str(self.telegram_id)
+
+
+class Entry(models.Model):
+    """A study unit: a word, a phrase or an inflected form. All three share a shape."""
+
+    kind = models.CharField(max_length=8, choices=Kind)
+    arabic = models.TextField(help_text="С огласовками, как распознано")
+    # Lookup key for near-duplicates; filled in save(), see spec 4.2.
+    arabic_norm = models.TextField(editable=False, db_index=True)
+    translation_ru = models.TextField()
+    # Service field: the Openverse image query. Never shown in the interface.
+    translation_en = models.TextField(blank=True, default="")
+    transliteration = models.TextField(blank=True, default="")
+
+    pos = models.CharField(max_length=8, choices=Pos, blank=True, default="")
+    base = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.CASCADE, related_name="forms"
+    )
+    person = models.CharField(max_length=8, choices=Person, blank=True, default="")
+    tense = models.CharField(max_length=8, choices=Tense, blank=True, default="")
+
+    topic = models.TextField(blank=True, default="", db_index=True)
+    source = models.CharField(max_length=16, choices=Source)
+
+    image = models.ImageField(upload_to="entries/", blank=True, null=True)
+    image_attribution = models.TextField(blank=True, default="")
+    image_source_url = models.TextField(blank=True, default="")
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = "единица"
+        verbose_name_plural = "единицы"
+        constraints = [
+            # Exact arabic, NOT arabic_norm: a gender pair differs only by the final
+            # harakat, and a norm-based constraint would forbid the feminine form.
+            models.UniqueConstraint(
+                fields=["arabic", "translation_ru"], name="uq_entry_arabic_translation"
+            ),
+            # One form per person and tense. person/tense are CharFields holding ""
+            # rather than NULL, so a possessive form (empty tense) still compares
+            # equal to another one and the constraint bites.
+            models.UniqueConstraint(
+                fields=["base", "person", "tense"],
+                condition=Q(kind=Kind.FORM),
+                name="uq_form_base_person_tense",
+            ),
+            models.CheckConstraint(
+                condition=~Q(kind=Kind.FORM) | (Q(base__isnull=False) & ~Q(person="")),
+                name="form_requires_base_and_person",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.arabic} — {self.translation_ru}"
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        # Kept here so no caller can forget it. bulk_create() bypasses save() —
+        # set arabic_norm explicitly there.
+        self.arabic_norm = normalize_arabic(self.arabic)
+        super().save(*args, **kwargs)
+
+    @property
+    def display_image(self) -> models.fields.files.ImageFieldFile | None:
+        """A form shows its base's picture: "его машина" reuses the car photo."""
+        if self.image:
+            return self.image
+        if self.base_id and self.base.image:
+            return self.base.image
+        return None
+
+    @property
+    def display_attribution(self) -> str:
+        if self.image:
+            return self.image_attribution
+        return self.base.image_attribution if self.base_id else ""
+
+
+class Sentence(models.Model):
+    """Usage example. Never becomes a card — phrases are Entry rows instead."""
+
+    arabic = models.TextField()
+    translation_ru = models.TextField()
+    source = models.CharField(max_length=16, choices=Source)
+    created_at = models.DateTimeField(auto_now_add=True)
+    entries = models.ManyToManyField(Entry, through="SentenceEntry", related_name="sentences")
+
+    class Meta:
+        verbose_name = "пример"
+        verbose_name_plural = "примеры"
+
+    def __str__(self) -> str:
+        return self.arabic
+
+
+class SentenceEntry(models.Model):
+    sentence = models.ForeignKey(Sentence, on_delete=models.CASCADE)
+    entry = models.ForeignKey(Entry, on_delete=models.CASCADE)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["sentence", "entry"], name="uq_sentence_entry")
+        ]
+
+
+class UserProgress(models.Model):
+    """One row per (learner, entry, direction). FSRS runs server-side."""
+
+    telegram_user = models.ForeignKey(
+        TelegramUser, on_delete=models.CASCADE, related_name="progress"
+    )
+    entry = models.ForeignKey(Entry, on_delete=models.CASCADE, related_name="progress")
+    direction = models.CharField(max_length=8, choices=Direction)
+    due = models.DateTimeField()
+    fsrs_state = models.JSONField()
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["telegram_user", "entry", "direction"], name="uq_progress_user_entry_dir"
+            )
+        ]
+        indexes = [models.Index(fields=["telegram_user", "due"], name="ix_progress_user_due")]
+
+
+class ReviewLog(models.Model):
+    """Rating history, kept to fit FSRS parameters for this group later.
+
+    telegram_id has no FK on purpose: history outlives a deleted learner.
     """
-    return SAEnum(
-        enum_cls,
-        native_enum=False,
-        length=length,
-        create_constraint=False,
-        values_callable=lambda members: [member.value for member in members],
-    )
 
-
-class User(Base):
-    __tablename__ = "users"
-
-    telegram_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    username: Mapped[str | None] = mapped_column(Text)
-    first_name: Mapped[str | None] = mapped_column(Text)
-    # Daily cap on new cards, per user.
-    new_per_day: Mapped[int] = mapped_column(default=5)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
-
-
-class Word(Base):
-    __tablename__ = "words"
-    __table_args__ = (
-        UniqueConstraint("arabic_norm", "translation_ru", name="uq_words_norm_translation"),
-        Index("ix_words_arabic_norm", "arabic_norm"),
-        Index("ix_words_created_at", "created_at"),
-    )
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    # Stored exactly as recognised, WITH diacritics.
-    arabic: Mapped[str] = mapped_column(Text)
-    # Comparison key, see services.arabic.normalize_arabic.
-    arabic_norm: Mapped[str] = mapped_column(Text)
-    translation_ru: Mapped[str] = mapped_column(Text)
-    transliteration: Mapped[str | None] = mapped_column(Text)
-    # Free-form label, replaces the lesson entity: "еда", "глаголы движения".
-    topic: Mapped[str | None] = mapped_column(Text)
-    source: Mapped[ContentSource] = mapped_column(_enum_column(ContentSource, 16))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
-
-    sentence_links: Mapped[list["SentenceWord"]] = relationship(
-        back_populates="word", cascade="all, delete-orphan"
-    )
-
-
-class Sentence(Base):
-    __tablename__ = "sentences"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    arabic: Mapped[str] = mapped_column(Text)
-    translation_ru: Mapped[str] = mapped_column(Text)
-    source: Mapped[ContentSource] = mapped_column(_enum_column(ContentSource, 16))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
-
-    word_links: Mapped[list["SentenceWord"]] = relationship(
-        back_populates="sentence", cascade="all, delete-orphan"
-    )
-
-
-class SentenceWord(Base):
-    """Link table. Powers example sentences on the card back and per-user novelty."""
-
-    __tablename__ = "sentence_words"
-
-    sentence_id: Mapped[int] = mapped_column(
-        ForeignKey("sentences.id", ondelete="CASCADE"), primary_key=True
-    )
-    word_id: Mapped[int] = mapped_column(
-        ForeignKey("words.id", ondelete="CASCADE"), primary_key=True
-    )
-
-    sentence: Mapped[Sentence] = relationship(back_populates="word_links")
-    word: Mapped[Word] = relationship(back_populates="sentence_links")
-
-
-class UserProgress(Base):
-    __tablename__ = "user_progress"
-    __table_args__ = (
-        UniqueConstraint(
-            "telegram_id", "word_id", "direction", name="uq_progress_user_word_direction"
-        ),
-        Index("ix_user_progress_due", "telegram_id", "due"),
-    )
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    telegram_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE")
-    )
-    word_id: Mapped[int] = mapped_column(ForeignKey("words.id", ondelete="CASCADE"))
-    direction: Mapped[Direction] = mapped_column(_enum_column(Direction, 8))
-    due: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    # Serialised FSRS card; the scheduler runs server-side.
-    fsrs_state: Mapped[dict] = mapped_column(JSONB)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
-
-
-class ReviewLog(Base):
-    """Rating history. Needed later to fit FSRS parameters for this group.
-
-    No FK on telegram_id on purpose: history outlives a deleted user.
-    """
-
-    __tablename__ = "review_log"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    telegram_id: Mapped[int] = mapped_column(BigInteger)
-    word_id: Mapped[int] = mapped_column(ForeignKey("words.id", ondelete="CASCADE"))
-    direction: Mapped[Direction] = mapped_column(_enum_column(Direction, 8))
-    # FSRS rating scale: 1 again, 2 hard, 3 good, 4 easy.
-    rating: Mapped[int] = mapped_column(SmallInteger)
-    reviewed_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    telegram_id = models.BigIntegerField(db_index=True)
+    entry = models.ForeignKey(Entry, on_delete=models.CASCADE, related_name="reviews")
+    direction = models.CharField(max_length=8, choices=Direction)
+    rating = models.PositiveSmallIntegerField(help_text="Шкала FSRS: 1 again … 4 easy")
+    reviewed_at = models.DateTimeField(auto_now_add=True, db_index=True)
 ```
 
-- [ ] **Step 3: Инициализировать Alembic**
+- [ ] **Step 3: Сгенерировать и применить миграцию**
 
-Run: `uv run alembic init -t async alembic`
-Expected: созданы `alembic.ini`, `alembic/env.py`, `alembic/script.py.mako`, `alembic/versions/`.
+Run: `uv run python manage.py makemigrations vocabulary`
+Expected: создан `vocabulary/migrations/0001_initial.py` с шестью моделями.
 
-- [ ] **Step 4: Подключить Alembic к настройкам и моделям**
+Run: `uv run python manage.py migrate`
+Expected: `Applying vocabulary.0001_initial... OK`.
 
-`alembic init -t async` генерирует рабочий `env.py` — его надо не переписывать, а
-дополнить в трёх местах. Сгенерированный файл уже содержит `import asyncio` и
-`asyncio.run(...)`; удалить их нельзя, иначе миграции перестанут запускаться.
+Run: `docker compose exec db psql -U mufradat -d mufradat -c '\dt vocabulary*'`
+Expected: таблицы `vocabulary_entry`, `vocabulary_sentence`, `vocabulary_sentenceentry`, `vocabulary_telegramuser`, `vocabulary_userprogress`, `vocabulary_reviewlog`.
 
-**6.1.** Добавить импорты после уже существующих:
+- [ ] **Step 4: Написать тесты моделей**
 
-```python
-from app.config import get_settings
-from app.db import models  # noqa: F401  # registers all mappers on Base.metadata
-from app.db.base import Base
-```
-
-**6.2.** Заменить строку `target_metadata = None` на две:
-
-```python
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
-target_metadata = Base.metadata
-```
-
-**6.3.** В обоих вызовах `context.configure(...)` (в `run_migrations_offline` и в
-`do_run_migrations`) добавить аргумент:
-
-```python
-        compare_type=True,
-```
-
-**6.4.** В `alembic.ini` удалить строку `sqlalchemy.url = ...` — URL приходит из
-настроек, и оставленная в ini пустая заглушка перекроет его.
-
-- [ ] **Step 5: Сгенерировать и применить миграцию**
-
-Run: `uv run alembic revision --autogenerate -m "initial schema"`
-Expected: создан файл в `alembic/versions/` с `op.create_table` для шести таблиц.
-
-Run: `uv run alembic upgrade head`
-Expected: `Running upgrade -> <rev>, initial schema` без ошибок.
-
-Run: `docker compose exec db psql -U mufradat -d mufradat -c '\dt'`
-Expected: в списке `users`, `words`, `sentences`, `sentence_words`, `user_progress`, `review_log`, `alembic_version`.
-
-- [ ] **Step 6: Написать фикстуры тестовой БД**
-
-`tests/conftest.py`:
-
-```python
-from collections.abc import AsyncIterator
-
-import pytest_asyncio
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
-
-from app.config import get_settings
-from app.db import models  # noqa: F401  # registers mappers before create_all
-from app.db.base import Base
-
-
-@pytest_asyncio.fixture(scope="session")
-async def engine() -> AsyncIterator[AsyncEngine]:
-    """Engine bound to the dedicated test database, with a freshly built schema."""
-    engine = create_async_engine(get_settings().test_database_url)
-    async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.drop_all)
-        await connection.run_sync(Base.metadata.create_all)
-    yield engine
-    await engine.dispose()
-
-
-@pytest_asyncio.fixture
-async def session(engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
-    """Session inside a transaction that is rolled back, so tests stay isolated."""
-    connection = await engine.connect()
-    transaction = await connection.begin()
-    maker = async_sessionmaker(bind=connection, expire_on_commit=False)
-    async with maker() as session:
-        yield session
-    await transaction.rollback()
-    await connection.close()
-```
-
-- [ ] **Step 7: Написать тесты моделей**
+Создать `tests/db/__init__.py` пустым.
 
 `tests/db/test_models.py`:
 
 ```python
 import pytest
-from sqlalchemy import select, text
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
+from django.db.utils import IntegrityError
 
-from app.db.enums import ContentSource, Direction
-from app.db.models import Sentence, SentenceWord, Word
-from app.services.arabic import normalize_arabic
+from vocabulary.enums import Kind, Person, Source, Tense
+from vocabulary.models import Entry, Sentence, SentenceEntry
+
+pytestmark = pytest.mark.django_db
 
 
-def make_word(arabic: str, translation: str) -> Word:
-    return Word(
-        arabic=arabic,
-        arabic_norm=normalize_arabic(arabic),
-        translation_ru=translation,
-        source=ContentSource.TEXTBOOK,
+def make_word(arabic: str, translation: str) -> Entry:
+    return Entry.objects.create(
+        kind=Kind.WORD, arabic=arabic, translation_ru=translation, source=Source.TEXTBOOK
     )
 
 
-async def test_word_round_trips_with_diacritics(session: AsyncSession) -> None:
-    session.add(make_word("كِتَاب", "книга"))
-    await session.flush()
+def test_save_fills_arabic_norm() -> None:
+    entry = make_word("كِتَاب", "книга")
 
-    stored = (await session.execute(select(Word))).scalar_one()
-    assert stored.arabic == "كِتَاب"
-    assert stored.arabic_norm == "كتاب"
-    assert stored.source is ContentSource.TEXTBOOK
-    assert stored.created_at is not None
+    assert entry.arabic_norm == "كتاب"
 
 
-async def test_same_word_with_different_harakat_is_rejected(session: AsyncSession) -> None:
-    session.add(make_word("مُدَرِّس", "учитель"))
-    await session.flush()
+def test_exact_duplicate_is_rejected() -> None:
+    make_word("كِتَاب", "книга")
 
-    # Same skeleton, different diacritics — must collide on (arabic_norm, translation_ru).
-    session.add(make_word("مُدَرِّسٌ", "учитель"))
     with pytest.raises(IntegrityError):
-        await session.flush()
+        make_word("كِتَاب", "книга")
 
 
-async def test_same_skeleton_with_different_translation_is_allowed(session: AsyncSession) -> None:
-    session.add(make_word("عَيْن", "глаз"))
-    session.add(make_word("عَيْن", "источник"))
-    await session.flush()
+def test_gender_pair_is_allowed() -> None:
+    """Regression test for spec 4.1.
 
-    words = (await session.execute(select(Word))).scalars().all()
-    assert len(words) == 2
-
-
-async def test_sentence_links_to_words(session: AsyncSession) -> None:
-    word = make_word("بَيْت", "дом")
-    sentence = Sentence(
-        arabic="هَذَا بَيْتٌ كَبِيرٌ",
-        translation_ru="Это большой дом.",
-        source=ContentSource.TEXTBOOK,
+    Both phrases normalize to the same key; uniqueness is on the exact arabic, so
+    the feminine form must be storable next to the masculine one.
+    """
+    masculine = Entry.objects.create(
+        kind=Kind.PHRASE,
+        arabic="مَا اسْمُكَ؟",
+        translation_ru="как тебя зовут? (к мужчине)",
+        person=Person.ANTA,
+        source=Source.MANUAL,
     )
-    session.add_all([word, sentence])
-    await session.flush()
+    feminine = Entry.objects.create(
+        kind=Kind.PHRASE,
+        arabic="مَا اسْمُكِ؟",
+        translation_ru="как тебя зовут? (к женщине)",
+        person=Person.ANTI,
+        source=Source.MANUAL,
+    )
 
-    session.add(SentenceWord(sentence_id=sentence.id, word_id=word.id))
-    await session.flush()
-
-    link = (await session.execute(select(SentenceWord))).scalar_one()
-    assert link.sentence_id == sentence.id
-    assert link.word_id == word.id
-
-
-async def test_source_stored_as_value_not_member_name(session: AsyncSession) -> None:
-    # Guards the values_callable setting in _enum_column: without it the column
-    # would hold "TEXTBOOK" and every consumer of the raw value would break.
-    session.add(make_word("بَاب", "дверь"))
-    await session.flush()
-
-    raw = (await session.execute(text("select source from words"))).scalar_one()
-    assert raw == "textbook"
+    assert masculine.arabic_norm == feminine.arabic_norm
+    assert Entry.objects.filter(kind=Kind.PHRASE).count() == 2
 
 
-async def test_direction_enum_values() -> None:
-    assert Direction.AR_RU == "ar_ru"
-    assert Direction.RU_AR == "ru_ar"
+def test_same_skeleton_with_other_translation_is_allowed() -> None:
+    make_word("عَيْن", "глаз")
+    make_word("عَيْن", "источник")
+
+    assert Entry.objects.count() == 2
+
+
+def test_form_requires_base_and_person() -> None:
+    with pytest.raises(IntegrityError):
+        Entry.objects.create(
+            kind=Kind.FORM,
+            arabic="سَيَّارَتُهُ",
+            translation_ru="его машина",
+            source=Source.MANUAL,
+        )
+
+
+def test_duplicate_possessive_form_is_rejected_with_empty_tense() -> None:
+    # Possessive forms carry no tense; the unique constraint must still fire, which
+    # is why person/tense are "" CharFields and not NULL.
+    base = make_word("سَيَّارَة", "машина")
+    Entry.objects.create(
+        kind=Kind.FORM,
+        arabic="سَيَّارَتُهُ",
+        translation_ru="его машина",
+        base=base,
+        person=Person.HUWA,
+        source=Source.MANUAL,
+    )
+
+    with pytest.raises(IntegrityError):
+        Entry.objects.create(
+            kind=Kind.FORM,
+            arabic="سَيَّارَتُهْ",
+            translation_ru="его машина (вариант)",
+            base=base,
+            person=Person.HUWA,
+            source=Source.MANUAL,
+        )
+
+
+def test_same_person_different_tense_is_allowed() -> None:
+    base = make_word("كَتَبَ", "писать")
+    Entry.objects.create(
+        kind=Kind.FORM,
+        arabic="كَتَبْتُ",
+        translation_ru="я написал",
+        base=base,
+        person=Person.ANA,
+        tense=Tense.PAST,
+        source=Source.MANUAL,
+    )
+    Entry.objects.create(
+        kind=Kind.FORM,
+        arabic="أَكْتُبُ",
+        translation_ru="я пишу",
+        base=base,
+        person=Person.ANA,
+        tense=Tense.PRESENT,
+        source=Source.MANUAL,
+    )
+
+    assert base.forms.count() == 2
+
+
+def test_form_inherits_image_from_base() -> None:
+    base = make_word("سَيَّارَة", "машина")
+    base.image = "entries/car.jpg"
+    base.image_attribution = '"Car" by Someone, CC BY 2.0'
+    base.save()
+    form = Entry.objects.create(
+        kind=Kind.FORM,
+        arabic="سَيَّارَتُهُ",
+        translation_ru="его машина",
+        base=base,
+        person=Person.HUWA,
+        source=Source.MANUAL,
+    )
+
+    assert not form.image
+    assert form.display_image is not None
+    assert form.display_image.name == "entries/car.jpg"
+    assert "CC BY" in form.display_attribution
+
+
+def test_sentence_links_to_entry() -> None:
+    entry = make_word("بَيْت", "дом")
+    sentence = Sentence.objects.create(
+        arabic="هَذَا بَيْتٌ كَبِيرٌ", translation_ru="Это большой дом.", source=Source.TEXTBOOK
+    )
+    SentenceEntry.objects.create(sentence=sentence, entry=entry)
+
+    assert list(sentence.entries.all()) == [entry]
 ```
 
-- [ ] **Step 8: Прогнать тесты**
+- [ ] **Step 5: Прогнать тесты**
 
-Run: `uv run pytest tests -v`
-Expected: PASS, все тесты (7 конфигурация + 21 арабский + 6 модели).
+Run: `uv run pytest -q 2>&1 | tail -3`
+Expected: 41 passed (10 конфигурация + 22 арабский + 9 модели).
 
-- [ ] **Step 9: Проверить, что миграция и модели не расходятся**
+- [ ] **Step 6: Проверить, что модели и миграция не расходятся**
 
-Run: `uv run alembic revision --autogenerate -m "should be empty"`
-Expected: в созданном файле `upgrade()` пустой (только `pass`). Если появились операции — модели и миграция расходятся, поправить и перегенерировать.
+Run: `uv run python manage.py makemigrations --check --dry-run`
+Expected: `No changes detected`.
 
-Run: `rm alembic/versions/*should_be_empty*.py`
-Expected: файл-проверка удалён.
-
-- [ ] **Step 10: Закоммитить**
+- [ ] **Step 7: Закоммитить**
 
 ```bash
-git add app/db/ alembic.ini alembic/ tests/
-git commit -m "feat: data model with normalized Arabic column and initial migration"
+git add vocabulary tests
+git commit -m "feat: Entry model covering words, phrases and inflected forms"
 ```
 
-**Проверка задачи для владельца:** `\dt` показывает шесть таблиц; попытка вставить то же слово с другими огласовками падает на уникальном ограничении; повторный autogenerate пустой.
+**Проверка задачи для владельца:** шесть таблиц в БД; пара «к мужчине / к женщине» сохраняется рядом, точный дубль отбивается, форма без базы отбивается; повторный `makemigrations` пустой.
 
 ---
 
-### Task 5: Сервис дедупликации
-
-Отвечает на вопрос, который бот задаёт при импорте каждой распознанной пары: это новое слово, точный дубль или похожее слово с другим переводом.
+### Task 5: Админка
 
 **Files:**
-- Create: `app/services/dedup.py`
+- Modify: `vocabulary/admin.py`
+- Test: `tests/db/test_admin.py`
+
+**Interfaces:**
+- Consumes: модели из задачи 4.
+- Produces: зарегистрированные `Entry`, `Sentence`, `TelegramUser`; страницы `/admin/vocabulary/entry/`, `/admin/vocabulary/sentence/`.
+
+- [ ] **Step 1: Написать админку**
+
+Заменить содержимое `vocabulary/admin.py`:
+
+```python
+from django.contrib import admin
+
+from vocabulary.models import Entry, Sentence, SentenceEntry, TelegramUser
+
+
+class FormInline(admin.TabularInline):
+    """Inflected forms of the entry being edited."""
+
+    model = Entry
+    fk_name = "base"
+    extra = 0
+    fields = ("kind", "arabic", "transliteration", "translation_ru", "person", "tense", "source")
+    verbose_name = "форма"
+    verbose_name_plural = "формы"
+
+
+class SentenceEntryInline(admin.TabularInline):
+    model = SentenceEntry
+    extra = 0
+    autocomplete_fields = ("entry",)
+
+
+@admin.register(Entry)
+class EntryAdmin(admin.ModelAdmin):
+    list_display = ("arabic", "translation_ru", "kind", "person", "topic", "has_image")
+    list_filter = ("kind", "pos", "source", "person")
+    search_fields = ("arabic", "arabic_norm", "translation_ru", "translation_en")
+    readonly_fields = ("arabic_norm", "created_at")
+    autocomplete_fields = ("base",)
+    inlines = (FormInline,)
+    fieldsets = (
+        (
+            None,
+            {"fields": ("kind", "arabic", "arabic_norm", "translation_ru", "transliteration")},
+        ),
+        ("Грамматика", {"fields": ("pos", "base", "person", "tense")}),
+        ("Картинка", {"fields": ("image", "image_attribution", "image_source_url")}),
+        ("Служебное", {"fields": ("translation_en", "topic", "source", "created_at")}),
+    )
+
+    @admin.display(boolean=True, description="картинка")
+    def has_image(self, obj: Entry) -> bool:
+        return bool(obj.display_image)
+
+
+@admin.register(Sentence)
+class SentenceAdmin(admin.ModelAdmin):
+    list_display = ("arabic", "translation_ru", "source")
+    list_filter = ("source",)
+    search_fields = ("arabic", "translation_ru")
+    inlines = (SentenceEntryInline,)
+
+
+@admin.register(TelegramUser)
+class TelegramUserAdmin(admin.ModelAdmin):
+    list_display = ("telegram_id", "username", "first_name", "new_per_day", "created_at")
+    search_fields = ("telegram_id", "username", "first_name")
+```
+
+- [ ] **Step 2: Написать тесты, что страницы открываются**
+
+`tests/db/test_admin.py`:
+
+```python
+import pytest
+
+from vocabulary.enums import Kind, Source
+from vocabulary.models import Entry
+
+pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture
+def staff_client(client, django_user_model):
+    django_user_model.objects.create_superuser(
+        username="admin", email="admin@example.com", password="pw"
+    )
+    client.force_login(django_user_model.objects.get(username="admin"))
+    return client
+
+
+def test_entry_changelist_opens(staff_client) -> None:
+    Entry.objects.create(
+        kind=Kind.WORD, arabic="بَيْت", translation_ru="дом", source=Source.TEXTBOOK
+    )
+
+    response = staff_client.get("/admin/vocabulary/entry/")
+
+    assert response.status_code == 200
+    assert "дом" in response.content.decode()
+
+
+def test_entry_add_form_opens(staff_client) -> None:
+    assert staff_client.get("/admin/vocabulary/entry/add/").status_code == 200
+
+
+def test_sentence_changelist_opens(staff_client) -> None:
+    assert staff_client.get("/admin/vocabulary/sentence/").status_code == 200
+
+
+def test_telegram_user_changelist_opens(staff_client) -> None:
+    assert staff_client.get("/admin/vocabulary/telegramuser/").status_code == 200
+```
+
+- [ ] **Step 3: Прогнать проверку Django и тесты**
+
+Run: `uv run python manage.py check && uv run pytest -q 2>&1 | tail -3`
+Expected: проверка без замечаний, 45 passed.
+
+- [ ] **Step 4: Создать суперпользователя для ручного захода**
+
+Run: `uv run python manage.py createsuperuser --username admin --email admin@example.com`
+Expected: пароль введён вручную, `Superuser created successfully.`
+
+- [ ] **Step 5: Закоммитить**
+
+```bash
+git add vocabulary/admin.py tests/db/test_admin.py
+git commit -m "feat: admin for entries, examples and learners"
+```
+
+**Проверка задачи для владельца:** `uv run python manage.py runserver`, открыть `http://127.0.0.1:8000/admin/` — единицы видны, фильтр по типу работает, у слова можно добавить форму инлайном.
+
+---
+
+### Task 6: Поиск похожих записей при импорте
+
+**Files:**
+- Create: `vocabulary/services/dedup.py`
 - Test: `tests/services/test_dedup.py`
 
 **Interfaces:**
-- Consumes: `app.db.models.Word`, `app.services.arabic.normalize_arabic`, фикстура `session`.
+- Consumes: `Entry`, `normalize_arabic`.
 - Produces:
-  - `app.services.dedup.DuplicateKind` (`NONE = "none"`, `EXACT = "exact"`, `SIMILAR = "similar"`).
-  - `app.services.dedup.DuplicateCheck` — frozen dataclass с полями `kind: DuplicateKind`, `existing_word_id: int | None`, `existing_translation: str | None`.
-  - `app.services.dedup.check_duplicate(session: AsyncSession, arabic: str, translation_ru: str) -> DuplicateCheck`.
+  - `vocabulary.services.dedup.DuplicateKind` — `NONE`, `EXACT`, `SIMILAR`.
+  - `vocabulary.services.dedup.DuplicateCheck` — frozen dataclass: `kind`, `existing_id: int | None`, `existing_arabic: str | None`, `existing_translation: str | None`, `same_translation: bool`.
+  - `vocabulary.services.dedup.check_duplicate(arabic: str, translation_ru: str) -> DuplicateCheck` — синхронная; из бота вызывается через `sync_to_async`.
 
 - [ ] **Step 1: Написать падающие тесты**
 
 `tests/services/test_dedup.py`:
 
 ```python
-from sqlalchemy.ext.asyncio import AsyncSession
+import pytest
 
-from app.db.enums import ContentSource
-from app.db.models import Word
-from app.services.arabic import normalize_arabic
-from app.services.dedup import DuplicateKind, check_duplicate
+from vocabulary.enums import Kind, Person, Source
+from vocabulary.models import Entry
+from vocabulary.services.dedup import DuplicateKind, check_duplicate
+
+pytestmark = pytest.mark.django_db
 
 
-async def add_word(session: AsyncSession, arabic: str, translation: str) -> Word:
-    word = Word(
-        arabic=arabic,
-        arabic_norm=normalize_arabic(arabic),
-        translation_ru=translation,
-        source=ContentSource.TEXTBOOK,
+def make_word(arabic: str, translation: str) -> Entry:
+    return Entry.objects.create(
+        kind=Kind.WORD, arabic=arabic, translation_ru=translation, source=Source.TEXTBOOK
     )
-    session.add(word)
-    await session.flush()
-    return word
 
 
-async def test_unknown_word_is_new(session: AsyncSession) -> None:
-    result = await check_duplicate(session, "كِتَاب", "книга")
+def test_unknown_entry_is_new() -> None:
+    result = check_duplicate("كِتَاب", "книга")
 
     assert result.kind is DuplicateKind.NONE
-    assert result.existing_word_id is None
+    assert result.existing_id is None
 
 
-async def test_identical_word_is_exact_duplicate(session: AsyncSession) -> None:
-    word = await add_word(session, "كِتَاب", "книга")
+def test_identical_entry_is_exact() -> None:
+    word = make_word("كِتَاب", "книга")
 
-    result = await check_duplicate(session, "كِتَاب", "книга")
-
-    assert result.kind is DuplicateKind.EXACT
-    assert result.existing_word_id == word.id
-
-
-async def test_different_harakat_still_counts_as_exact(session: AsyncSession) -> None:
-    word = await add_word(session, "مُدَرِّس", "учитель")
-
-    result = await check_duplicate(session, "مُدَرِّسٌ", "учитель")
+    result = check_duplicate("كِتَاب", "книга")
 
     assert result.kind is DuplicateKind.EXACT
-    assert result.existing_word_id == word.id
+    assert result.existing_id == word.id
 
 
-async def test_translation_comparison_ignores_case_and_spaces(session: AsyncSession) -> None:
-    word = await add_word(session, "بَيْت", "дом")
+def test_translation_comparison_ignores_case_and_spaces() -> None:
+    word = make_word("بَيْت", "дом")
 
-    result = await check_duplicate(session, "بَيْت", "  Дом ")
+    result = check_duplicate("بَيْت", "  Дом ")
 
     assert result.kind is DuplicateKind.EXACT
-    assert result.existing_word_id == word.id
+    assert result.existing_id == word.id
 
 
-async def test_same_skeleton_other_translation_is_similar(session: AsyncSession) -> None:
-    word = await add_word(session, "عَيْن", "глаз")
+def test_other_harakat_same_translation_is_similar_with_flag() -> None:
+    # Most likely the same word re-imported with different harakat — skip it.
+    word = make_word("مُدَرِّس", "учитель")
 
-    result = await check_duplicate(session, "عَيْن", "источник")
+    result = check_duplicate("مُدَرِّسٌ", "учитель")
 
     assert result.kind is DuplicateKind.SIMILAR
-    assert result.existing_word_id == word.id
-    assert result.existing_translation == "глаз"
+    assert result.same_translation is True
+    assert result.existing_id == word.id
 
 
-async def test_exact_match_wins_over_similar(session: AsyncSession) -> None:
-    await add_word(session, "عَيْن", "глаз")
-    expected = await add_word(session, "عَيْن", "источник")
+def test_gender_pair_is_similar_without_flag() -> None:
+    # Same skeleton, different translation: the feminine counterpart, must be added.
+    masculine = Entry.objects.create(
+        kind=Kind.PHRASE,
+        arabic="مَا اسْمُكَ؟",
+        translation_ru="как тебя зовут? (к мужчине)",
+        person=Person.ANTA,
+        source=Source.MANUAL,
+    )
 
-    result = await check_duplicate(session, "عَيْن", "источник")
+    result = check_duplicate("مَا اسْمُكِ؟", "как тебя зовут? (к женщине)")
+
+    assert result.kind is DuplicateKind.SIMILAR
+    assert result.same_translation is False
+    assert result.existing_id == masculine.id
+    assert result.existing_arabic == "مَا اسْمُكَ؟"
+
+
+def test_homograph_is_similar_without_flag() -> None:
+    make_word("عَيْن", "глаз")
+
+    result = check_duplicate("عَيْن", "источник")
+
+    assert result.kind is DuplicateKind.SIMILAR
+    assert result.same_translation is False
+
+
+def test_exact_wins_over_similar() -> None:
+    make_word("عَيْن", "глаз")
+    expected = make_word("عَيْن", "источник")
+
+    result = check_duplicate("عَيْن", "источник")
 
     assert result.kind is DuplicateKind.EXACT
-    assert result.existing_word_id == expected.id
+    assert result.existing_id == expected.id
+
+
+def test_same_translation_candidate_is_preferred_in_report() -> None:
+    make_word("مُدَرِّس", "преподаватель")
+    same_translation = make_word("مُدَرِّسٌ", "учитель")
+
+    result = check_duplicate("مُدَرِّسْ", "учитель")
+
+    assert result.kind is DuplicateKind.SIMILAR
+    assert result.same_translation is True
+    assert result.existing_id == same_translation.id
 ```
 
 - [ ] **Step 2: Убедиться, что тесты падают**
 
-Run: `uv run pytest tests/services/test_dedup.py -v`
-Expected: FAIL с `ModuleNotFoundError: No module named 'app.services.dedup'`.
+Run: `uv run pytest tests/services/test_dedup.py -q 2>&1 | tail -5`
+Expected: FAIL — `ModuleNotFoundError: No module named 'vocabulary.services.dedup'`.
 
-- [ ] **Step 3: Реализовать сервис**
+- [ ] **Step 3: Реализовать поиск**
 
-`app/services/dedup.py`:
+`vocabulary/services/dedup.py`:
 
 ```python
-"""Duplicate detection for imported words."""
+"""Classify an incoming entry against the shared deck. See spec 4.2."""
 
 from dataclasses import dataclass
 from enum import StrEnum
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.db.models import Word
-from app.services.arabic import normalize_arabic
+from vocabulary.models import Entry
+from vocabulary.services.arabic import normalize_arabic
 
 
 class DuplicateKind(StrEnum):
     NONE = "none"
     EXACT = "exact"
-    # Same skeleton, different translation: possibly a homograph, so the admin decides.
+    # Same skeleton, but not the same exact arabic or not the same translation.
     SIMILAR = "similar"
 
 
 @dataclass(frozen=True)
 class DuplicateCheck:
     kind: DuplicateKind
-    existing_word_id: int | None = None
+    existing_id: int | None = None
+    existing_arabic: str | None = None
     existing_translation: str | None = None
+    # True when the found entry has the same translation, which usually means the
+    # same word re-imported with different harakat. False points at a gender
+    # counterpart or a homograph — content that should be added.
+    same_translation: bool = False
 
 
 def _same_translation(left: str, right: str) -> bool:
     return left.strip().casefold() == right.strip().casefold()
 
 
-async def check_duplicate(
-    session: AsyncSession, arabic: str, translation_ru: str
-) -> DuplicateCheck:
-    """Classify an incoming (arabic, translation) pair against the shared deck."""
-    norm = normalize_arabic(arabic)
-    candidates = (
-        (await session.execute(select(Word).where(Word.arabic_norm == norm))).scalars().all()
-    )
+def check_duplicate(arabic: str, translation_ru: str) -> DuplicateCheck:
+    """Look up near-duplicates by normalized skeleton, then compare exact arabic.
 
+    Synchronous: the bot calls it through asgiref.sync.sync_to_async.
+    """
+    candidates = list(Entry.objects.filter(arabic_norm=normalize_arabic(arabic)))
     if not candidates:
         return DuplicateCheck(DuplicateKind.NONE)
 
-    for candidate in candidates:
-        if _same_translation(candidate.translation_ru, translation_ru):
+    matching = [c for c in candidates if _same_translation(c.translation_ru, translation_ru)]
+
+    for candidate in matching:
+        if candidate.arabic == arabic:
             return DuplicateCheck(
-                DuplicateKind.EXACT, candidate.id, candidate.translation_ru
+                DuplicateKind.EXACT,
+                candidate.id,
+                candidate.arabic,
+                candidate.translation_ru,
+                same_translation=True,
             )
 
-    first = candidates[0]
-    return DuplicateCheck(DuplicateKind.SIMILAR, first.id, first.translation_ru)
+    # Report the most informative candidate: one with the same translation when there
+    # is one, since that is the case where skipping is usually right.
+    reported = (matching or candidates)[0]
+    return DuplicateCheck(
+        DuplicateKind.SIMILAR,
+        reported.id,
+        reported.arabic,
+        reported.translation_ru,
+        same_translation=bool(matching),
+    )
 ```
 
 - [ ] **Step 4: Прогнать тесты**
 
-Run: `uv run pytest tests/services/test_dedup.py -v`
-Expected: PASS, 6 тестов.
+Run: `uv run pytest tests/services/test_dedup.py -q 2>&1 | tail -3`
+Expected: 8 passed.
 
 - [ ] **Step 5: Закоммитить**
 
 ```bash
-git add app/services/dedup.py tests/services/test_dedup.py
-git commit -m "feat: classify imported words as new, exact duplicate or similar"
+git add vocabulary/services/dedup.py tests/services/test_dedup.py
+git commit -m "feat: classify imported entries as new, exact duplicate or similar"
 ```
 
-**Проверка задачи для владельца:** слово с другими огласовками распознаётся как точный дубль; то же слово с другим переводом — как «похожее», а не как дубль.
+**Проверка задачи для владельца:** слово с другими огласовками и тем же переводом помечается как похожее с флагом «перевод совпадает»; женская форма фразы — как похожее без флага, то есть предлагается добавить.
 
 ---
 
-### Task 6: Сидер и README
+### Task 7: Файл поведения ИИ и его загрузчик
 
 **Files:**
-- Create: `scripts/seed.py`
-- Create: `README.md`
-- Test: проверяется запуском сидера и SQL-запросом (данные, не логика).
+- Create: `content/curriculum.yaml`
+- Create: `vocabulary/services/curriculum.py`
+- Test: `tests/services/test_curriculum.py`
 
 **Interfaces:**
-- Consumes: `app.db.session.get_sessionmaker`, `app.db.models`, `app.services.arabic.normalize_arabic`, `match_words_in_sentence`.
-- Produces: `scripts/seed.py` как исполняемый скрипт (`uv run python scripts/seed.py`), идемпотентный.
+- Consumes: `vocabulary.enums.Person`.
+- Produces:
+  - `vocabulary.services.curriculum.Curriculum` — `rules: Rules`, `topics: list[Topic]`; методы `enabled_topics() -> list[Topic]`, `topic(topic_id: str) -> Topic`.
+  - `Rules` — `language_register: str` (в YAML ключ `register`), `harakat: str`, `max_new_words_per_sentence: int`, `forms_per_entry: int`, `pronouns: list[str]`, `service_words: list[str]`.
+  - `Topic` — `id`, `title`, `enabled`, `target_count`, `ask_for: list[str]`, `examples: list[Example]`; `Example` — `ar: str`, `ru: str`.
+  - `load_curriculum(path: Path | None = None) -> Curriculum`.
 
-- [ ] **Step 1: Написать сидер**
+- [ ] **Step 1: Создать файл содержания**
 
-`scripts/seed.py`:
+`content/curriculum.yaml`:
+
+```yaml
+# Файл поведения ИИ. Меняется без правки кода.
+#
+# Главный рычаг — examples: модель ловит стиль по образцам точнее, чем по описанию.
+# Нужна другая выдача по теме — допиши в неё пример.
+#
+# pronouns управляет сразу двумя вещами: какие лица генерировать в формах слов и
+# какие использовать во фразах. Прошли новое местоимение — допиши строку.
+
+rules:
+  register: msa                      # литературный арабский, по «العربية بين يديك»
+  harakat: required                  # огласовки обязательны везде
+  max_new_words_per_sentence: 1      # больше одного нового слова на предложение нельзя
+  forms_per_entry: 2                 # сколько форм просить у ИИ на одно слово
+  pronouns: [ana, huwa, hiya, anta, anti, nahnu]
+  service_words:                     # служебные слова, разрешённые всегда
+    - فِي
+    - مِنْ
+    - إِلَى
+    - هَذَا
+    - هَذِهِ
+    - مَا
+    - مَاذَا
+    - أَيْنَ
+
+topics:
+  - id: introductions
+    title: Знакомство
+    enabled: true
+    target_count: 12
+    ask_for:
+      - вопрос и ответ об имени
+      - вопрос и ответ о происхождении
+    examples:
+      - ar: مَا اسْمُكَ؟
+        ru: как тебя зовут? (к мужчине)
+      - ar: مَا اسْمُكِ؟
+        ru: как тебя зовут? (к женщине)
+      - ar: مِنْ أَيْنَ أَنْتَ؟
+        ru: откуда ты? (к мужчине)
+
+  - id: daily_activity
+    title: Чем занимаешься
+    enabled: true
+    target_count: 10
+    ask_for:
+      - вопрос о текущем занятии
+      - ответ о текущем занятии
+    examples:
+      - ar: مَاذَا تَفْعَلُ؟
+        ru: что ты делаешь? (к мужчине)
+      - ar: مَاذَا تَفْعَلِينَ؟
+        ru: что ты делаешь? (к женщине)
+
+  # Пример выключенной темы: остаётся в файле, но не используется.
+  - id: shopping
+    title: Покупки
+    enabled: false
+    target_count: 10
+    ask_for:
+      - вопрос о цене
+    examples: []
+```
+
+- [ ] **Step 2: Написать падающие тесты**
+
+`tests/services/test_curriculum.py`:
+
+```python
+from pathlib import Path
+
+import pytest
+from pydantic import ValidationError
+
+from vocabulary.services.curriculum import load_curriculum
+
+VALID = """
+rules:
+  register: msa
+  harakat: required
+  max_new_words_per_sentence: 1
+  forms_per_entry: 2
+  pronouns: [ana, anta, anti]
+  service_words: [فِي]
+topics:
+  - id: introductions
+    title: Знакомство
+    enabled: true
+    target_count: 12
+    ask_for: [вопрос об имени]
+    examples:
+      - ar: مَا اسْمُكَ؟
+        ru: как тебя зовут? (к мужчине)
+  - id: shopping
+    title: Покупки
+    enabled: false
+    target_count: 5
+    ask_for: [вопрос о цене]
+    examples: []
+"""
+
+
+def write(tmp_path: Path, text: str) -> Path:
+    path = tmp_path / "curriculum.yaml"
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def test_loads_valid_file(tmp_path: Path) -> None:
+    curriculum = load_curriculum(write(tmp_path, VALID))
+
+    assert curriculum.rules.forms_per_entry == 2
+    assert curriculum.rules.pronouns == ["ana", "anta", "anti"]
+    assert len(curriculum.topics) == 2
+
+
+def test_enabled_topics_skips_disabled(tmp_path: Path) -> None:
+    curriculum = load_curriculum(write(tmp_path, VALID))
+
+    assert [topic.id for topic in curriculum.enabled_topics()] == ["introductions"]
+
+
+def test_topic_lookup_by_id(tmp_path: Path) -> None:
+    curriculum = load_curriculum(write(tmp_path, VALID))
+
+    assert curriculum.topic("introductions").title == "Знакомство"
+
+
+def test_unknown_topic_id_raises(tmp_path: Path) -> None:
+    curriculum = load_curriculum(write(tmp_path, VALID))
+
+    with pytest.raises(KeyError, match="nope"):
+        curriculum.topic("nope")
+
+
+def test_unknown_pronoun_is_rejected(tmp_path: Path) -> None:
+    text = VALID.replace("[ana, anta, anti]", "[ana, hum]")
+
+    with pytest.raises(ValidationError, match="hum"):
+        load_curriculum(write(tmp_path, text))
+
+
+def test_duplicate_topic_id_is_rejected(tmp_path: Path) -> None:
+    text = VALID.replace("id: shopping", "id: introductions")
+
+    with pytest.raises(ValidationError, match="introductions"):
+        load_curriculum(write(tmp_path, text))
+
+
+def test_enabled_topic_without_examples_is_rejected(tmp_path: Path) -> None:
+    # Examples are the main steering lever, so an active topic must have one.
+    text = VALID.replace(
+        """    examples:
+      - ar: مَا اسْمُكَ؟
+        ru: как тебя зовут? (к мужчине)""",
+        "    examples: []",
+    )
+
+    with pytest.raises(ValidationError, match="introductions"):
+        load_curriculum(write(tmp_path, text))
+
+
+def test_typo_in_field_name_is_rejected(tmp_path: Path) -> None:
+    # extra="forbid" turns a silent no-op into a clear error.
+    text = VALID.replace("forms_per_entry: 2", "forms_per_entrys: 2")
+
+    with pytest.raises(ValidationError):
+        load_curriculum(write(tmp_path, text))
+
+
+def test_shipped_file_is_valid() -> None:
+    curriculum = load_curriculum()
+
+    assert curriculum.rules.language_register == "msa"
+    assert "anti" in curriculum.rules.pronouns
+    assert curriculum.enabled_topics()
+```
+
+- [ ] **Step 3: Убедиться, что тесты падают**
+
+Run: `uv run pytest tests/services/test_curriculum.py -q 2>&1 | tail -5`
+Expected: FAIL — `ModuleNotFoundError: No module named 'vocabulary.services.curriculum'`.
+
+- [ ] **Step 4: Реализовать загрузчик**
+
+`vocabulary/services/curriculum.py`:
+
+```python
+"""Loader for content/curriculum.yaml — the editable description of AI behaviour.
+
+Validated through pydantic so a typo in the file produces a clear error instead of a
+strange prompt.
+"""
+
+from pathlib import Path
+from typing import Literal, Self
+
+import yaml
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from vocabulary.enums import Person
+
+DEFAULT_PATH = Path(__file__).resolve().parents[2] / "content" / "curriculum.yaml"
+
+_VALID_PRONOUNS = {choice.value for choice in Person}
+
+
+class Example(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ar: str
+    ru: str
+
+
+class Rules(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    # Aliased: the YAML key stays "register" (the linguistic term), but a field of
+    # that name would shadow ABCMeta.register inherited by BaseModel and make
+    # pydantic emit a warning on every import.
+    language_register: str = Field(alias="register")
+    harakat: Literal["required", "optional"] = "required"
+    max_new_words_per_sentence: int = Field(default=1, ge=0)
+    forms_per_entry: int = Field(default=2, ge=0)
+    pronouns: list[str] = Field(min_length=1)
+    service_words: list[str] = []
+
+    @model_validator(mode="after")
+    def _check_pronouns(self) -> Self:
+        unknown = [name for name in self.pronouns if name not in _VALID_PRONOUNS]
+        if unknown:
+            allowed = ", ".join(sorted(_VALID_PRONOUNS))
+            raise ValueError(f"unknown pronouns: {', '.join(unknown)}; allowed: {allowed}")
+        return self
+
+
+class Topic(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    title: str
+    enabled: bool = True
+    target_count: int = Field(ge=1)
+    ask_for: list[str] = Field(min_length=1)
+    examples: list[Example] = []
+
+
+class Curriculum(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    rules: Rules
+    topics: list[Topic] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _check_topics(self) -> Self:
+        seen: set[str] = set()
+        for topic in self.topics:
+            if topic.id in seen:
+                raise ValueError(f"duplicate topic id: {topic.id}")
+            seen.add(topic.id)
+            # Examples are the main steering lever; an active topic without one
+            # would produce unguided output.
+            if topic.enabled and not topic.examples:
+                raise ValueError(f"enabled topic without examples: {topic.id}")
+        return self
+
+    def enabled_topics(self) -> list[Topic]:
+        return [topic for topic in self.topics if topic.enabled]
+
+    def topic(self, topic_id: str) -> Topic:
+        for topic in self.topics:
+            if topic.id == topic_id:
+                return topic
+        raise KeyError(f"unknown topic: {topic_id}")
+
+
+def load_curriculum(path: Path | None = None) -> Curriculum:
+    raw = yaml.safe_load((path or DEFAULT_PATH).read_text(encoding="utf-8"))
+    return Curriculum.model_validate(raw)
+```
+
+- [ ] **Step 5: Прогнать тесты**
+
+Run: `uv run pytest tests/services/test_curriculum.py -q 2>&1 | tail -3`
+Expected: 9 passed.
+
+- [ ] **Step 6: Закоммитить**
+
+```bash
+git add content vocabulary/services/curriculum.py tests/services/test_curriculum.py
+git commit -m "feat: validated curriculum file driving AI content generation"
+```
+
+**Проверка задачи для владельца:** впиши в `content/curriculum.yaml` опечатку в имени поля или несуществующее местоимение — `uv run pytest tests/services/test_curriculum.py::test_shipped_file_is_valid` упадёт с внятным сообщением.
+
+---
+
+### Task 8: Сидер и README
+
+**Files:**
+- Create: `vocabulary/management/__init__.py`, `vocabulary/management/commands/__init__.py`, `vocabulary/management/commands/seed_deck.py`
+- Create: `README.md`
+
+**Interfaces:**
+- Consumes: модели, `match_entries_in_sentence`.
+- Produces: команда `uv run python manage.py seed_deck` — идемпотентная.
+
+- [ ] **Step 1: Написать команду**
+
+Создать `vocabulary/management/__init__.py` и `vocabulary/management/commands/__init__.py` пустыми.
+
+`vocabulary/management/commands/seed_deck.py`:
 
 ```python
 """Seed the shared deck with a small textbook-like sample.
 
-Idempotent: re-running it does not duplicate rows.
+Idempotent: re-running adds nothing. Covers all three kinds of study unit so the
+queues have something realistic to work with.
 """
 
-import asyncio
+from typing import Any
 
-from sqlalchemy import select
+from django.core.management.base import BaseCommand
+from django.db import transaction
 
-from app.db.enums import ContentSource
-from app.db.models import Sentence, SentenceWord, Word
-from app.db.session import get_engine, get_sessionmaker
-from app.services.arabic import match_words_in_sentence, normalize_arabic
+from vocabulary.enums import Kind, Person, Pos, Source, Tense
+from vocabulary.models import Entry, Sentence, SentenceEntry
+from vocabulary.services.arabic import match_entries_in_sentence
 
-# (arabic with harakat, russian, transliteration, topic)
-WORDS: list[tuple[str, str, str, str]] = [
-    ("بَيْت", "дом", "bayt", "быт"),
-    ("كِتَاب", "книга", "kitab", "учёба"),
-    ("مَدْرَسَة", "школа", "madrasa", "учёба"),
-    ("مُدَرِّس", "учитель", "mudarris", "учёба"),
-    ("طَالِب", "студент", "talib", "учёба"),
-    ("قَلَم", "ручка", "qalam", "учёба"),
-    ("مَاء", "вода", "ma'", "еда"),
-    ("خُبْز", "хлеб", "khubz", "еда"),
-    ("بَاب", "дверь", "bab", "быт"),
-    ("وَلَد", "мальчик", "walad", "люди"),
-    ("بِنْت", "девочка", "bint", "люди"),
-    ("رَجُل", "мужчина", "rajul", "люди"),
-    ("اِمْرَأَة", "женщина", "imra'a", "люди"),
-    ("صَدِيق", "друг", "sadiq", "люди"),
-    ("مَدِينَة", "город", "madina", "город"),
-    ("سَيَّارَة", "машина", "sayyara", "город"),
-    ("شَمْس", "солнце", "shams", "природа"),
-    ("قَمَر", "луна", "qamar", "природа"),
-    ("يَوْم", "день", "yawm", "время"),
-    ("كَبِير", "большой", "kabir", "признаки"),
+# (arabic, russian, transliteration, topic, part of speech)
+WORDS: list[tuple[str, str, str, str, str]] = [
+    ("بَيْت", "дом", "bayt", "быт", Pos.NOUN),
+    ("كِتَاب", "книга", "kitab", "учёба", Pos.NOUN),
+    ("مَدْرَسَة", "школа", "madrasa", "учёба", Pos.NOUN),
+    ("مُدَرِّس", "учитель", "mudarris", "учёба", Pos.NOUN),
+    ("طَالِب", "студент", "talib", "учёба", Pos.NOUN),
+    ("قَلَم", "ручка", "qalam", "учёба", Pos.NOUN),
+    ("مَاء", "вода", "ma'", "еда", Pos.NOUN),
+    ("خُبْز", "хлеб", "khubz", "еда", Pos.NOUN),
+    ("بَاب", "дверь", "bab", "быт", Pos.NOUN),
+    ("وَلَد", "мальчик", "walad", "люди", Pos.NOUN),
+    ("بِنْت", "девочка", "bint", "люди", Pos.NOUN),
+    ("رَجُل", "мужчина", "rajul", "люди", Pos.NOUN),
+    ("اِمْرَأَة", "женщина", "imra'a", "люди", Pos.NOUN),
+    ("صَدِيق", "друг", "sadiq", "люди", Pos.NOUN),
+    ("مَدِينَة", "город", "madina", "город", Pos.NOUN),
+    ("سَيَّارَة", "машина", "sayyara", "город", Pos.NOUN),
+    ("شَمْس", "солнце", "shams", "природа", Pos.NOUN),
+    ("قَمَر", "луна", "qamar", "природа", Pos.NOUN),
+    ("يَوْم", "день", "yawm", "время", Pos.NOUN),
+    ("كَبِير", "большой", "kabir", "признаки", ""),
+    ("كَتَبَ", "писать", "kataba", "учёба", Pos.VERB),
 ]
 
-# (arabic with harakat, russian)
+# (arabic, russian, transliteration, base arabic, person, tense)
+FORMS: list[tuple[str, str, str, str, str, str]] = [
+    ("سَيَّارَتُهُ", "его машина", "sayyaratuhu", "سَيَّارَة", Person.HUWA, ""),
+    ("سَيَّارَتُهَا", "её машина", "sayyaratuha", "سَيَّارَة", Person.HIYA, ""),
+    ("كِتَابِي", "моя книга", "kitabi", "كِتَاب", Person.ANA, ""),
+    ("كِتَابُكَ", "твоя книга (к мужчине)", "kitabuka", "كِتَاب", Person.ANTA, ""),
+    ("أَكْتُبُ", "я пишу", "aktubu", "كَتَبَ", Person.ANA, Tense.PRESENT),
+    ("يَكْتُبُ", "он пишет", "yaktubu", "كَتَبَ", Person.HUWA, Tense.PRESENT),
+]
+
+# (arabic, russian, transliteration, person)
+PHRASES: list[tuple[str, str, str, str]] = [
+    ("مَا اسْمُكَ؟", "как тебя зовут? (к мужчине)", "ma ismuka?", Person.ANTA),
+    ("مَا اسْمُكِ؟", "как тебя зовут? (к женщине)", "ma ismuki?", Person.ANTI),
+    ("مِنْ أَيْنَ أَنْتَ؟", "откуда ты? (к мужчине)", "min ayna anta?", Person.ANTA),
+    ("مِنْ أَيْنَ أَنْتِ؟", "откуда ты? (к женщине)", "min ayna anti?", Person.ANTI),
+    ("مَاذَا تَفْعَلُ؟", "что ты делаешь? (к мужчине)", "madha taf'alu?", Person.ANTA),
+]
+
 SENTENCES: list[tuple[str, str]] = [
     ("هَذَا بَيْتٌ كَبِيرٌ", "Это большой дом."),
     ("الْمُدَرِّسُ فِي الْمَدْرَسَةِ", "Учитель в школе."),
@@ -1275,86 +1876,121 @@ SENTENCES: list[tuple[str, str]] = [
 ]
 
 
-async def main() -> None:
-    maker = get_sessionmaker()
-    async with maker() as session:
-        existing_words = {
-            word.arabic_norm: word.id
-            for word in (await session.execute(select(Word))).scalars().all()
-        }
+class Command(BaseCommand):
+    help = "Наполнить общую колоду учебным набором слов, фраз и форм"
 
-        added_words = 0
-        for arabic, translation, transliteration, topic in WORDS:
-            norm = normalize_arabic(arabic)
-            if norm in existing_words:
-                continue
-            word = Word(
+    @transaction.atomic
+    def handle(self, *args: Any, **options: Any) -> None:
+        words = self._seed_words()
+        forms = self._seed_forms()
+        phrases = self._seed_phrases()
+        sentences, links = self._seed_sentences()
+
+        self.stdout.write(
+            f"words +{words}, forms +{forms}, phrases +{phrases}, "
+            f"sentences +{sentences}, links +{links}"
+        )
+
+    def _seed_words(self) -> int:
+        added = 0
+        for arabic, translation, translit, topic, pos in WORDS:
+            _, created = Entry.objects.get_or_create(
                 arabic=arabic,
-                arabic_norm=norm,
                 translation_ru=translation,
-                transliteration=transliteration,
-                topic=topic,
-                source=ContentSource.TEXTBOOK,
+                defaults={
+                    "kind": Kind.WORD,
+                    "transliteration": translit,
+                    "topic": topic,
+                    "pos": pos,
+                    "source": Source.TEXTBOOK,
+                },
             )
-            session.add(word)
-            await session.flush()
-            existing_words[norm] = word.id
-            added_words += 1
+            added += int(created)
+        return added
 
-        existing_sentences = {
-            sentence.arabic
-            for sentence in (await session.execute(select(Sentence))).scalars().all()
-        }
+    def _seed_forms(self) -> int:
+        added = 0
+        for arabic, translation, translit, base_arabic, person, tense in FORMS:
+            base = Entry.objects.get(arabic=base_arabic, kind=Kind.WORD)
+            _, created = Entry.objects.get_or_create(
+                arabic=arabic,
+                translation_ru=translation,
+                defaults={
+                    "kind": Kind.FORM,
+                    "transliteration": translit,
+                    "base": base,
+                    "person": person,
+                    "tense": tense,
+                    "topic": base.topic,
+                    "source": Source.MANUAL,
+                },
+            )
+            added += int(created)
+        return added
 
+    def _seed_phrases(self) -> int:
+        added = 0
+        for arabic, translation, translit, person in PHRASES:
+            _, created = Entry.objects.get_or_create(
+                arabic=arabic,
+                translation_ru=translation,
+                defaults={
+                    "kind": Kind.PHRASE,
+                    "transliteration": translit,
+                    "person": person,
+                    "topic": "знакомство",
+                    "source": Source.MANUAL,
+                },
+            )
+            added += int(created)
+        return added
+
+    def _seed_sentences(self) -> tuple[int, int]:
+        known = {entry.arabic_norm: entry.id for entry in Entry.objects.all()}
         added_sentences = 0
         added_links = 0
         for arabic, translation in SENTENCES:
-            if arabic in existing_sentences:
-                continue
-            sentence = Sentence(
+            sentence, created = Sentence.objects.get_or_create(
                 arabic=arabic,
-                translation_ru=translation,
-                source=ContentSource.TEXTBOOK,
+                defaults={"translation_ru": translation, "source": Source.TEXTBOOK},
             )
-            session.add(sentence)
-            await session.flush()
-            added_sentences += 1
-
-            for word_id in match_words_in_sentence(arabic, existing_words):
-                session.add(SentenceWord(sentence_id=sentence.id, word_id=word_id))
-                added_links += 1
-
-        await session.commit()
-
-    print(f"words +{added_words}, sentences +{added_sentences}, links +{added_links}")
-    await get_engine().dispose()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+            added_sentences += int(created)
+            for entry_id in match_entries_in_sentence(arabic, known):
+                _, link_created = SentenceEntry.objects.get_or_create(
+                    sentence=sentence, entry_id=entry_id
+                )
+                added_links += int(link_created)
+        return added_sentences, added_links
 ```
 
 - [ ] **Step 2: Запустить сидер**
 
-Run: `uv run python scripts/seed.py`
-Expected: ровно `words +20, sentences +5, links +10` — по два связанных слова
-в каждом из пяти предложений.
+Run: `uv run python manage.py seed_deck`
+Expected: ровно `words +21, forms +6, phrases +5, sentences +5, links +10` (числа посчитаны прогоном логики сопоставления на этих данных).
 
 - [ ] **Step 3: Проверить идемпотентность**
 
-Run: `uv run python scripts/seed.py`
-Expected: `words +0, sentences +0, links +0`.
+Run: `uv run python manage.py seed_deck`
+Expected: `words +0, forms +0, phrases +0, sentences +0, links +0`.
 
-- [ ] **Step 4: Проверить связки в БД**
+- [ ] **Step 4: Проверить данные в БД**
 
 Run:
 ```bash
 docker compose exec db psql -U mufradat -d mufradat -c \
-  "select s.translation_ru, count(sw.word_id) as words
-   from sentences s left join sentence_words sw on sw.sentence_id = s.id
+  "select kind, count(*) from vocabulary_entry group by kind order by kind;"
+```
+Expected: `form 6`, `phrase 5`, `word 21`.
+
+Run:
+```bash
+docker compose exec db psql -U mufradat -d mufradat -c \
+  "select s.translation_ru, count(se.entry_id) as entries
+   from vocabulary_sentence s
+   left join vocabulary_sentenceentry se on se.sentence_id = s.id
    group by s.id, s.translation_ru order by s.id;"
 ```
-Expected: у каждого из пяти предложений минимум одно связанное слово; у «Учитель в школе.» — два, у «Солнце и луна.» — два.
+Expected: у каждого из пяти примеров по 2 связанные единицы.
 
 - [ ] **Step 5: Написать README**
 
@@ -1363,9 +1999,9 @@ Expected: у каждого из пяти предложений минимум 
 ````markdown
 # Mufradat Bot
 
-Telegram Mini App для заучивания арабских слов группой из ~10 человек. Общая
-колода на всех: админ наполняет базу через фото страниц учебника, остальные учат
-по карточкам с интервальным повторением (FSRS). Личный прогресс — у каждого свой.
+Telegram Mini App для заучивания арабских слов группой из ~10 человек. Общая колода
+на всех: админ наполняет базу, остальные учат по карточкам с интервальным
+повторением (FSRS). Прогресс у каждого свой.
 
 Дизайн: `docs/superpowers/specs/2026-08-05-mufradat-bot-design.md`.
 
@@ -1378,14 +2014,16 @@ Telegram Mini App для заучивания арабских слов груп
 ## Локальный запуск
 
 ```bash
-cp .env.example .env         # порт 5433, чтобы не конфликтовать с локальным Postgres
-docker compose up -d         # Postgres 16 + отдельная тестовая база
+cp .env.example .env         # заполнить значения; порт 5433, чтобы не мешать локальному Postgres
+docker compose up -d
 uv sync --extra dev
-uv run alembic upgrade head
-uv run python scripts/seed.py
+uv run python manage.py migrate
+uv run python manage.py seed_deck
+uv run python manage.py createsuperuser
+uv run python manage.py runserver
 ```
 
-Проверка соединения: `uv run python scripts/check_db.py`.
+Админка: `http://127.0.0.1:8000/admin/`.
 
 ## Тесты
 
@@ -1394,47 +2032,61 @@ uv run pytest            # весь набор
 uv run ruff check .      # линтер
 ```
 
-Тесты, которым нужна БД, идут в отдельную базу `mufradat_test` (создаётся
-автоматически при первом старте контейнера) и откатывают транзакцию после
-каждого теста.
+Тестовую базу `pytest-django` создаёт и удаляет сам.
 
-## Структура
+## Что где лежит
 
 | Путь | Ответственность |
 |---|---|
-| `app/config.py` | настройки из `.env`, гейтинг админа |
-| `app/db/` | модели SQLAlchemy, сессии, перечисления |
-| `app/services/arabic.py` | нормализация арабского, сопоставление слов предложения |
-| `app/services/dedup.py` | классификация импортируемых слов |
-| `alembic/` | миграции |
-| `scripts/` | проверка соединения, сидер |
+| `mufradat/config.py` | настройки из `.env`, гейтинг админа |
+| `mufradat/settings.py` | настройки Django, собирает `DATABASES` из конфига |
+| `vocabulary/models.py` | `Entry` (слова, фразы, формы), примеры, прогресс, история |
+| `vocabulary/admin.py` | админка для правки базы без кода |
+| `vocabulary/services/arabic.py` | нормализация, сопоставление слов предложения |
+| `vocabulary/services/dedup.py` | поиск похожих записей при импорте |
+| `vocabulary/services/curriculum.py` | загрузчик `content/curriculum.yaml` |
+| `content/curriculum.yaml` | **поведение ИИ: темы, правила, примеры** |
+
+## Как менять поведение ИИ
+
+Правится `content/curriculum.yaml`, код не трогается. Главный рычаг — блок
+`examples` внутри темы: модель ловит стиль по образцам точнее, чем по описанию.
+Список `pronouns` управляет и формами слов, и лицами во фразах.
+
+Проверить файл после правки:
+
+```bash
+uv run pytest tests/services/test_curriculum.py -q
+```
 ````
 
-- [ ] **Step 6: Прогнать весь набор тестов и линтер**
+- [ ] **Step 6: Прогнать весь набор и линтер**
 
-Run: `uv run pytest -v && uv run ruff check . && uv run ruff format --check .`
-Expected: все тесты PASS, линтер без ошибок.
+Run: `uv run pytest -q 2>&1 | tail -3 && uv run ruff format . && uv run ruff check .`
+Expected: 62 passed, линтер без ошибок.
 
 - [ ] **Step 7: Закоммитить**
 
 ```bash
-git add scripts/seed.py README.md
-git commit -m "feat: idempotent seeder with sample vocabulary and README"
+git add vocabulary/management README.md
+git commit -m "feat: idempotent deck seeder and project README"
 ```
 
-**Проверка задачи для владельца:** сидер заливает 20 слов и 5 предложений со связками, повторный запуск ничего не добавляет, README описывает запуск с нуля.
+**Проверка задачи для владельца:** `manage.py seed_deck` заливает 21 слово, 6 форм, 5 фраз, 5 примеров и 10 связок; повторный запуск ничего не добавляет; в админке видны все три типа единиц.
 
 ---
 
 ## Что дальше
 
-Следующие планы (пишутся по одному, после одобрения предыдущего):
+Следующие планы пишутся по одному, после одобрения предыдущего:
 
 | План | Содержание | Этап спеки |
 |---|---|---|
 | 2 | Скелет бота: `/start` печатает Telegram ID, роли, `/help` | 3 |
-| 3 | Импорт по фото: vision, FSM подтверждения, запись | 4 |
-| 4 | FastAPI: валидация `initData`, очереди, FSRS | 5 |
-| 5 | Mini App на Vue 3: три режима, карточки | 6 |
-| 6 | Генерация предложений и кандидаты в новые слова | 7 |
-| 7 | Полировка: счётчики, фильтры, лимиты, обработка ошибок | 8 |
+| 3 | Ручной ввод `/add`: слова и фразы с занятий | 4 |
+| 4 | Импорт по фото: vision, дедупликация, подтверждение | 5 |
+| 5 | Картинки: Openverse, своё фото, атрибуция | 6 |
+| 6 | DRF: аутентификация по `initData`, очереди, FSRS | 7 |
+| 7 | Mini App на Vue 3: три режима, карточки | 8 |
+| 8 | Словоформы `/forms` и генерация по темам | 9 |
+| 9 | Полировка | 10 |
