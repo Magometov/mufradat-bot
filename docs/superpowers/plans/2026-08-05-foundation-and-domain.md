@@ -4,9 +4,9 @@
 
 **Goal:** Поднять Django-проект с рабочей БД, схемой данных, админкой, протестированной логикой обработки арабского и редактируемым файлом поведения ИИ — фундамент, на который встанут бот, API и Mini App.
 
-**Architecture:** Проект Django `mufradat/` (настройки, конфиг) плюс приложение `vocabulary/` (модели, админка, домен). Настройки читаются один раз через `pydantic-settings`, `settings.py` собирает из них `DATABASES` — параметры БД не дублируются между `docker-compose.yml` и приложением. Логика обработки арабского живёт в `vocabulary/services/arabic.py` как чистые функции без БД и тестируется полностью; всё, что требует БД, тестируется на реальном Postgres 16 через `pytest-django`, который сам создаёт и удаляет тестовую базу.
+**Architecture:** Питон живёт в `backend/`: `config/` (настройки, urls, wsgi) и приложение `apps/vocabulary/` (модели, админка, домен). Настройки читаются через `os.getenv` + `python-dotenv`, те же переменные читает `docker-compose.yml`, поэтому параметры БД не дублируются. Логика обработки арабского живёт в `backend/apps/vocabulary/services/arabic.py` как чистые функции без БД и тестируется полностью; всё, что требует БД, тестируется на реальном Postgres 16 через `pytest-django`, который сам создаёт и удаляет тестовую базу.
 
-**Tech Stack:** Python 3.12, Django 6.0, psycopg 3.3, Postgres 16 в Docker, pydantic-settings, PyYAML, Pillow, pytest + pytest-django, uv.
+**Tech Stack:** Python 3.12, Django 6.0, psycopg 3.3, Postgres 16 в Docker, python-dotenv, pydantic, PyYAML, Pillow, pytest + pytest-django, uv.
 
 Покрывает этапы 1–2 спеки `docs/superpowers/specs/2026-08-05-mufradat-bot-design.md` (ревизия 3).
 
@@ -22,7 +22,7 @@
 - Никаких секретов в коде. `.env` в `.gitignore`; `.env.example` — только имена и
   комментарии, без значений.
 - Версии (проверены на PyPI 2026-08-05): `django>=6.0,<6.1`,
-  `psycopg[binary]>=3.3,<3.4`, `pydantic-settings>=2.14,<3`, `pillow>=12.3,<13`,
+  `psycopg[binary]>=3.3,<3.4`, `python-dotenv>=1.2,<2`, `pydantic>=2.13,<3`, `pillow>=12.3,<13`,
   `pyyaml>=6,<7`, `pytest>=9.1,<10`, `pytest-django>=4.12,<5`, `ruff>=0.16,<0.17`.
   DRF, aiogram, fsrs и anthropic добавляются в своих планах, не здесь.
 - Django 6: у `CheckConstraint` аргумент называется `condition`, а не `check`
@@ -33,532 +33,32 @@
 
 ---
 
-### Task 1: Каркас Django, конфигурация, БД
+### Task 1: Каркас Django, конфигурация, БД — **выполнено**
 
-**Files:**
-- Modify: `pyproject.toml` (переписать под Django), `docker-compose.yml`, `.env`, `.env.example`, `.gitignore`
-- Delete: `docker/init-test-db.sql`, каталог `app/` (артефакты стека SQLAlchemy)
-- Delete после генерации: `mufradat/asgi.py`, `vocabulary/views.py`, `vocabulary/admin.py`, `vocabulary/models.py` — не нужны до своих задач
-- Create: `manage.py`, `mufradat/{__init__,settings,urls,asgi,wsgi}.py` (генерируются), `mufradat/config.py`
-- Create: `vocabulary/` (генерируется `startapp`)
-- Test: `tests/test_config.py` (переписать)
-
-**Interfaces:**
-- Consumes: ничего.
-- Produces:
-  - `mufradat.config.Settings` — **обязательные** (без значений по умолчанию, только из окружения): `postgres_user: str`, `postgres_password: SecretStr`, `postgres_db: str`, `postgres_host: str`, `postgres_port: int`, `django_secret_key: SecretStr`. Со значениями по умолчанию: `django_debug: bool = False`, `admin_telegram_ids: Annotated[list[int], NoDecode] = []`, `ai_model: str = "claude-sonnet-5"`, `bot_token`/`anthropic_api_key`/`webapp_url` = `None`. Метод `is_admin(telegram_id: int) -> bool`.
-  - `mufradat.config.get_settings() -> Settings` — кэширующий геттер.
-  - `mufradat.settings` — модуль настроек Django (`DJANGO_SETTINGS_MODULE`).
-
-- [ ] **Step 1: Убрать артефакты старого стека**
-
-Каталог `app/` и init-скрипт тестовой базы относились к SQLAlchemy. `pytest-django`
-создаёт тестовую базу сам, поэтому отдельная `mufradat_test` больше не нужна.
-
-Run: `rm -rf app docker/init-test-db.sql && docker compose exec db dropdb -U mufradat --if-exists mufradat_test && echo cleaned`
-Expected: `cleaned`.
-
-- [ ] **Step 2: Переписать `pyproject.toml`**
-
-```toml
-[project]
-name = "mufradat-bot"
-version = "0.1.0"
-description = "Telegram Mini App for learning Arabic vocabulary with spaced repetition"
-requires-python = ">=3.12,<3.13"
-dependencies = [
-    "django>=6.0,<6.1",
-    "psycopg[binary]>=3.3,<3.4",
-    "pydantic-settings>=2.14,<3",
-    "pillow>=12.3,<13",
-    "pyyaml>=6,<7",
-]
-
-[project.optional-dependencies]
-dev = [
-    "pytest>=9.1,<10",
-    "pytest-django>=4.12,<5",
-    "ruff>=0.16,<0.17",
-]
-# Fallback diacritizer: pulls torch (~1-2 GB), so it stays out of the default set.
-tashkeel = [
-    "arabic-diacritizer>=1.0,<2",
-]
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["mufradat", "vocabulary"]
-
-[tool.pytest.ini_options]
-DJANGO_SETTINGS_MODULE = "mufradat.settings"
-testpaths = ["tests"]
-
-[tool.ruff]
-line-length = 100
-target-version = "py312"
-# ruff format also reformats python blocks inside markdown, which mangles the
-# deliberate fragments in the plans (a bare "app-name," line became a tuple).
-exclude = ["docs"]
-
-[tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
-
-[tool.ruff.lint.per-file-ignores]
-# Django migrations are generated code.
-"*/migrations/*" = ["E501"]
-```
-
-- [ ] **Step 3: Убрать монтирование init-скрипта из `docker-compose.yml`**
-
-Удалить из `volumes` сервиса `db` строку:
-
-```yaml
-      - ./docker/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql:ro
-```
-
-Остальное (подстановка `${POSTGRES_*}`, порт `5433`, healthcheck) не трогать.
-
-Run: `docker compose config --quiet && echo "compose ok"`
-Expected: `compose ok`.
-
-- [ ] **Step 4: Обновить `.env.example` и `.env`**
-
-Из обоих файлов убрать `DATABASE_URL`: Django принимает параметры БД по частям, и
-готовый DSN ему не нужен.
-
-Добавить в `.env.example` после блока базы данных:
+Структуру по ходу работы задал владелец, поэтому здесь записано фактическое
+состояние, а не исходные шаги.
 
 ```
-# --- Django ------------------------------------------------------------------
-# Обязателен, когда DJANGO_DEBUG=false. Сгенерировать:
-#   uv run python -c "import secrets; print(secrets.token_urlsafe(50))"
-DJANGO_SECRET_KEY=
-DJANGO_DEBUG=
+docker-compose.yml  pyproject.toml  .env  .env.example      # корень
+backend/manage.py
+backend/config/{settings,urls,wsgi}.py
+backend/apps/vocabulary/{apps.py,migrations/}
+backend/tests/
 ```
 
-В `.env` — те же две строки, но заполненные: `DJANGO_DEBUG=true` и настоящий ключ,
-потому что `django_secret_key` обязателен:
-
-Run: `` key=$(uv run python -c "import secrets; print(secrets.token_urlsafe(50))") && printf 'DJANGO_SECRET_KEY=%s\nDJANGO_DEBUG=true\n' "$key" ``
-Expected: ключ сгенерирован и вписан в `.env` (файл в `.gitignore`).
-
-- [ ] **Step 5: Установить зависимости**
-
-Run: `uv sync --extra dev 2>&1 | tail -6`
-Expected: среди установленного есть `django`, `psycopg`, `pytest-django`.
-
-- [ ] **Step 6: Создать проект и приложение Django**
-
-Run: `uv run django-admin startproject mufradat . && uv run python manage.py startapp vocabulary && ls mufradat vocabulary`
-Expected: в `mufradat/` появились `settings.py`, `urls.py`, `wsgi.py`, `asgi.py`; в `vocabulary/` — `models.py`, `admin.py`, `apps.py`, `migrations/`.
-
-Сразу убрать то, что не нужно до своих задач: `asgi.py` не используется (`runserver`
-идёт через `WSGI_APPLICATION`), а пустые `models.py`, `admin.py` и `views.py` только
-ломают линтер неиспользуемыми импортами.
-
-Run: `rm -f mufradat/asgi.py vocabulary/views.py vocabulary/admin.py vocabulary/models.py vocabulary/tests.py`
-Expected: файлы удалены; `manage.py check` на шаге 12 всё равно проходит.
-
-- [ ] **Step 7: Написать падающие тесты конфигурации**
-
-Заменить содержимое `tests/test_config.py`:
-
-```python
-from pathlib import Path
-
-import pytest
-from pydantic import ValidationError
-
-from mufradat.config import Settings
-
-ENV_VARS = (
-    "POSTGRES_USER",
-    "POSTGRES_PASSWORD",
-    "POSTGRES_DB",
-    "POSTGRES_HOST",
-    "POSTGRES_PORT",
-    "DJANGO_SECRET_KEY",
-    "DJANGO_DEBUG",
-    "BOT_TOKEN",
-    "ADMIN_TELEGRAM_IDS",
-    "ANTHROPIC_API_KEY",
-    "AI_MODEL",
-    "WEBAPP_URL",
-)
-
-# Минимум для конструктора: у этих полей нет значений по умолчанию.
-REQUIRED = {
-    "postgres_user": "u",
-    "postgres_password": "p",
-    "postgres_db": "d",
-    "postgres_host": "h",
-    "postgres_port": 5433,
-    "django_secret_key": "k",
-}
-
-DOTENV_REQUIRED = """
-POSTGRES_USER=u
-POSTGRES_PASSWORD=p
-POSTGRES_DB=d
-POSTGRES_HOST=h
-POSTGRES_PORT=5433
-DJANGO_SECRET_KEY=k
-"""
-
-
-@pytest.fixture(autouse=True)
-def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Изолировать тесты от того, что разработчик держит в окружении."""
-    for name in ENV_VARS:
-        monkeypatch.delenv(name, raising=False)
-
-
-def write_dotenv(tmp_path: Path, body: str) -> Path:
-    path = tmp_path / ".env"
-    path.write_text(body, encoding="utf-8")
-    return path
-
-
-def test_database_fields_are_required() -> None:
-    # Пропущенная переменная должна назвать себя, а не привести к подключению не туда.
-    with pytest.raises(ValidationError, match="postgres_user"):
-        Settings(_env_file=None)
-
-
-def test_secret_key_is_required() -> None:
-    without_key = {key: value for key, value in REQUIRED.items() if key != "django_secret_key"}
-
-    with pytest.raises(ValidationError, match="django_secret_key"):
-        Settings(**without_key, _env_file=None)
-
-
-def test_blank_value_is_treated_as_missing() -> None:
-    # В .env из шаблона пусто у каждого ключа: это «не заполнено», а не пустой логин.
-    incomplete = REQUIRED | {"postgres_user": "   "}
-
-    with pytest.raises(ValidationError, match="postgres_user"):
-        Settings(**incomplete, _env_file=None)
-
-
-def test_reads_values_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("POSTGRES_USER", "env_user")
-    monkeypatch.setenv("POSTGRES_PASSWORD", "env_pw")
-    monkeypatch.setenv("POSTGRES_DB", "env_db")
-    monkeypatch.setenv("POSTGRES_HOST", "env_host")
-    monkeypatch.setenv("POSTGRES_PORT", "6543")
-    monkeypatch.setenv("DJANGO_SECRET_KEY", "env_key")
-
-    settings = Settings(_env_file=None)
-
-    assert settings.postgres_user == "env_user"
-    assert settings.postgres_db == "env_db"
-    assert settings.postgres_host == "env_host"
-    assert settings.postgres_port == 6543
-    assert settings.postgres_password.get_secret_value() == "env_pw"
-
-
-def test_reads_values_from_dotenv_file(tmp_path: Path) -> None:
-    settings = Settings(_env_file=write_dotenv(tmp_path, DOTENV_REQUIRED))
-
-    assert settings.postgres_user == "u"
-    assert settings.postgres_port == 5433
-
-
-def test_admin_ids_from_dotenv_file(tmp_path: Path) -> None:
-    # Регрессия: составной тип из .env раньше JSON-декодировался до валидаторов,
-    # поэтому «111,222» роняло старт.
-    dotenv = write_dotenv(tmp_path, DOTENV_REQUIRED + "ADMIN_TELEGRAM_IDS=111,222\n")
-
-    settings = Settings(_env_file=dotenv)
-
-    assert settings.admin_telegram_ids == [111, 222]
-
-
-def test_blank_admin_ids_in_dotenv_file_gives_empty_list(tmp_path: Path) -> None:
-    # Та же регрессия, пустой случай: в шаблоне ADMIN_TELEGRAM_IDS пустой.
-    dotenv = write_dotenv(tmp_path, DOTENV_REQUIRED + "ADMIN_TELEGRAM_IDS=\n")
-
-    settings = Settings(_env_file=dotenv)
-
-    assert settings.admin_telegram_ids == []
-
-
-def test_admin_ids_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ADMIN_TELEGRAM_IDS", " 111 , 222 , ")
-
-    settings = Settings(**REQUIRED, _env_file=None)
-
-    assert settings.admin_telegram_ids == [111, 222]
-
-
-def test_admin_ids_absent_gives_empty_list() -> None:
-    assert Settings(**REQUIRED, _env_file=None).admin_telegram_ids == []
-
-
-def test_is_admin() -> None:
-    settings = Settings(**REQUIRED, admin_telegram_ids="111", _env_file=None)
-
-    assert settings.is_admin(111) is True
-    assert settings.is_admin(222) is False
-
-
-def test_ai_model_has_default() -> None:
-    assert Settings(**REQUIRED, _env_file=None).ai_model == "claude-sonnet-5"
-
-
-def test_django_debug_is_off_unless_enabled() -> None:
-    assert Settings(**REQUIRED, _env_file=None).django_debug is False
-    assert Settings(**REQUIRED, django_debug="true", _env_file=None).django_debug is True
-
-
-def test_optional_fields_default_to_none() -> None:
-    settings = Settings(**REQUIRED, _env_file=None)
-
-    assert settings.bot_token is None
-    assert settings.anthropic_api_key is None
-    assert settings.webapp_url is None
-
-
-def test_secrets_are_hidden_in_repr() -> None:
-    # Отличимые значения, а не слово «secret»: оно есть в имени поля django_secret_key,
-    # и проверка на подстроку не проверяла бы ничего.
-    settings = Settings(
-        **REQUIRED | {"postgres_password": "pw-xyz", "django_secret_key": "key-qaz"},
-        bot_token="123:tok-abc",
-        _env_file=None,
-    )
-
-    dumped = repr(settings)
-    assert "pw-xyz" not in dumped
-    assert "key-qaz" not in dumped
-    assert "tok-abc" not in dumped
-    assert settings.bot_token is not None
-    assert settings.bot_token.get_secret_value() == "123:tok-abc"
-```
-
-- [ ] **Step 8: Убедиться, что тесты падают**
-
-Run: `uv run pytest tests/test_config.py -q 2>&1 | tail -5`
-Expected: FAIL — `ModuleNotFoundError: No module named 'mufradat.config'`.
-
-- [ ] **Step 9: Реализовать `mufradat/config.py`**
-
-```python
-from functools import lru_cache
-from typing import Annotated
-
-from pydantic import SecretStr, field_validator, model_validator
-from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
-
-
-class Settings(BaseSettings):
-    """Настройки из окружения и `.env`; общие для веба и бота."""
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
-
-    # Без значений по умолчанию: те же переменные читает docker-compose, поэтому
-    # данные живут только в .env, а пропущенная переменная роняет старт с именем поля.
-    postgres_user: str
-    postgres_password: SecretStr
-    postgres_db: str
-    postgres_host: str
-    postgres_port: int
-
-    django_secret_key: SecretStr
-    django_debug: bool = False
-
-    bot_token: SecretStr | None = None
-    # NoDecode отключает JSON-разбор значения: для составного типа он идёт до любых
-    # валидаторов и падает на записи через запятую, которую только и держит .env.
-    admin_telegram_ids: Annotated[list[int], NoDecode] = []
-
-    anthropic_api_key: SecretStr | None = None
-    # Дефолт в коде намеренно: модель меняется для всей группы сразу.
-    ai_model: str = "claude-sonnet-5"
-
-    webapp_url: str | None = None
-
-    @model_validator(mode="before")
-    @classmethod
-    def _ignore_blank_values(cls, data: object) -> object:
-        """Считать `VAR=` отсутствующим, чтобы шаблонный `.env` давал понятную ошибку."""
-        if isinstance(data, dict):
-            return {
-                key: value
-                for key, value in data.items()
-                if not (isinstance(value, str) and not value.strip())
-            }
-        return data
-
-    @field_validator("admin_telegram_ids", mode="before")
-    @classmethod
-    def _parse_admin_ids(cls, value: object) -> object:
-        """Разобрать список ID, записанный через запятую."""
-        if isinstance(value, str):
-            return [int(part) for part in value.split(",") if part.strip()]
-        return value
-
-    def is_admin(self, telegram_id: int) -> bool:
-        """Единственное место, где решается вопрос о правах админа."""
-        return telegram_id in self.admin_telegram_ids
-
-
-@lru_cache
-def get_settings() -> Settings:
-    """Прочитать окружение один раз за процесс."""
-    return Settings()
-```
-
-- [ ] **Step 10: Убедиться, что тесты проходят**
-
-Run: `uv run pytest tests/test_config.py -q 2>&1 | tail -3`
-Expected: 14 passed.
-
-- [ ] **Step 11: Заменить `mufradat/settings.py` и подчистить `manage.py`**
-
-Сгенерированный `settings.py` состоит в основном из комментариев со ссылками на
-документацию. Вместо точечных правок проще заменить содержимое целиком, оставив
-только те комментарии, что объясняют решение:
-
-```python
-from pathlib import Path
-
-from mufradat.config import get_settings
-
-BASE_DIR = Path(__file__).resolve().parent.parent
-
-# Единственное место, где читается окружение; процесс бота импортирует этот же объект.
-config = get_settings()
-
-SECRET_KEY = config.django_secret_key.get_secret_value()
-
-DEBUG = config.django_debug
-
-ALLOWED_HOSTS: list[str] = ["localhost", "127.0.0.1"]
-
-INSTALLED_APPS = [
-    "django.contrib.admin",
-    "django.contrib.auth",
-    "django.contrib.contenttypes",
-    "django.contrib.sessions",
-    "django.contrib.messages",
-    "django.contrib.staticfiles",
-    "vocabulary",
-]
-
-MIDDLEWARE = [
-    "django.middleware.security.SecurityMiddleware",
-    "django.contrib.sessions.middleware.SessionMiddleware",
-    "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
-    "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",
-]
-
-ROOT_URLCONF = "mufradat.urls"
-
-TEMPLATES = [
-    {
-        "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
-        "APP_DIRS": True,
-        "OPTIONS": {
-            "context_processors": [
-                "django.template.context_processors.request",
-                "django.contrib.auth.context_processors.auth",
-                "django.contrib.messages.context_processors.messages",
-            ],
-        },
-    },
-]
-
-WSGI_APPLICATION = "mufradat.wsgi.application"
-
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": config.postgres_db,
-        "USER": config.postgres_user,
-        "PASSWORD": config.postgres_password.get_secret_value(),
-        "HOST": config.postgres_host,
-        "PORT": str(config.postgres_port),
-    }
-}
-
-# Пароли есть только у staff в админке; ученики входят через Telegram.
-AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
-    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
-    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
-]
-
-LANGUAGE_CODE = "ru-ru"
-TIME_ZONE = "UTC"
-USE_I18N = True
-USE_TZ = True
-
-STATIC_URL = "static/"
-
-# Картинки единиц: скачиваются один раз и дальше отдаются как обычные файлы.
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
-```
-
-`manage.py` тоже сокращается: guard вокруг импорта Django нужен там, где окружение
-собирают руками, а мы всегда запускаем через `uv run`.
-
-```python
-#!/usr/bin/env python
-"""Точка входа для команд Django."""
-
-import os
-import sys
-
-from django.core.management import execute_from_command_line
-
-
-def main() -> None:
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mufradat.settings")
-    execute_from_command_line(sys.argv)
-
-
-if __name__ == "__main__":
-    main()
-```
-
-- [ ] **Step 12: Проверить, что Django поднимается и миграции применяются**
-
-Run: `uv run python manage.py check`
-Expected: `System check identified no issues (0 silenced).`
-
-Run: `uv run python manage.py migrate 2>&1 | tail -6`
-Expected: применяются миграции `contenttypes`, `auth`, `admin`, `sessions` без ошибок.
-
-Run: `docker compose exec db psql -U mufradat -d mufradat -c '\dt' | head -12`
-Expected: в списке есть `auth_user`, `django_migrations`, `django_content_type`.
-
-- [ ] **Step 13: Добавить `media/` в `.gitignore`, проверить линтер, закоммитить**
-
-Дописать в `.gitignore` строку `media/`.
-
-Run: `uv run ruff format . && uv run ruff check .`
-Expected: линтер без ошибок.
-
-```bash
-git add -A
-git commit -m "feat: Django project skeleton with settings sourced from one config"
-```
-
-**Проверка задачи для владельца:** `manage.py check` без замечаний, `manage.py migrate` прошёл, `uv run pytest` зелёный (14 тестов).
+- Настройки — `os.getenv` плюс `python-dotenv`; `.env` читается из корня репозитория,
+  и уже заданные переменные окружения не перезаписываются, поэтому в Docker побеждает
+  реальное окружение.
+- Параметры БД (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_NAME`, `POSTGRES_HOST`,
+  `POSTGRES_PORT`) читают и `docker-compose.yml`, и Django — значения только в `.env`.
+- `DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"` задан глобально: иначе модели
+  из задачи 4 дадут предупреждения `models.W042`.
+- `verbose_name` приложения — «Словарный запас», это заголовок раздела в админке.
+- Тестов на `settings` нет по решению владельца: конфигурация проверяется тем, что
+  проект поднимается.
+
+Проверка: `uv run python backend/manage.py check` без замечаний, `migrate` проходит,
+админка отдаёт HTTP 200.
 
 ---
 
@@ -568,8 +68,8 @@ git commit -m "feat: Django project skeleton with settings sourced from one conf
 расстановкой харакат, должно приводиться к одной форме.
 
 **Files:**
-- Create: `vocabulary/services/__init__.py`, `vocabulary/services/arabic.py`
-- Test: `tests/services/__init__.py`, `tests/services/test_arabic.py`
+- Create: `backend/apps/backend/apps/vocabulary/services/__init__.py`, `backend/apps/vocabulary/services/arabic.py`
+- Test: `backend/backend/tests/services/__init__.py`, `backend/tests/services/test_arabic.py`
 
 **Interfaces:**
 - Consumes: ничего (чистая логика, без БД и настроек).
@@ -577,12 +77,12 @@ git commit -m "feat: Django project skeleton with settings sourced from one conf
 
 - [ ] **Step 1: Написать падающие тесты**
 
-Создать пакеты: `mkdir -p vocabulary/services tests/services && touch vocabulary/services/__init__.py tests/services/__init__.py`.
+Создать пакеты: `mkdir -p backend/apps/vocabulary/services backend/tests/services && touch backend/apps/vocabulary/services/__init__.py backend/tests/services/__init__.py`.
 
-`tests/services/test_arabic.py`:
+`backend/tests/services/test_arabic.py`:
 
 ```python
-from vocabulary.services.arabic import normalize_arabic
+from apps.vocabulary.services.arabic import normalize_arabic
 
 
 def test_strips_diacritics() -> None:
@@ -647,12 +147,12 @@ def test_gender_pairs_collapse_and_that_is_expected() -> None:
 
 - [ ] **Step 2: Убедиться, что тесты падают**
 
-Run: `uv run pytest tests/services/test_arabic.py -q 2>&1 | tail -5`
+Run: `uv run pytest backend/tests/services/test_arabic.py -q 2>&1 | tail -5`
 Expected: FAIL — `ModuleNotFoundError: No module named 'vocabulary.services.arabic'`.
 
 - [ ] **Step 3: Реализовать нормализацию**
 
-`vocabulary/services/arabic.py`:
+`backend/apps/vocabulary/services/arabic.py`:
 
 ```python
 """Работа с арабским текстом: чистые функции без БД и настроек."""
@@ -695,13 +195,13 @@ def normalize_arabic(text: str) -> str:
 
 - [ ] **Step 4: Убедиться, что тесты проходят**
 
-Run: `uv run pytest tests/services/test_arabic.py -q 2>&1 | tail -3`
+Run: `uv run pytest backend/tests/services/test_arabic.py -q 2>&1 | tail -3`
 Expected: 13 passed.
 
 - [ ] **Step 5: Закоммитить**
 
 ```bash
-git add vocabulary/services tests/services
+git add backend/apps/vocabulary/services tests/services
 git commit -m "feat: normalize Arabic text for near-duplicate lookup"
 ```
 
@@ -712,8 +212,8 @@ git commit -m "feat: normalize Arabic text for near-duplicate lookup"
 ### Task 3: Сопоставление слов предложения со словарём
 
 **Files:**
-- Modify: `vocabulary/services/arabic.py` (дописать в конец)
-- Modify: `tests/services/test_arabic.py` (дописать в конец)
+- Modify: `backend/apps/vocabulary/services/arabic.py` (дописать в конец)
+- Modify: `backend/tests/services/test_arabic.py` (дописать в конец)
 
 **Interfaces:**
 - Consumes: `normalize_arabic`.
@@ -721,10 +221,10 @@ git commit -m "feat: normalize Arabic text for near-duplicate lookup"
 
 - [ ] **Step 1: Написать падающие тесты**
 
-Дописать в конец `tests/services/test_arabic.py`:
+Дописать в конец `backend/tests/services/test_arabic.py`:
 
 ```python
-from vocabulary.services.arabic import match_entries_in_sentence
+from apps.vocabulary.services.arabic import match_entries_in_sentence
 
 # arabic_norm -> entry id
 KNOWN = {
@@ -776,12 +276,12 @@ def test_empty_dictionary() -> None:
 
 - [ ] **Step 2: Убедиться, что тесты падают**
 
-Run: `uv run pytest tests/services/test_arabic.py -q 2>&1 | tail -5`
+Run: `uv run pytest backend/tests/services/test_arabic.py -q 2>&1 | tail -5`
 Expected: FAIL — `ImportError: cannot import name 'match_entries_in_sentence'`.
 
 - [ ] **Step 3: Реализовать сопоставление**
 
-Дописать в конец `vocabulary/services/arabic.py`:
+Дописать в конец `backend/apps/vocabulary/services/arabic.py`:
 
 ```python
 _ARABIC_LETTERS = re.compile(r"[ء-ي]+")
@@ -835,13 +335,13 @@ def match_entries_in_sentence(sentence: str, known: dict[str, int]) -> set[int]:
 
 - [ ] **Step 4: Прогнать тесты файла**
 
-Run: `uv run pytest tests/services/test_arabic.py -q 2>&1 | tail -3`
+Run: `uv run pytest backend/tests/services/test_arabic.py -q 2>&1 | tail -3`
 Expected: 22 passed (13 из задачи 2 + 9 новых).
 
 - [ ] **Step 5: Закоммитить**
 
 ```bash
-git add vocabulary/services/arabic.py tests/services/test_arabic.py
+git add backend/apps/vocabulary/services/arabic.py tests/services/test_arabic.py
 git commit -m "feat: match sentence tokens to dictionary entries through proclitics"
 ```
 
@@ -852,10 +352,10 @@ git commit -m "feat: match sentence tokens to dictionary entries through proclit
 ### Task 4: Модели данных и первая миграция
 
 **Files:**
-- Create: `vocabulary/enums.py`
-- Create: `vocabulary/models.py`
-- Create: `vocabulary/migrations/0001_initial.py` (генерируется)
-- Test: `tests/db/__init__.py`, `tests/db/test_models.py`
+- Create: `backend/apps/vocabulary/enums.py`
+- Create: `backend/apps/vocabulary/models.py`
+- Create: `backend/apps/vocabulary/migrations/0001_initial.py` (генерируется)
+- Test: `backend/backend/tests/db/__init__.py`, `backend/tests/db/test_models.py`
 
 **Interfaces:**
 - Consumes: `normalize_arabic`.
@@ -865,7 +365,7 @@ git commit -m "feat: match sentence tokens to dictionary entries through proclit
 
 - [ ] **Step 1: Создать перечисления**
 
-`vocabulary/enums.py`:
+`backend/apps/vocabulary/enums.py`:
 
 ```python
 from django.db import models
@@ -913,14 +413,14 @@ class Source(models.TextChoices):
 
 - [ ] **Step 2: Написать модели**
 
-Создать `vocabulary/models.py`:
+Создать `backend/apps/vocabulary/models.py`:
 
 ```python
 from django.db import models
 from django.db.models import Q
 
-from vocabulary.enums import Direction, Kind, Person, Pos, Source, Tense
-from vocabulary.services.arabic import normalize_arabic
+from apps.vocabulary.enums import Direction, Kind, Person, Pos, Source, Tense
+from apps.vocabulary.services.arabic import normalize_arabic
 
 
 class TelegramUser(models.Model):
@@ -1079,10 +579,10 @@ class ReviewLog(models.Model):
 
 - [ ] **Step 3: Сгенерировать и применить миграцию**
 
-Run: `uv run python manage.py makemigrations vocabulary`
-Expected: создан `vocabulary/migrations/0001_initial.py` с шестью моделями.
+Run: `uv run python backend/manage.py makemigrations vocabulary`
+Expected: создан `backend/apps/vocabulary/migrations/0001_initial.py` с шестью моделями.
 
-Run: `uv run python manage.py migrate`
+Run: `uv run python backend/manage.py migrate`
 Expected: `Applying vocabulary.0001_initial... OK`.
 
 Run: `docker compose exec db psql -U mufradat -d mufradat -c '\dt vocabulary*'`
@@ -1090,16 +590,16 @@ Expected: таблицы `vocabulary_entry`, `vocabulary_sentence`, `vocabulary_
 
 - [ ] **Step 4: Написать тесты моделей**
 
-Создать пакет: `mkdir -p tests/db && touch tests/db/__init__.py`.
+Создать пакет: `mkdir -p backend/tests/db && touch backend/tests/db/__init__.py`.
 
-`tests/db/test_models.py`:
+`backend/tests/db/test_models.py`:
 
 ```python
 import pytest
 from django.db.utils import IntegrityError
 
-from vocabulary.enums import Kind, Person, Source, Tense
-from vocabulary.models import Entry, Sentence, SentenceEntry
+from apps.vocabulary.enums import Kind, Person, Source, Tense
+from apps.vocabulary.models import Entry, Sentence, SentenceEntry
 
 pytestmark = pytest.mark.django_db
 
@@ -1250,13 +750,13 @@ Expected: 45 passed (14 конфигурация + 22 арабский + 9 мо�
 
 - [ ] **Step 6: Проверить, что модели и миграция не расходятся**
 
-Run: `uv run python manage.py makemigrations --check --dry-run`
+Run: `uv run python backend/manage.py makemigrations --check --dry-run`
 Expected: `No changes detected`.
 
 - [ ] **Step 7: Закоммитить**
 
 ```bash
-git add vocabulary tests
+git add backend/apps/vocabulary backend/tests
 git commit -m "feat: Entry model covering words, phrases and inflected forms"
 ```
 
@@ -1267,8 +767,8 @@ git commit -m "feat: Entry model covering words, phrases and inflected forms"
 ### Task 5: Админка
 
 **Files:**
-- Create: `vocabulary/admin.py`
-- Test: `tests/db/test_admin.py`
+- Create: `backend/apps/vocabulary/admin.py`
+- Test: `backend/tests/db/test_admin.py`
 
 **Interfaces:**
 - Consumes: модели из задачи 4.
@@ -1276,12 +776,12 @@ git commit -m "feat: Entry model covering words, phrases and inflected forms"
 
 - [ ] **Step 1: Написать админку**
 
-Создать `vocabulary/admin.py`:
+Создать `backend/apps/vocabulary/admin.py`:
 
 ```python
 from django.contrib import admin
 
-from vocabulary.models import Entry, Sentence, SentenceEntry, TelegramUser
+from apps.vocabulary.models import Entry, Sentence, SentenceEntry, TelegramUser
 
 
 class FormInline(admin.TabularInline):
@@ -1340,13 +840,13 @@ class TelegramUserAdmin(admin.ModelAdmin):
 
 - [ ] **Step 2: Написать тесты, что страницы открываются**
 
-`tests/db/test_admin.py`:
+`backend/tests/db/test_admin.py`:
 
 ```python
 import pytest
 
-from vocabulary.enums import Kind, Source
-from vocabulary.models import Entry
+from apps.vocabulary.enums import Kind, Source
+from apps.vocabulary.models import Entry
 
 pytestmark = pytest.mark.django_db
 
@@ -1385,30 +885,30 @@ def test_telegram_user_changelist_opens(staff_client) -> None:
 
 - [ ] **Step 3: Прогнать проверку Django и тесты**
 
-Run: `uv run python manage.py check && uv run pytest -q 2>&1 | tail -3`
+Run: `uv run python backend/manage.py check && uv run pytest -q 2>&1 | tail -3`
 Expected: проверка без замечаний, 49 passed.
 
 - [ ] **Step 4: Создать суперпользователя для ручного захода**
 
-Run: `uv run python manage.py createsuperuser --username admin --email admin@example.com`
+Run: `uv run python backend/manage.py createsuperuser --username admin --email admin@example.com`
 Expected: пароль введён вручную, `Superuser created successfully.`
 
 - [ ] **Step 5: Закоммитить**
 
 ```bash
-git add vocabulary/admin.py tests/db/test_admin.py
+git add backend/apps/vocabulary/admin.py tests/db/test_admin.py
 git commit -m "feat: admin for entries, examples and learners"
 ```
 
-**Проверка задачи для владельца:** `uv run python manage.py runserver`, открыть `http://127.0.0.1:8000/admin/` — единицы видны, фильтр по типу работает, у слова можно добавить форму инлайном.
+**Проверка задачи для владельца:** `uv run python backend/manage.py runserver`, открыть `http://127.0.0.1:8000/admin/` — единицы видны, фильтр по типу работает, у слова можно добавить форму инлайном.
 
 ---
 
 ### Task 6: Поиск похожих записей при импорте
 
 **Files:**
-- Create: `vocabulary/services/dedup.py`
-- Test: `tests/services/test_dedup.py`
+- Create: `backend/apps/vocabulary/services/dedup.py`
+- Test: `backend/tests/services/test_dedup.py`
 
 **Interfaces:**
 - Consumes: `Entry`, `normalize_arabic`.
@@ -1419,14 +919,14 @@ git commit -m "feat: admin for entries, examples and learners"
 
 - [ ] **Step 1: Написать падающие тесты**
 
-`tests/services/test_dedup.py`:
+`backend/tests/services/test_dedup.py`:
 
 ```python
 import pytest
 
-from vocabulary.enums import Kind, Person, Source
-from vocabulary.models import Entry
-from vocabulary.services.dedup import DuplicateKind, check_duplicate
+from apps.vocabulary.enums import Kind, Person, Source
+from apps.vocabulary.models import Entry
+from apps.vocabulary.services.dedup import DuplicateKind, check_duplicate
 
 pytestmark = pytest.mark.django_db
 
@@ -1523,12 +1023,12 @@ def test_same_translation_candidate_is_preferred_in_report() -> None:
 
 - [ ] **Step 2: Убедиться, что тесты падают**
 
-Run: `uv run pytest tests/services/test_dedup.py -q 2>&1 | tail -5`
+Run: `uv run pytest backend/tests/services/test_dedup.py -q 2>&1 | tail -5`
 Expected: FAIL — `ModuleNotFoundError: No module named 'vocabulary.services.dedup'`.
 
 - [ ] **Step 3: Реализовать поиск**
 
-`vocabulary/services/dedup.py`:
+`backend/apps/vocabulary/services/dedup.py`:
 
 ```python
 """Классификация входящей записи относительно общей колоды (§4.2 спеки)."""
@@ -1536,8 +1036,8 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'vocabulary.services.de
 from dataclasses import dataclass
 from enum import StrEnum
 
-from vocabulary.models import Entry
-from vocabulary.services.arabic import normalize_arabic
+from apps.vocabulary.models import Entry
+from apps.vocabulary.services.arabic import normalize_arabic
 
 
 class DuplicateKind(StrEnum):
@@ -1598,13 +1098,13 @@ def check_duplicate(arabic: str, translation_ru: str) -> DuplicateCheck:
 
 - [ ] **Step 4: Прогнать тесты**
 
-Run: `uv run pytest tests/services/test_dedup.py -q 2>&1 | tail -3`
+Run: `uv run pytest backend/tests/services/test_dedup.py -q 2>&1 | tail -3`
 Expected: 8 passed.
 
 - [ ] **Step 5: Закоммитить**
 
 ```bash
-git add vocabulary/services/dedup.py tests/services/test_dedup.py
+git add backend/apps/vocabulary/services/dedup.py tests/services/test_dedup.py
 git commit -m "feat: classify imported entries as new, exact duplicate or similar"
 ```
 
@@ -1615,9 +1115,9 @@ git commit -m "feat: classify imported entries as new, exact duplicate or simila
 ### Task 7: Файл поведения ИИ и его загрузчик
 
 **Files:**
-- Create: `content/curriculum.yaml`
-- Create: `vocabulary/services/curriculum.py`
-- Test: `tests/services/test_curriculum.py`
+- Create: `backend/content/curriculum.yaml`
+- Create: `backend/apps/vocabulary/services/curriculum.py`
+- Test: `backend/tests/services/test_curriculum.py`
 
 **Interfaces:**
 - Consumes: `vocabulary.enums.Person`.
@@ -1629,7 +1129,7 @@ git commit -m "feat: classify imported entries as new, exact duplicate or simila
 
 - [ ] **Step 1: Создать файл содержания**
 
-`content/curriculum.yaml`:
+`backend/backend/content/curriculum.yaml`:
 
 ```yaml
 # Файл поведения ИИ. Меняется без правки кода.
@@ -1697,7 +1197,7 @@ topics:
 
 - [ ] **Step 2: Написать падающие тесты**
 
-`tests/services/test_curriculum.py`:
+`backend/tests/services/test_curriculum.py`:
 
 ```python
 from pathlib import Path
@@ -1705,7 +1205,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from vocabulary.services.curriculum import load_curriculum
+from apps.vocabulary.services.curriculum import load_curriculum
 
 VALID = """
 rules:
@@ -1811,15 +1311,15 @@ def test_shipped_file_is_valid() -> None:
 
 - [ ] **Step 3: Убедиться, что тесты падают**
 
-Run: `uv run pytest tests/services/test_curriculum.py -q 2>&1 | tail -5`
+Run: `uv run pytest backend/tests/services/test_curriculum.py -q 2>&1 | tail -5`
 Expected: FAIL — `ModuleNotFoundError: No module named 'vocabulary.services.curriculum'`.
 
 - [ ] **Step 4: Реализовать загрузчик**
 
-`vocabulary/services/curriculum.py`:
+`backend/apps/vocabulary/services/curriculum.py`:
 
 ```python
-"""Загрузчик `content/curriculum.yaml` — редактируемого описания поведения ИИ.
+"""Загрузчик `backend/content/curriculum.yaml` — редактируемого описания поведения ИИ.
 
 Проверяется через pydantic, поэтому опечатка в файле даёт внятную ошибку, а не
 странный промпт.
@@ -1829,11 +1329,12 @@ from pathlib import Path
 from typing import Literal, Self
 
 import yaml
+from django.conf import settings
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from vocabulary.enums import Person
+from apps.vocabulary.enums import Person
 
-DEFAULT_PATH = Path(__file__).resolve().parents[2] / "content" / "curriculum.yaml"
+DEFAULT_PATH = Path(settings.BASE_DIR) / "content" / "curriculum.yaml"
 
 _VALID_PRONOUNS = {choice.value for choice in Person}
 
@@ -1914,35 +1415,35 @@ def load_curriculum(path: Path | None = None) -> Curriculum:
 
 - [ ] **Step 5: Прогнать тесты**
 
-Run: `uv run pytest tests/services/test_curriculum.py -q 2>&1 | tail -3`
+Run: `uv run pytest backend/tests/services/test_curriculum.py -q 2>&1 | tail -3`
 Expected: 9 passed.
 
 - [ ] **Step 6: Закоммитить**
 
 ```bash
-git add content vocabulary/services/curriculum.py tests/services/test_curriculum.py
+git add backend/content backend/apps/vocabulary/services/curriculum.py tests/services/test_curriculum.py
 git commit -m "feat: validated curriculum file driving AI content generation"
 ```
 
-**Проверка задачи для владельца:** впиши в `content/curriculum.yaml` опечатку в имени поля или несуществующее местоимение — `uv run pytest tests/services/test_curriculum.py::test_shipped_file_is_valid` упадёт с внятным сообщением.
+**Проверка задачи для владельца:** впиши в `backend/content/curriculum.yaml` опечатку в имени поля или несуществующее местоимение — `uv run pytest backend/tests/services/test_curriculum.py::test_shipped_file_is_valid` упадёт с внятным сообщением.
 
 ---
 
 ### Task 8: Сидер и README
 
 **Files:**
-- Create: `vocabulary/management/__init__.py`, `vocabulary/management/commands/__init__.py`, `vocabulary/management/commands/seed_deck.py`
+- Create: `backend/apps/vocabulary/management/__init__.py`, `backend/apps/vocabulary/management/commands/__init__.py`, `backend/apps/vocabulary/management/commands/seed_deck.py`
 - Create: `README.md`
 
 **Interfaces:**
 - Consumes: модели, `match_entries_in_sentence`.
-- Produces: команда `uv run python manage.py seed_deck` — идемпотентная.
+- Produces: команда `uv run python backend/manage.py seed_deck` — идемпотентная.
 
 - [ ] **Step 1: Написать команду**
 
-Создать `vocabulary/management/__init__.py` и `vocabulary/management/commands/__init__.py` пустыми.
+Создать `backend/apps/vocabulary/management/__init__.py` и `backend/apps/vocabulary/management/commands/__init__.py` пустыми.
 
-`vocabulary/management/commands/seed_deck.py`:
+`backend/apps/vocabulary/management/commands/seed_deck.py`:
 
 ```python
 """Наполнить общую колоду небольшим учебным набором.
@@ -1956,9 +1457,9 @@ from typing import Any
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from vocabulary.enums import Kind, Person, Pos, Source, Tense
-from vocabulary.models import Entry, Sentence, SentenceEntry
-from vocabulary.services.arabic import match_entries_in_sentence
+from apps.vocabulary.enums import Kind, Person, Pos, Source, Tense
+from apps.vocabulary.models import Entry, Sentence, SentenceEntry
+from apps.vocabulary.services.arabic import match_entries_in_sentence
 
 # (arabic, russian, transliteration, topic, part of speech)
 WORDS: list[tuple[str, str, str, str, str]] = [
@@ -2102,12 +1603,12 @@ class Command(BaseCommand):
 
 - [ ] **Step 2: Запустить сидер**
 
-Run: `uv run python manage.py seed_deck`
+Run: `uv run python backend/manage.py seed_deck`
 Expected: ровно `words +21, forms +6, phrases +5, sentences +5, links +10` (числа посчитаны прогоном логики сопоставления на этих данных).
 
 - [ ] **Step 3: Проверить идемпотентность**
 
-Run: `uv run python manage.py seed_deck`
+Run: `uv run python backend/manage.py seed_deck`
 Expected: `words +0, forms +0, phrases +0, sentences +0, links +0`.
 
 - [ ] **Step 4: Проверить данные в БД**
@@ -2154,10 +1655,10 @@ Telegram Mini App для заучивания арабских слов груп
 cp .env.example .env         # заполнить значения; порт 5433, чтобы не мешать локальному Postgres
 docker compose up -d
 uv sync --extra dev
-uv run python manage.py migrate
-uv run python manage.py seed_deck
-uv run python manage.py createsuperuser
-uv run python manage.py runserver
+uv run python backend/manage.py migrate
+uv run python backend/manage.py seed_deck
+uv run python backend/manage.py createsuperuser
+uv run python backend/manage.py runserver
 ```
 
 Админка: `http://127.0.0.1:8000/admin/`.
@@ -2175,25 +1676,24 @@ uv run ruff check .      # линтер
 
 | Путь | Ответственность |
 |---|---|
-| `mufradat/config.py` | настройки из `.env`, гейтинг админа |
-| `mufradat/settings.py` | настройки Django, собирает `DATABASES` из конфига |
-| `vocabulary/models.py` | `Entry` (слова, фразы, формы), примеры, прогресс, история |
-| `vocabulary/admin.py` | админка для правки базы без кода |
-| `vocabulary/services/arabic.py` | нормализация, сопоставление слов предложения |
-| `vocabulary/services/dedup.py` | поиск похожих записей при импорте |
-| `vocabulary/services/curriculum.py` | загрузчик `content/curriculum.yaml` |
-| `content/curriculum.yaml` | **поведение ИИ: темы, правила, примеры** |
+| `backend/config/settings.py` | настройки Django, читает `.env` из корня |
+| `backend/apps/vocabulary/models.py` | `Entry` (слова, фразы, формы), примеры, прогресс, история |
+| `backend/apps/vocabulary/admin.py` | админка для правки базы без кода |
+| `backend/apps/vocabulary/services/arabic.py` | нормализация, сопоставление слов предложения |
+| `backend/apps/vocabulary/services/dedup.py` | поиск похожих записей при импорте |
+| `backend/apps/vocabulary/services/curriculum.py` | загрузчик `backend/content/curriculum.yaml` |
+| `backend/content/curriculum.yaml` | **поведение ИИ: темы, правила, примеры** |
 
 ## Как менять поведение ИИ
 
-Правится `content/curriculum.yaml`, код не трогается. Главный рычаг — блок
+Правится `backend/content/curriculum.yaml`, код не трогается. Главный рычаг — блок
 `examples` внутри темы: модель ловит стиль по образцам точнее, чем по описанию.
 Список `pronouns` управляет и формами слов, и лицами во фразах.
 
 Проверить файл после правки:
 
 ```bash
-uv run pytest tests/services/test_curriculum.py -q
+uv run pytest backend/tests/services/test_curriculum.py -q
 ```
 ````
 
@@ -2205,7 +1705,7 @@ Expected: 66 passed, линтер без ошибок.
 - [ ] **Step 7: Закоммитить**
 
 ```bash
-git add vocabulary/management README.md
+git add backend/apps/vocabulary/management README.md
 git commit -m "feat: idempotent deck seeder and project README"
 ```
 

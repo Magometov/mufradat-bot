@@ -51,7 +51,7 @@ Django + DRF; к карточкам добавлены картинки с ав�
 | Огласовки (fallback) | `arabic-diacritizer` 1.0.0 — **опциональная** группа зависимостей |
 | Frontend | Vue 3 + Vite (SPA, без Nuxt), CSS Modules, rem-сетка |
 | Тесты | `pytest` + `pytest-django` 4.12 |
-| Конфигурация | `pydantic-settings` (читается из `settings.py`) |
+| Конфигурация | `python-dotenv` + `os.getenv` в `settings.py` |
 
 Два процесса на общей БД: `web` (Django, он же раздаёт собранный Mini App) и `bot`
 (aiogram).
@@ -59,19 +59,23 @@ Django + DRF; к карточкам добавлены картинки с ав�
 ### Структура
 
 ```
-manage.py
-mufradat/              # проект Django: settings.py, urls.py, wsgi.py, config.py
-vocabulary/            # приложение Django: модели, админка, миграции, домен
-  models.py  admin.py  enums.py  migrations/
-  services/{arabic,dedup,srs,images,curriculum,tashkeel}.py
-  services/ai/{client,schemas,prompts}.py
-  management/commands/seed_deck.py
-api/                   # приложение Django: DRF — аутентификация, сериализаторы, view
-bot/                   # пакет aiogram: handlers/, states.py, keyboards.py
-web/                   # Vue 3 + Vite SPA
-content/curriculum.yaml  # редактируемый файл поведения ИИ
-media/                 # картинки (не в git)
 docker-compose.yml
+pyproject.toml
+.env                      # значения; .env.example — только имена
+backend/
+  manage.py
+  config/                 # настройки Django, urls, wsgi
+  apps/vocabulary/        # модели, админка, миграции, домен
+    models.py  admin.py  enums.py  migrations/
+    services/{arabic,dedup,srs,images,curriculum,tashkeel}.py
+    services/ai/{client,schemas,prompts}.py
+    management/commands/seed_deck.py
+  apps/api/               # DRF: аутентификация, сериализаторы, view
+  bot/                    # aiogram: handlers/, states.py, keyboards.py
+  tests/
+  content/curriculum.yaml # редактируемый файл поведения ИИ
+  media/                  # картинки (не в git)
+frontend/                 # Vue 3 + Vite SPA
 ```
 
 ### Бот и Django ORM
@@ -410,7 +414,7 @@ msg=data_check_string)` плюс свежесть `auth_date`; при успех
 значение по умолчанию», чтобы `.env`, скопированный из шаблона, ничего не ломал.
 
 ```
-POSTGRES_USER=  POSTGRES_PASSWORD=  POSTGRES_DB=  POSTGRES_HOST=  POSTGRES_PORT=
+POSTGRES_USER=  POSTGRES_PASSWORD=  POSTGRES_NAME=  POSTGRES_HOST=  POSTGRES_PORT=
 DJANGO_SECRET_KEY=  DJANGO_DEBUG=
 BOT_TOKEN=  ADMIN_TELEGRAM_IDS=  WEBAPP_URL=
 ANTHROPIC_API_KEY=  AI_MODEL=
