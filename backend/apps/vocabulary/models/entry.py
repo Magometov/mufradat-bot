@@ -1,19 +1,17 @@
 from django.db import models
 
-from apps.vocabulary.enums import Kind, Source
-from apps.vocabulary.services.arabic import normalize_arabic
+from apps.vocabulary.enums import Kind
 
 
 class Entry(models.Model):
     """Единица заучивания: слово или фраза."""
 
-    kind = models.CharField("Тип", max_length=8, choices=Kind)
-    arabic = models.TextField("Арабское", help_text="С огласовками, как распознано")
-    arabic_norm = models.TextField("Ключ поиска похожих", editable=False, db_index=True)
+    kind = models.CharField("Тип", max_length=8, choices=Kind, default=Kind.WORD)
+    arabic = models.TextField("Арабское", help_text="С огласовками")
     translation_ru = models.TextField("Перевод")
     transliteration = models.TextField("Транслитерация", blank=True, default="")
     topic = models.TextField("Тема", blank=True, default="", db_index=True)
-    source = models.CharField("Источник", max_length=16, choices=Source)
+    image = models.ImageField("Картинка", upload_to="entries/", blank=True, null=True)
     created_at = models.DateTimeField("Добавлено", auto_now_add=True, db_index=True)
 
     class Meta:
@@ -28,7 +26,3 @@ class Entry(models.Model):
 
     def __str__(self) -> str:
         return f"{self.arabic} — {self.translation_ru}"
-
-    def save(self, *args: object, **kwargs: object) -> None:
-        self.arabic_norm = normalize_arabic(self.arabic)
-        super().save(*args, **kwargs)
