@@ -13,7 +13,8 @@
 ## Global Constraints
 
 - Python 3.12 (`requires-python = ">=3.12,<3.13"`). Зависимости — через `uv sync`.
-- Идентификаторы и комментарии в коде — на английском. Всё, что видит пользователь
+- Идентификаторы и построчные комментарии — на английском, **docstring — на
+  русском** (решение владельца по ходу задачи 1). Всё, что видит пользователь
   (админка, данные сидера) — на русском.
 - Локальный Postgres 14 не трогаем: контейнер слушает **порт 5433**.
 - Никаких секретов в коде. `.env` в `.gitignore`; `.env.example` — только имена и
@@ -42,8 +43,7 @@
 **Interfaces:**
 - Consumes: ничего.
 - Produces:
-  - `mufradat.config.Settings` — поля `postgres_user: str`, `postgres_password: SecretStr`, `postgres_db: str`, `postgres_host: str`, `postgres_port: int`, `django_secret_key: SecretStr`, `django_debug: bool`, `bot_token: SecretStr | None`, `admin_telegram_ids: list[int]`, `anthropic_api_key: SecretStr | None`, `ai_model: str`, `webapp_url: str | None`; метод `is_admin(telegram_id: int) -> bool`.
-  - `mufradat.config.DEV_SECRET_KEY` — строка-заглушка для разработки.
+  - `mufradat.config.Settings` — **обязательные** (без значений по умолчанию, только из окружения): `postgres_user: str`, `postgres_password: SecretStr`, `postgres_db: str`, `postgres_host: str`, `postgres_port: int`, `django_secret_key: SecretStr`. Со значениями по умолчанию: `django_debug: bool = False`, `admin_telegram_ids: Annotated[list[int], NoDecode] = []`, `ai_model: str = "claude-sonnet-5"`, `bot_token`/`anthropic_api_key`/`webapp_url` = `None`. Метод `is_admin(telegram_id: int) -> bool`.
   - `mufradat.config.get_settings() -> Settings` — кэширующий геттер.
   - `mufradat.settings` — модуль настроек Django (`DJANGO_SETTINGS_MODULE`).
 
@@ -96,6 +96,9 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# ruff format also reformats python blocks inside markdown, which mangles the
+# deliberate fragments in the plans (a bare "app-name," line became a tuple).
+exclude = ["docs"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
@@ -133,8 +136,11 @@ DJANGO_SECRET_KEY=
 DJANGO_DEBUG=
 ```
 
-В `.env` — те же две строки: `DJANGO_DEBUG=true`, `DJANGO_SECRET_KEY` оставить
-пустым (для разработки подставится значение по умолчанию).
+В `.env` — те же две строки, но заполненные: `DJANGO_DEBUG=true` и настоящий ключ,
+потому что `django_secret_key` обязателен:
+
+Run: `` key=$(uv run python -c "import secrets; print(secrets.token_urlsafe(50))") && printf 'DJANGO_SECRET_KEY=%s\nDJANGO_DEBUG=true\n' "$key" ``
+Expected: ключ сгенерирован и вписан в `.env` (файл в `.gitignore`).
 
 - [ ] **Step 5: Установить зависимости**
 
@@ -151,10 +157,12 @@ Expected: в `mufradat/` появились `settings.py`, `urls.py`, `wsgi.py`,
 Заменить содержимое `tests/test_config.py`:
 
 ```python
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
-from mufradat.config import DEV_SECRET_KEY, Settings
+from mufradat.config import Settings
 
 ENV_VARS = (
     "POSTGRES_USER",
@@ -171,80 +179,157 @@ ENV_VARS = (
     "WEBAPP_URL",
 )
 
+# Minimum needed to construct Settings, since these fields have no defaults.
+REQUIRED = {
+    "postgres_user": "u",
+    "postgres_password": "p",
+    "postgres_db": "d",
+    "postgres_host": "h",
+    "postgres_port": 5433,
+    "django_secret_key": "k",
+}
+
+DOTENV_REQUIRED = """
+POSTGRES_USER=u
+POSTGRES_PASSWORD=p
+POSTGRES_DB=d
+POSTGRES_HOST=h
+POSTGRES_PORT=5433
+DJANGO_SECRET_KEY=k
+"""
+
 
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep these tests independent of whatever the developer exported."""
+    """Изолировать тесты от того, что разработчик держит в окружении."""
     for name in ENV_VARS:
         monkeypatch.delenv(name, raising=False)
 
 
-def test_database_defaults() -> None:
+def write_dotenv(tmp_path: Path, body: str) -> Path:
+    path = tmp_path / ".env"
+    path.write_text(body, encoding="utf-8")
+    return path
+
+
+def test_database_fields_are_required() -> None:
+    # No defaults on purpose: a missing variable must name itself, not silently
+    # point the app at some other database.
+    with pytest.raises(ValidationError, match="postgres_user"):
+        Settings(_env_file=None)
+
+
+def test_secret_key_is_required() -> None:
+    without_key = {key: value for key, value in REQUIRED.items() if key != "django_secret_key"}
+
+    with pytest.raises(ValidationError, match="django_secret_key"):
+        Settings(**without_key, _env_file=None)
+
+
+def test_blank_value_is_treated_as_missing() -> None:
+    # A .env copied from the template holds VAR= everywhere; that must read as
+    # "not filled in", not as an empty username.
+    incomplete = REQUIRED | {"postgres_user": "   "}
+
+    with pytest.raises(ValidationError, match="postgres_user"):
+        Settings(**incomplete, _env_file=None)
+
+
+def test_reads_values_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("POSTGRES_USER", "env_user")
+    monkeypatch.setenv("POSTGRES_PASSWORD", "env_pw")
+    monkeypatch.setenv("POSTGRES_DB", "env_db")
+    monkeypatch.setenv("POSTGRES_HOST", "env_host")
+    monkeypatch.setenv("POSTGRES_PORT", "6543")
+    monkeypatch.setenv("DJANGO_SECRET_KEY", "env_key")
+
     settings = Settings(_env_file=None)
 
-    assert settings.postgres_user == "mufradat"
-    assert settings.postgres_db == "mufradat"
-    assert settings.postgres_host == "localhost"
+    assert settings.postgres_user == "env_user"
+    assert settings.postgres_db == "env_db"
+    assert settings.postgres_host == "env_host"
+    assert settings.postgres_port == 6543
+    assert settings.postgres_password.get_secret_value() == "env_pw"
+
+
+def test_reads_values_from_dotenv_file(tmp_path: Path) -> None:
+    settings = Settings(_env_file=write_dotenv(tmp_path, DOTENV_REQUIRED))
+
+    assert settings.postgres_user == "u"
     assert settings.postgres_port == 5433
 
 
-def test_blank_env_value_falls_back_to_default() -> None:
-    # A .env copied from .env.example holds VAR= everywhere; an empty string must
-    # not overwrite the declared default.
-    settings = Settings(postgres_user="", postgres_host="   ", ai_model="", _env_file=None)
+def test_admin_ids_from_dotenv_file(tmp_path: Path) -> None:
+    # Regression: a complex type read through the dotenv source used to be
+    # JSON-decoded before any validator ran, so "111,222" raised SettingsError.
+    dotenv = write_dotenv(tmp_path, DOTENV_REQUIRED + "ADMIN_TELEGRAM_IDS=111,222\n")
 
-    assert settings.postgres_user == "mufradat"
-    assert settings.postgres_host == "localhost"
-    assert settings.ai_model == "claude-sonnet-5"
-
-
-def test_admin_ids_parsed_from_comma_separated_string() -> None:
-    settings = Settings(admin_telegram_ids="111,222", _env_file=None)
+    settings = Settings(_env_file=dotenv)
 
     assert settings.admin_telegram_ids == [111, 222]
 
 
-def test_admin_ids_tolerate_spaces_and_trailing_comma() -> None:
-    settings = Settings(admin_telegram_ids=" 111 , 222 , ", _env_file=None)
+def test_blank_admin_ids_in_dotenv_file_gives_empty_list(tmp_path: Path) -> None:
+    # Same regression, blank case: the template ships ADMIN_TELEGRAM_IDS= empty.
+    dotenv = write_dotenv(tmp_path, DOTENV_REQUIRED + "ADMIN_TELEGRAM_IDS=\n")
+
+    settings = Settings(_env_file=dotenv)
+
+    assert settings.admin_telegram_ids == []
+
+
+def test_admin_ids_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ADMIN_TELEGRAM_IDS", " 111 , 222 , ")
+
+    settings = Settings(**REQUIRED, _env_file=None)
 
     assert settings.admin_telegram_ids == [111, 222]
 
 
 def test_admin_ids_absent_gives_empty_list() -> None:
-    assert Settings(_env_file=None).admin_telegram_ids == []
+    assert Settings(**REQUIRED, _env_file=None).admin_telegram_ids == []
 
 
 def test_is_admin() -> None:
-    settings = Settings(admin_telegram_ids="111", _env_file=None)
+    settings = Settings(**REQUIRED, admin_telegram_ids="111", _env_file=None)
 
     assert settings.is_admin(111) is True
     assert settings.is_admin(222) is False
 
 
-def test_dev_secret_key_is_allowed_while_debugging() -> None:
-    settings = Settings(django_debug=True, _env_file=None)
-
-    assert settings.django_secret_key.get_secret_value() == DEV_SECRET_KEY
-
-
-def test_dev_secret_key_is_rejected_with_debug_off() -> None:
-    # Shipping the placeholder key to a real deployment must fail loudly.
-    with pytest.raises(ValidationError, match="DJANGO_SECRET_KEY"):
-        Settings(django_debug=False, _env_file=None)
+def test_ai_model_has_default() -> None:
+    # Operational default kept in code so the whole group moves together.
+    assert Settings(**REQUIRED, _env_file=None).ai_model == "claude-sonnet-5"
 
 
-def test_explicit_secret_key_with_debug_off_is_fine() -> None:
-    settings = Settings(django_debug=False, django_secret_key="real-key", _env_file=None)
+def test_django_debug_is_off_unless_enabled() -> None:
+    assert Settings(**REQUIRED, _env_file=None).django_debug is False
+    assert Settings(**REQUIRED, django_debug="true", _env_file=None).django_debug is True
 
-    assert settings.django_secret_key.get_secret_value() == "real-key"
+
+def test_optional_fields_default_to_none() -> None:
+    settings = Settings(**REQUIRED, _env_file=None)
+
+    assert settings.bot_token is None
+    assert settings.anthropic_api_key is None
+    assert settings.webapp_url is None
 
 
 def test_secrets_are_hidden_in_repr() -> None:
-    settings = Settings(bot_token="123:secret", postgres_password="pw-secret", _env_file=None)
+    # Distinctive values, not the word "secret": that substring also occurs in the
+    # field name django_secret_key, so asserting on it would test nothing.
+    settings = Settings(
+        **REQUIRED | {"postgres_password": "pw-xyz", "django_secret_key": "key-qaz"},
+        bot_token="123:tok-abc",
+        _env_file=None,
+    )
 
-    assert "secret" not in repr(settings)
+    dumped = repr(settings)
+    assert "pw-xyz" not in dumped
+    assert "key-qaz" not in dumped
+    assert "tok-abc" not in dumped
     assert settings.bot_token is not None
-    assert settings.bot_token.get_secret_value() == "123:secret"
+    assert settings.bot_token.get_secret_value() == "123:tok-abc"
 ```
 
 - [ ] **Step 8: Убедиться, что тесты падают**
@@ -256,16 +341,19 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'mufradat.config'`.
 
 ```python
 from functools import lru_cache
+from typing import Annotated
 
 from pydantic import SecretStr, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-# Placeholder for local development only; rejected when DEBUG is off.
-DEV_SECRET_KEY = "dev-insecure-do-not-use-in-production"
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Settings loaded from environment variables and .env, shared by web and bot."""
+    """Настройки из переменных окружения (и `.env`), общие для веба и бота.
+
+    Данные живут в окружении, а не здесь: у параметров БД и секретного ключа нет
+    значений по умолчанию, поэтому отсутствующая переменная роняет запуск с именем
+    поля, а не приводит к тихому подключению не туда.
+    """
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -273,21 +361,26 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Read by docker-compose.yml as well, so credentials live in exactly one place.
-    postgres_user: str = "mufradat"
-    postgres_password: SecretStr = SecretStr("mufradat")
-    postgres_db: str = "mufradat"
-    postgres_host: str = "localhost"
-    # Not 5432: a local Postgres install must keep working untouched.
-    postgres_port: int = 5433
+    # Read by docker-compose.yml from the same variables, so credentials exist in
+    # exactly one place: .env.
+    postgres_user: str
+    postgres_password: SecretStr
+    postgres_db: str
+    postgres_host: str
+    postgres_port: int
 
-    django_secret_key: SecretStr = SecretStr(DEV_SECRET_KEY)
-    django_debug: bool = True
+    django_secret_key: SecretStr
+    # A switch, not data: off unless the environment turns it on.
+    django_debug: bool = False
 
     bot_token: SecretStr | None = None
-    admin_telegram_ids: list[int] = []
+    # NoDecode stops pydantic-settings from JSON-decoding the raw value: for a
+    # complex type it would try that before any validator runs, and choke on the
+    # comma-separated form a .env file can actually hold.
+    admin_telegram_ids: Annotated[list[int], NoDecode] = []
 
     anthropic_api_key: SecretStr | None = None
+    # Operational default, deliberately in code so the whole group moves together.
     ai_model: str = "claude-sonnet-5"
 
     webapp_url: str | None = None
@@ -295,10 +388,11 @@ class Settings(BaseSettings):
     @model_validator(mode="before")
     @classmethod
     def _ignore_blank_values(cls, data: object) -> object:
-        """Treat `VAR=` as absent so the declared default still applies.
+        """Считать `VAR=` отсутствующим значением.
 
-        A .env copied from .env.example holds an empty value for every key; without
-        this, each empty string would overwrite its default.
+        В `.env`, скопированном из `.env.example`, пусто у каждого ключа. Отбрасывая
+        пустые значения, получаем внятную ошибку «поле обязательно» вместо пустого
+        логина, доехавшего до драйвера базы.
         """
         if isinstance(data, dict):
             return {
@@ -311,31 +405,26 @@ class Settings(BaseSettings):
     @field_validator("admin_telegram_ids", mode="before")
     @classmethod
     def _parse_admin_ids(cls, value: object) -> object:
-        """Accept a comma-separated string, since .env cannot hold a JSON list."""
+        """Принять список через запятую: JSON-список в `.env` держать неудобно."""
         if isinstance(value, str):
             return [int(part) for part in value.split(",") if part.strip()]
         return value
 
-    @model_validator(mode="after")
-    def _reject_dev_secret_key_outside_debug(self) -> "Settings":
-        if not self.django_debug and self.django_secret_key.get_secret_value() == DEV_SECRET_KEY:
-            raise ValueError("DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is off")
-        return self
-
     def is_admin(self, telegram_id: int) -> bool:
-        """Single place where admin rights are decided."""
+        """Единственное место, где решается вопрос о правах админа."""
         return telegram_id in self.admin_telegram_ids
 
 
 @lru_cache
 def get_settings() -> Settings:
+    """Вернуть настройки, прочитав окружение один раз за процесс."""
     return Settings()
 ```
 
 - [ ] **Step 10: Убедиться, что тесты проходят**
 
 Run: `uv run pytest tests/test_config.py -q 2>&1 | tail -3`
-Expected: 10 passed.
+Expected: 14 passed.
 
 - [ ] **Step 11: Подключить настройки к Django**
 
@@ -417,7 +506,7 @@ git add -A
 git commit -m "feat: Django project skeleton with settings sourced from one config"
 ```
 
-**Проверка задачи для владельца:** `manage.py check` без замечаний, `manage.py migrate` прошёл, `uv run pytest` зелёный (10 тестов).
+**Проверка задачи для владельца:** `manage.py check` без замечаний, `manage.py migrate` прошёл, `uv run pytest` зелёный (14 тестов).
 
 ---
 
@@ -1109,7 +1198,7 @@ def test_sentence_links_to_entry() -> None:
 - [ ] **Step 5: Прогнать тесты**
 
 Run: `uv run pytest -q 2>&1 | tail -3`
-Expected: 41 passed (10 конфигурация + 22 арабский + 9 модели).
+Expected: 45 passed (14 конфигурация + 22 арабский + 9 модели).
 
 - [ ] **Step 6: Проверить, что модели и миграция не расходятся**
 
@@ -1249,7 +1338,7 @@ def test_telegram_user_changelist_opens(staff_client) -> None:
 - [ ] **Step 3: Прогнать проверку Django и тесты**
 
 Run: `uv run python manage.py check && uv run pytest -q 2>&1 | tail -3`
-Expected: проверка без замечаний, 45 passed.
+Expected: проверка без замечаний, 49 passed.
 
 - [ ] **Step 4: Создать суперпользователя для ручного захода**
 
@@ -2063,7 +2152,7 @@ uv run pytest tests/services/test_curriculum.py -q
 - [ ] **Step 6: Прогнать весь набор и линтер**
 
 Run: `uv run pytest -q 2>&1 | tail -3 && uv run ruff format . && uv run ruff check .`
-Expected: 62 passed, линтер без ошибок.
+Expected: 66 passed, линтер без ошибок.
 
 - [ ] **Step 7: Закоммитить**
 

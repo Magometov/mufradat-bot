@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: mufradat-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mufradat}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mufradat}
+      POSTGRES_DB: ${POSTGRES_DB:-mufradat}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mufradat} -d ${POSTGRES_DB:-mufradat}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
