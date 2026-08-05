@@ -94,3 +94,12 @@ WEBAPP_URL = getenv("WEBAPP_URL")
 
 ANTHROPIC_API_KEY = getenv("ANTHROPIC_API_KEY", default="")
 AI_MODEL = getenv("AI_MODEL") or "claude-sonnet-5"
+
+# Без этого записи уровня INFO из наших модулей не видны в консоли.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"simple": {"format": "{asctime} {levelname} {name}: {message}", "style": "{"}},
+    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "simple"}},
+    "loggers": {"apps": {"handlers": ["console"], "level": "INFO"}},
+}
