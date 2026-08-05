@@ -2,27 +2,16 @@ from pathlib import Path
 
 from mufradat.config import get_settings
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Single place where environment variables are read and validated; the bot process
-# imports the same object.
+# Единственное место, где читается окружение; процесс бота импортирует этот же объект.
 config = get_settings()
 
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
-
-# Comes from DJANGO_SECRET_KEY. The development placeholder is rejected by
-# mufradat.config when DEBUG is off, so it cannot reach a deployment unnoticed.
 SECRET_KEY = config.django_secret_key.get_secret_value()
 
 DEBUG = config.django_debug
 
 ALLOWED_HOSTS: list[str] = ["localhost", "127.0.0.1"]
-
-
-# Application definition
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -63,10 +52,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "mufradat.wsgi.application"
 
-
-# Database
-# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -78,44 +63,21 @@ DATABASES = {
     }
 }
 
-
-# Password validation
-# https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
-
+# Пароли есть только у staff в админке; ученики входят через Telegram.
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
-    },
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-
-# Internationalization
-# https://docs.djangoproject.com/en/6.0/topics/i18n/
-
 LANGUAGE_CODE = "ru-ru"
-
 TIME_ZONE = "UTC"
-
 USE_I18N = True
-
 USE_TZ = True
-
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = "static/"
 
-# Entry images live here: downloaded once from Telegram or Openverse, then served
-# as ordinary files. See spec 7.
+# Картинки единиц: скачиваются один раз и дальше отдаются как обычные файлы.
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"

@@ -6,12 +6,7 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Настройки из переменных окружения (и `.env`), общие для веба и бота.
-
-    Данные живут в окружении, а не здесь: у параметров БД и секретного ключа нет
-    значений по умолчанию, поэтому отсутствующая переменная роняет запуск с именем
-    поля, а не приводит к тихому подключению не туда.
-    """
+    """Настройки из окружения и `.env`; общие для веба и бота."""
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -19,8 +14,8 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Read by docker-compose.yml from the same variables, so credentials exist in
-    # exactly one place: .env.
+    # Без значений по умолчанию: те же переменные читает docker-compose, поэтому
+    # данные живут только в .env, а пропущенная переменная роняет старт с именем поля.
     postgres_user: str
     postgres_password: SecretStr
     postgres_db: str
@@ -28,17 +23,15 @@ class Settings(BaseSettings):
     postgres_port: int
 
     django_secret_key: SecretStr
-    # A switch, not data: off unless the environment turns it on.
     django_debug: bool = False
 
     bot_token: SecretStr | None = None
-    # NoDecode stops pydantic-settings from JSON-decoding the raw value: for a
-    # complex type it would try that before any validator runs, and choke on the
-    # comma-separated form a .env file can actually hold.
+    # NoDecode отключает JSON-разбор значения: для составного типа он идёт до любых
+    # валидаторов и падает на записи через запятую, которую только и держит .env.
     admin_telegram_ids: Annotated[list[int], NoDecode] = []
 
     anthropic_api_key: SecretStr | None = None
-    # Operational default, deliberately in code so the whole group moves together.
+    # Дефолт в коде намеренно: модель меняется для всей группы сразу.
     ai_model: str = "claude-sonnet-5"
 
     webapp_url: str | None = None
@@ -46,12 +39,7 @@ class Settings(BaseSettings):
     @model_validator(mode="before")
     @classmethod
     def _ignore_blank_values(cls, data: object) -> object:
-        """Считать `VAR=` отсутствующим значением.
-
-        В `.env`, скопированном из `.env.example`, пусто у каждого ключа. Отбрасывая
-        пустые значения, получаем внятную ошибку «поле обязательно» вместо пустого
-        логина, доехавшего до драйвера базы.
-        """
+        """Считать `VAR=` отсутствующим, чтобы шаблонный `.env` давал понятную ошибку."""
         if isinstance(data, dict):
             return {
                 key: value
@@ -63,7 +51,7 @@ class Settings(BaseSettings):
     @field_validator("admin_telegram_ids", mode="before")
     @classmethod
     def _parse_admin_ids(cls, value: object) -> object:
-        """Принять список через запятую: JSON-список в `.env` держать неудобно."""
+        """Разобрать список ID, записанный через запятую."""
         if isinstance(value, str):
             return [int(part) for part in value.split(",") if part.strip()]
         return value
@@ -75,5 +63,5 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    """Вернуть настройки, прочитав окружение один раз за процесс."""
+    """Прочитать окружение один раз за процесс."""
     return Settings()

@@ -20,7 +20,7 @@ ENV_VARS = (
     "WEBAPP_URL",
 )
 
-# Minimum needed to construct Settings, since these fields have no defaults.
+# Минимум для конструктора: у этих полей нет значений по умолчанию.
 REQUIRED = {
     "postgres_user": "u",
     "postgres_password": "p",
@@ -54,8 +54,7 @@ def write_dotenv(tmp_path: Path, body: str) -> Path:
 
 
 def test_database_fields_are_required() -> None:
-    # No defaults on purpose: a missing variable must name itself, not silently
-    # point the app at some other database.
+    # Пропущенная переменная должна назвать себя, а не привести к подключению не туда.
     with pytest.raises(ValidationError, match="postgres_user"):
         Settings(_env_file=None)
 
@@ -68,8 +67,7 @@ def test_secret_key_is_required() -> None:
 
 
 def test_blank_value_is_treated_as_missing() -> None:
-    # A .env copied from the template holds VAR= everywhere; that must read as
-    # "not filled in", not as an empty username.
+    # В .env из шаблона пусто у каждого ключа: это «не заполнено», а не пустой логин.
     incomplete = REQUIRED | {"postgres_user": "   "}
 
     with pytest.raises(ValidationError, match="postgres_user"):
@@ -101,8 +99,8 @@ def test_reads_values_from_dotenv_file(tmp_path: Path) -> None:
 
 
 def test_admin_ids_from_dotenv_file(tmp_path: Path) -> None:
-    # Regression: a complex type read through the dotenv source used to be
-    # JSON-decoded before any validator ran, so "111,222" raised SettingsError.
+    # Регрессия: составной тип из .env раньше JSON-декодировался до валидаторов,
+    # поэтому «111,222» роняло старт.
     dotenv = write_dotenv(tmp_path, DOTENV_REQUIRED + "ADMIN_TELEGRAM_IDS=111,222\n")
 
     settings = Settings(_env_file=dotenv)
@@ -111,7 +109,7 @@ def test_admin_ids_from_dotenv_file(tmp_path: Path) -> None:
 
 
 def test_blank_admin_ids_in_dotenv_file_gives_empty_list(tmp_path: Path) -> None:
-    # Same regression, blank case: the template ships ADMIN_TELEGRAM_IDS= empty.
+    # Та же регрессия, пустой случай: в шаблоне ADMIN_TELEGRAM_IDS пустой.
     dotenv = write_dotenv(tmp_path, DOTENV_REQUIRED + "ADMIN_TELEGRAM_IDS=\n")
 
     settings = Settings(_env_file=dotenv)
@@ -139,7 +137,6 @@ def test_is_admin() -> None:
 
 
 def test_ai_model_has_default() -> None:
-    # Operational default kept in code so the whole group moves together.
     assert Settings(**REQUIRED, _env_file=None).ai_model == "claude-sonnet-5"
 
 
@@ -157,8 +154,8 @@ def test_optional_fields_default_to_none() -> None:
 
 
 def test_secrets_are_hidden_in_repr() -> None:
-    # Distinctive values, not the word "secret": that substring also occurs in the
-    # field name django_secret_key, so asserting on it would test nothing.
+    # Отличимые значения, а не слово «secret»: оно есть в имени поля django_secret_key,
+    # и проверка на подстроку не проверяла бы ничего.
     settings = Settings(
         **REQUIRED | {"postgres_password": "pw-xyz", "django_secret_key": "key-qaz"},
         bot_token="123:tok-abc",

@@ -13,8 +13,10 @@
 ## Global Constraints
 
 - Python 3.12 (`requires-python = ">=3.12,<3.13"`). Зависимости — через `uv sync`.
-- Идентификаторы и построчные комментарии — на английском, **docstring — на
-  русском** (решение владельца по ходу задачи 1). Всё, что видит пользователь
+- Идентификаторы — на английском. **Docstring и построчные комментарии — на русском
+  и коротко**; комментарий пишется только там, где объясняет решение, а не
+  пересказывает код (решения владельца по ходу задачи 1). В блоках кода ниже часть
+  комментариев осталась на английском — при реализации переводятся. Всё, что видит пользователь
   (админка, данные сидера) — на русском.
 - Локальный Postgres 14 не трогаем: контейнер слушает **порт 5433**.
 - Никаких секретов в коде. `.env` в `.gitignore`; `.env.example` — только имена и
@@ -36,6 +38,7 @@
 **Files:**
 - Modify: `pyproject.toml` (переписать под Django), `docker-compose.yml`, `.env`, `.env.example`, `.gitignore`
 - Delete: `docker/init-test-db.sql`, каталог `app/` (артефакты стека SQLAlchemy)
+- Delete после генерации: `mufradat/asgi.py`, `vocabulary/views.py`, `vocabulary/admin.py`, `vocabulary/models.py` — не нужны до своих задач
 - Create: `manage.py`, `mufradat/{__init__,settings,urls,asgi,wsgi}.py` (генерируются), `mufradat/config.py`
 - Create: `vocabulary/` (генерируется `startapp`)
 - Test: `tests/test_config.py` (переписать)
@@ -152,6 +155,13 @@ Expected: среди установленного есть `django`, `psycopg`, 
 Run: `uv run django-admin startproject mufradat . && uv run python manage.py startapp vocabulary && ls mufradat vocabulary`
 Expected: в `mufradat/` появились `settings.py`, `urls.py`, `wsgi.py`, `asgi.py`; в `vocabulary/` — `models.py`, `admin.py`, `apps.py`, `migrations/`.
 
+Сразу убрать то, что не нужно до своих задач: `asgi.py` не используется (`runserver`
+идёт через `WSGI_APPLICATION`), а пустые `models.py`, `admin.py` и `views.py` только
+ломают линтер неиспользуемыми импортами.
+
+Run: `rm -f mufradat/asgi.py vocabulary/views.py vocabulary/admin.py vocabulary/models.py vocabulary/tests.py`
+Expected: файлы удалены; `manage.py check` на шаге 12 всё равно проходит.
+
 - [ ] **Step 7: Написать падающие тесты конфигурации**
 
 Заменить содержимое `tests/test_config.py`:
@@ -179,7 +189,7 @@ ENV_VARS = (
     "WEBAPP_URL",
 )
 
-# Minimum needed to construct Settings, since these fields have no defaults.
+# Минимум для конструктора: у этих полей нет значений по умолчанию.
 REQUIRED = {
     "postgres_user": "u",
     "postgres_password": "p",
@@ -213,8 +223,7 @@ def write_dotenv(tmp_path: Path, body: str) -> Path:
 
 
 def test_database_fields_are_required() -> None:
-    # No defaults on purpose: a missing variable must name itself, not silently
-    # point the app at some other database.
+    # Пропущенная переменная должна назвать себя, а не привести к подключению не туда.
     with pytest.raises(ValidationError, match="postgres_user"):
         Settings(_env_file=None)
 
@@ -227,8 +236,7 @@ def test_secret_key_is_required() -> None:
 
 
 def test_blank_value_is_treated_as_missing() -> None:
-    # A .env copied from the template holds VAR= everywhere; that must read as
-    # "not filled in", not as an empty username.
+    # В .env из шаблона пусто у каждого ключа: это «не заполнено», а не пустой логин.
     incomplete = REQUIRED | {"postgres_user": "   "}
 
     with pytest.raises(ValidationError, match="postgres_user"):
@@ -260,8 +268,8 @@ def test_reads_values_from_dotenv_file(tmp_path: Path) -> None:
 
 
 def test_admin_ids_from_dotenv_file(tmp_path: Path) -> None:
-    # Regression: a complex type read through the dotenv source used to be
-    # JSON-decoded before any validator ran, so "111,222" raised SettingsError.
+    # Регрессия: составной тип из .env раньше JSON-декодировался до валидаторов,
+    # поэтому «111,222» роняло старт.
     dotenv = write_dotenv(tmp_path, DOTENV_REQUIRED + "ADMIN_TELEGRAM_IDS=111,222\n")
 
     settings = Settings(_env_file=dotenv)
@@ -270,7 +278,7 @@ def test_admin_ids_from_dotenv_file(tmp_path: Path) -> None:
 
 
 def test_blank_admin_ids_in_dotenv_file_gives_empty_list(tmp_path: Path) -> None:
-    # Same regression, blank case: the template ships ADMIN_TELEGRAM_IDS= empty.
+    # Та же регрессия, пустой случай: в шаблоне ADMIN_TELEGRAM_IDS пустой.
     dotenv = write_dotenv(tmp_path, DOTENV_REQUIRED + "ADMIN_TELEGRAM_IDS=\n")
 
     settings = Settings(_env_file=dotenv)
@@ -298,7 +306,6 @@ def test_is_admin() -> None:
 
 
 def test_ai_model_has_default() -> None:
-    # Operational default kept in code so the whole group moves together.
     assert Settings(**REQUIRED, _env_file=None).ai_model == "claude-sonnet-5"
 
 
@@ -316,8 +323,8 @@ def test_optional_fields_default_to_none() -> None:
 
 
 def test_secrets_are_hidden_in_repr() -> None:
-    # Distinctive values, not the word "secret": that substring also occurs in the
-    # field name django_secret_key, so asserting on it would test nothing.
+    # Отличимые значения, а не слово «secret»: оно есть в имени поля django_secret_key,
+    # и проверка на подстроку не проверяла бы ничего.
     settings = Settings(
         **REQUIRED | {"postgres_password": "pw-xyz", "django_secret_key": "key-qaz"},
         bot_token="123:tok-abc",
@@ -348,12 +355,7 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Настройки из переменных окружения (и `.env`), общие для веба и бота.
-
-    Данные живут в окружении, а не здесь: у параметров БД и секретного ключа нет
-    значений по умолчанию, поэтому отсутствующая переменная роняет запуск с именем
-    поля, а не приводит к тихому подключению не туда.
-    """
+    """Настройки из окружения и `.env`; общие для веба и бота."""
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -361,8 +363,8 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Read by docker-compose.yml from the same variables, so credentials exist in
-    # exactly one place: .env.
+    # Без значений по умолчанию: те же переменные читает docker-compose, поэтому
+    # данные живут только в .env, а пропущенная переменная роняет старт с именем поля.
     postgres_user: str
     postgres_password: SecretStr
     postgres_db: str
@@ -370,17 +372,15 @@ class Settings(BaseSettings):
     postgres_port: int
 
     django_secret_key: SecretStr
-    # A switch, not data: off unless the environment turns it on.
     django_debug: bool = False
 
     bot_token: SecretStr | None = None
-    # NoDecode stops pydantic-settings from JSON-decoding the raw value: for a
-    # complex type it would try that before any validator runs, and choke on the
-    # comma-separated form a .env file can actually hold.
+    # NoDecode отключает JSON-разбор значения: для составного типа он идёт до любых
+    # валидаторов и падает на записи через запятую, которую только и держит .env.
     admin_telegram_ids: Annotated[list[int], NoDecode] = []
 
     anthropic_api_key: SecretStr | None = None
-    # Operational default, deliberately in code so the whole group moves together.
+    # Дефолт в коде намеренно: модель меняется для всей группы сразу.
     ai_model: str = "claude-sonnet-5"
 
     webapp_url: str | None = None
@@ -388,12 +388,7 @@ class Settings(BaseSettings):
     @model_validator(mode="before")
     @classmethod
     def _ignore_blank_values(cls, data: object) -> object:
-        """Считать `VAR=` отсутствующим значением.
-
-        В `.env`, скопированном из `.env.example`, пусто у каждого ключа. Отбрасывая
-        пустые значения, получаем внятную ошибку «поле обязательно» вместо пустого
-        логина, доехавшего до драйвера базы.
-        """
+        """Считать `VAR=` отсутствующим, чтобы шаблонный `.env` давал понятную ошибку."""
         if isinstance(data, dict):
             return {
                 key: value
@@ -405,7 +400,7 @@ class Settings(BaseSettings):
     @field_validator("admin_telegram_ids", mode="before")
     @classmethod
     def _parse_admin_ids(cls, value: object) -> object:
-        """Принять список через запятую: JSON-список в `.env` держать неудобно."""
+        """Разобрать список ID, записанный через запятую."""
         if isinstance(value, str):
             return [int(part) for part in value.split(",") if part.strip()]
         return value
@@ -417,7 +412,7 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    """Вернуть настройки, прочитав окружение один раз за процесс."""
+    """Прочитать окружение один раз за процесс."""
     return Settings()
 ```
 
@@ -426,35 +421,67 @@ def get_settings() -> Settings:
 Run: `uv run pytest tests/test_config.py -q 2>&1 | tail -3`
 Expected: 14 passed.
 
-- [ ] **Step 11: Подключить настройки к Django**
+- [ ] **Step 11: Заменить `mufradat/settings.py` и подчистить `manage.py`**
 
-Правки в `mufradat/settings.py` точечные — сгенерированный файл не переписывать.
-
-**11.1.** После существующих импортов добавить:
+Сгенерированный `settings.py` состоит в основном из комментариев со ссылками на
+документацию. Вместо точечных правок проще заменить содержимое целиком, оставив
+только те комментарии, что объясняют решение:
 
 ```python
+from pathlib import Path
+
 from mufradat.config import get_settings
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Единственное место, где читается окружение; процесс бота импортирует этот же объект.
 config = get_settings()
-```
 
-**11.2.** Заменить строки `SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`:
-
-```python
 SECRET_KEY = config.django_secret_key.get_secret_value()
+
 DEBUG = config.django_debug
+
 ALLOWED_HOSTS: list[str] = ["localhost", "127.0.0.1"]
-```
 
-**11.3.** В `INSTALLED_APPS` добавить последним элементом:
-
-```python
+INSTALLED_APPS = [
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
     "vocabulary",
-```
+]
 
-**11.4.** Заменить блок `DATABASES` целиком:
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
 
-```python
+ROOT_URLCONF = "mufradat.urls"
+
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            ],
+        },
+    },
+]
+
+WSGI_APPLICATION = "mufradat.wsgi.application"
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -465,22 +492,47 @@ DATABASES = {
         "PORT": str(config.postgres_port),
     }
 }
-```
 
-**11.5.** Заменить локаль и часовой пояс:
+# Пароли есть только у staff в админке; ученики входят через Telegram.
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
 
-```python
 LANGUAGE_CODE = "ru-ru"
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
-```
 
-**11.6.** В конец файла добавить настройки медиа:
+STATIC_URL = "static/"
 
-```python
+# Картинки единиц: скачиваются один раз и дальше отдаются как обычные файлы.
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+```
+
+`manage.py` тоже сокращается: guard вокруг импорта Django нужен там, где окружение
+собирают руками, а мы всегда запускаем через `uv run`.
+
+```python
+#!/usr/bin/env python
+"""Точка входа для команд Django."""
+
+import os
+import sys
+
+from django.core.management import execute_from_command_line
+
+
+def main() -> None:
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mufradat.settings")
+    execute_from_command_line(sys.argv)
+
+
+if __name__ == "__main__":
+    main()
 ```
 
 - [ ] **Step 12: Проверить, что Django поднимается и миграции применяются**
@@ -525,7 +577,7 @@ git commit -m "feat: Django project skeleton with settings sourced from one conf
 
 - [ ] **Step 1: Написать падающие тесты**
 
-Создать `vocabulary/services/__init__.py` и `tests/services/__init__.py` пустыми.
+Создать пакеты: `mkdir -p vocabulary/services tests/services && touch vocabulary/services/__init__.py tests/services/__init__.py`.
 
 `tests/services/test_arabic.py`:
 
@@ -583,11 +635,11 @@ def test_non_arabic_passes_through() -> None:
 
 
 def test_gender_pairs_collapse_and_that_is_expected() -> None:
-    """Documents the blind spot the data model works around (spec 4.1).
+    """Фиксирует слепоту, вокруг которой построена модель (§4.1 спеки).
 
-    Masculine and feminine address differ only by the final harakat, which
-    normalization strips. Uniqueness is therefore enforced on the exact `arabic`,
-    and the pair is distinguished structurally by Entry.person.
+    Обращение к мужчине и к женщине различается только последней харакой, а её
+    нормализация снимает. Поэтому уникальность стоит на точном `arabic`, а различает
+    пару поле `Entry.person`.
     """
     assert normalize_arabic("مَا اسْمُكَ؟") == normalize_arabic("مَا اسْمُكِ؟")
     assert normalize_arabic("كَتَبْتَ") == normalize_arabic("كَتَبْتِ")
@@ -603,7 +655,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'vocabulary.services.ar
 `vocabulary/services/arabic.py`:
 
 ```python
-"""Pure text helpers for Arabic. No database, no settings — trivially testable."""
+"""Работа с арабским текстом: чистые функции без БД и настроек."""
 
 import re
 import unicodedata
@@ -627,15 +679,12 @@ _LETTER_FOLDING = str.maketrans(
 
 
 def normalize_arabic(text: str) -> str:
-    """Reduce an Arabic string to a lookup key for finding near-duplicates.
+    """Привести арабское слово к ключу для поиска похожих записей.
 
-    Diacritics are how the textbook teaches pronunciation, so they are stored as
-    recognised — but they must not participate in the lookup: the vision model may
-    return the same word with slightly different harakat.
-
-    Note the deliberate blind spot: masculine and feminine forms that differ only by
-    the final harakat map to the same key. See spec 4.1 — uniqueness is enforced on
-    the exact `arabic`, not on this key.
+    Огласовки хранятся как распознаны, но в ключ не входят: модель может вернуть то
+    же слово с иной расстановкой харакат. Осознанная слепота: формы, различающиеся
+    только последней харакой, дают один ключ — поэтому уникальность в БД стоит на
+    точном `arabic`, а не на нём (§4.1 спеки).
     """
     text = unicodedata.normalize("NFC", text)
     text = _DIACRITICS.sub("", text)
@@ -744,10 +793,10 @@ _PROCLITICS = ("و", "ف", "ب", "ل", "ك")
 
 
 def _candidate_forms(token: str) -> list[str]:
-    """Forms to try for one normalized token, most specific first.
+    """Варианты одного токена, от точного к менее точному.
 
-    The full form comes first on purpose: stripping a leading letter from a word
-    that simply starts with it must never win over an exact dictionary hit.
+    Полная форма идёт первой намеренно: снятие первой буквы у слова, которое просто
+    с неё начинается, не должно побеждать точное попадание в словарь.
     """
     forms = [token]
 
@@ -765,11 +814,10 @@ def _candidate_forms(token: str) -> list[str]:
 
 
 def match_entries_in_sentence(sentence: str, known: dict[str, int]) -> set[int]:
-    """Find which dictionary entries a sentence uses.
+    """Найти единицы словаря, использованные в предложении.
 
-    `known` maps an entry's normalized form (Entry.arabic_norm) to its id. Needed
-    because in running text a word carries the definite article and clitic
-    prepositions, so a plain comparison would miss it.
+    `known` — отображение `Entry.arabic_norm` в id. Нужно потому, что в тексте слово
+    идёт с артиклем и слитными предлогами, и прямое сравнение его не найдёт.
     """
     if not known:
         return set()
@@ -805,7 +853,7 @@ git commit -m "feat: match sentence tokens to dictionary entries through proclit
 
 **Files:**
 - Create: `vocabulary/enums.py`
-- Modify: `vocabulary/models.py`
+- Create: `vocabulary/models.py`
 - Create: `vocabulary/migrations/0001_initial.py` (генерируется)
 - Test: `tests/db/__init__.py`, `tests/db/test_models.py`
 
@@ -830,7 +878,7 @@ class Kind(models.TextChoices):
 
 
 class Pos(models.TextChoices):
-    """Part of speech. Only needed to decide which forms make sense."""
+    """Часть речи. Нужна только чтобы понять, какие формы уместны."""
 
     NOUN = "noun", "существительное"
     VERB = "verb", "глагол"
@@ -851,7 +899,7 @@ class Tense(models.TextChoices):
 
 
 class Direction(models.TextChoices):
-    """Every entry yields two independent SRS cards."""
+    """Каждая единица даёт две независимые карточки."""
 
     AR_RU = "ar_ru", "арабское → русский"
     RU_AR = "ru_ar", "русское → арабский"
@@ -865,7 +913,7 @@ class Source(models.TextChoices):
 
 - [ ] **Step 2: Написать модели**
 
-Заменить содержимое `vocabulary/models.py`:
+Создать `vocabulary/models.py`:
 
 ```python
 from django.db import models
@@ -876,7 +924,7 @@ from vocabulary.services.arabic import normalize_arabic
 
 
 class TelegramUser(models.Model):
-    """A learner. Separate from Django's auth user: no password, Telegram id as pk."""
+    """Ученик. Отдельно от auth-пользователя Django: пароля нет, ключ — Telegram ID."""
 
     telegram_id = models.BigIntegerField(primary_key=True)
     username = models.TextField(blank=True, default="")
@@ -893,7 +941,7 @@ class TelegramUser(models.Model):
 
 
 class Entry(models.Model):
-    """A study unit: a word, a phrase or an inflected form. All three share a shape."""
+    """Единица заучивания: слово, фраза или словоформа — структура у всех одна."""
 
     kind = models.CharField(max_length=8, choices=Kind)
     arabic = models.TextField(help_text="С огласовками, как распознано")
@@ -954,7 +1002,7 @@ class Entry(models.Model):
 
     @property
     def display_image(self) -> models.fields.files.ImageFieldFile | None:
-        """A form shows its base's picture: "его машина" reuses the car photo."""
+        """Форма показывает картинку базы: «его машина» берёт фотографию машины."""
         if self.image:
             return self.image
         if self.base_id and self.base.image:
@@ -969,7 +1017,7 @@ class Entry(models.Model):
 
 
 class Sentence(models.Model):
-    """Usage example. Never becomes a card — phrases are Entry rows instead."""
+    """Пример употребления. Карточкой не становится — для этого есть фразы в Entry."""
 
     arabic = models.TextField()
     translation_ru = models.TextField()
@@ -996,7 +1044,7 @@ class SentenceEntry(models.Model):
 
 
 class UserProgress(models.Model):
-    """One row per (learner, entry, direction). FSRS runs server-side."""
+    """Одна строка на (ученик, единица, направление). FSRS считается на сервере."""
 
     telegram_user = models.ForeignKey(
         TelegramUser, on_delete=models.CASCADE, related_name="progress"
@@ -1017,9 +1065,9 @@ class UserProgress(models.Model):
 
 
 class ReviewLog(models.Model):
-    """Rating history, kept to fit FSRS parameters for this group later.
+    """История оценок: понадобится, чтобы подогнать параметры FSRS под группу.
 
-    telegram_id has no FK on purpose: history outlives a deleted learner.
+    FK на ученика нет намеренно — история переживает его удаление.
     """
 
     telegram_id = models.BigIntegerField(db_index=True)
@@ -1042,7 +1090,7 @@ Expected: таблицы `vocabulary_entry`, `vocabulary_sentence`, `vocabulary_
 
 - [ ] **Step 4: Написать тесты моделей**
 
-Создать `tests/db/__init__.py` пустым.
+Создать пакет: `mkdir -p tests/db && touch tests/db/__init__.py`.
 
 `tests/db/test_models.py`:
 
@@ -1076,10 +1124,10 @@ def test_exact_duplicate_is_rejected() -> None:
 
 
 def test_gender_pair_is_allowed() -> None:
-    """Regression test for spec 4.1.
+    """Регрессионный тест на §4.1 спеки.
 
-    Both phrases normalize to the same key; uniqueness is on the exact arabic, so
-    the feminine form must be storable next to the masculine one.
+    Обе фразы дают один ключ нормализации; уникальность стоит на точном арабском,
+    поэтому женская форма должна сохраняться рядом с мужской.
     """
     masculine = Entry.objects.create(
         kind=Kind.PHRASE,
@@ -1219,7 +1267,7 @@ git commit -m "feat: Entry model covering words, phrases and inflected forms"
 ### Task 5: Админка
 
 **Files:**
-- Modify: `vocabulary/admin.py`
+- Create: `vocabulary/admin.py`
 - Test: `tests/db/test_admin.py`
 
 **Interfaces:**
@@ -1228,7 +1276,7 @@ git commit -m "feat: Entry model covering words, phrases and inflected forms"
 
 - [ ] **Step 1: Написать админку**
 
-Заменить содержимое `vocabulary/admin.py`:
+Создать `vocabulary/admin.py`:
 
 ```python
 from django.contrib import admin
@@ -1237,7 +1285,7 @@ from vocabulary.models import Entry, Sentence, SentenceEntry, TelegramUser
 
 
 class FormInline(admin.TabularInline):
-    """Inflected forms of the entry being edited."""
+    """Словоформы редактируемой единицы."""
 
     model = Entry
     fk_name = "base"
@@ -1483,7 +1531,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'vocabulary.services.de
 `vocabulary/services/dedup.py`:
 
 ```python
-"""Classify an incoming entry against the shared deck. See spec 4.2."""
+"""Классификация входящей записи относительно общей колоды (§4.2 спеки)."""
 
 from dataclasses import dataclass
 from enum import StrEnum
@@ -1516,9 +1564,9 @@ def _same_translation(left: str, right: str) -> bool:
 
 
 def check_duplicate(arabic: str, translation_ru: str) -> DuplicateCheck:
-    """Look up near-duplicates by normalized skeleton, then compare exact arabic.
+    """Найти кандидатов по скелету, затем сравнить точное арабское написание.
 
-    Synchronous: the bot calls it through asgiref.sync.sync_to_async.
+    Синхронная: из бота вызывается через `asgiref.sync.sync_to_async`.
     """
     candidates = list(Entry.objects.filter(arabic_norm=normalize_arabic(arabic)))
     if not candidates:
@@ -1771,10 +1819,10 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'vocabulary.services.cu
 `vocabulary/services/curriculum.py`:
 
 ```python
-"""Loader for content/curriculum.yaml — the editable description of AI behaviour.
+"""Загрузчик `content/curriculum.yaml` — редактируемого описания поведения ИИ.
 
-Validated through pydantic so a typo in the file produces a clear error instead of a
-strange prompt.
+Проверяется через pydantic, поэтому опечатка в файле даёт внятную ошибку, а не
+странный промпт.
 """
 
 from pathlib import Path
@@ -1897,10 +1945,10 @@ git commit -m "feat: validated curriculum file driving AI content generation"
 `vocabulary/management/commands/seed_deck.py`:
 
 ```python
-"""Seed the shared deck with a small textbook-like sample.
+"""Наполнить общую колоду небольшим учебным набором.
 
-Idempotent: re-running adds nothing. Covers all three kinds of study unit so the
-queues have something realistic to work with.
+Идемпотентно: повторный запуск ничего не добавляет. Есть все три типа единиц,
+чтобы очередям было с чем работать.
 """
 
 from typing import Any
