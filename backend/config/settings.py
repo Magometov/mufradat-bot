@@ -87,13 +87,10 @@ STATIC_ROOT = Path(BASE_DIR) / "static"
 MEDIA_URL = "/m/"
 MEDIA_ROOT = Path(BASE_DIR) / "media"
 
-# --- Telegram и ИИ ---------------------------------------------------------
+# --- Telegram --------------------------------------------------------------
 BOT_TOKEN = getenv("BOT_TOKEN")
 ADMIN_TELEGRAM_ID = int(getenv("ADMIN_TELEGRAM_ID") or 0)
 WEBAPP_URL = getenv("WEBAPP_URL")
-
-ANTHROPIC_API_KEY = getenv("ANTHROPIC_API_KEY", default="")
-AI_MODEL = getenv("AI_MODEL") or "claude-sonnet-5"
 
 # Без этого записи уровня INFO из наших модулей не видны в консоли.
 LOGGING = {
