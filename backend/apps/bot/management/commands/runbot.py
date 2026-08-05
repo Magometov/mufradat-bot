@@ -6,7 +6,7 @@ from aiogram.enums import ParseMode
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from apps.bot.handlers import start
+from apps.bot.handlers import add, start
 
 
 class Command(BaseCommand):
@@ -26,7 +26,9 @@ class Command(BaseCommand):
             default=DefaultBotProperties(parse_mode=ParseMode.HTML),
         )
         dispatcher = Dispatcher()
+        # Порядок важен: команды разбираются раньше свободного текста.
         dispatcher.include_router(start.router)
+        dispatcher.include_router(add.router)
 
         me = await bot.get_me()
         self.stdout.write(f"Бот @{me.username} запущен")
