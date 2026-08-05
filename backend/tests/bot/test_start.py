@@ -26,11 +26,17 @@ class FakeMessage:
         self.answers.append((text, reply_markup))
 
 
-def test_is_admin_reads_settings(settings) -> None:
-    settings.ADMIN_TELEGRAM_IDS = [111]
+def test_admin_is_a_single_id(settings) -> None:
+    settings.ADMIN_TELEGRAM_ID = 795856546
 
-    assert is_admin(111) is True
-    assert is_admin(222) is False
+    assert is_admin(795856546) is True
+    assert is_admin(111) is False
+
+
+def test_nobody_is_admin_when_id_is_unset(settings) -> None:
+    settings.ADMIN_TELEGRAM_ID = 0
+
+    assert is_admin(0) is False
 
 
 def test_open_app_button_absent_until_url_is_set(settings) -> None:
@@ -49,7 +55,7 @@ def test_open_app_button_points_at_webapp(settings) -> None:
 
 
 async def test_admin_gets_the_entry_format(settings) -> None:
-    settings.ADMIN_TELEGRAM_IDS = [111]
+    settings.ADMIN_TELEGRAM_ID = 111
     message = FakeMessage(from_user=FakeUser(id=111))
 
     await handle_start(message)
@@ -60,7 +66,7 @@ async def test_admin_gets_the_entry_format(settings) -> None:
 
 
 async def test_user_is_invited_to_the_app(settings) -> None:
-    settings.ADMIN_TELEGRAM_IDS = []
+    settings.ADMIN_TELEGRAM_ID = 111
     settings.WEBAPP_URL = APP_URL
     message = FakeMessage(from_user=FakeUser(id=222))
 
@@ -72,7 +78,7 @@ async def test_user_is_invited_to_the_app(settings) -> None:
 
 
 async def test_without_webapp_url_user_is_told_to_wait(settings) -> None:
-    settings.ADMIN_TELEGRAM_IDS = []
+    settings.ADMIN_TELEGRAM_ID = 111
     settings.WEBAPP_URL = ""
     message = FakeMessage(from_user=FakeUser(id=444))
 

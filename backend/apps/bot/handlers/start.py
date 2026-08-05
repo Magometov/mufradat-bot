@@ -19,7 +19,6 @@ async def handle_start(message: Message) -> None:
         return
 
     user = message.from_user
-    # В логе видно, кто подключился; оттуда же берётся ID для ADMIN_TELEGRAM_IDS.
     logger.info("/start от %s (@%s)", user.id, user.username)
 
     if is_admin(user.id):

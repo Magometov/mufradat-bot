@@ -89,7 +89,7 @@ MEDIA_ROOT = Path(BASE_DIR) / "media"
 
 # --- Telegram и ИИ ---------------------------------------------------------
 BOT_TOKEN = getenv("BOT_TOKEN")
-ADMIN_TELEGRAM_IDS = [int(x) for x in getenv("ADMIN_TELEGRAM_IDS", "").split(",") if x.strip()]
+ADMIN_TELEGRAM_ID = int(getenv("ADMIN_TELEGRAM_ID") or 0)
 WEBAPP_URL = getenv("WEBAPP_URL")
 
 ANTHROPIC_API_KEY = getenv("ANTHROPIC_API_KEY", default="")
