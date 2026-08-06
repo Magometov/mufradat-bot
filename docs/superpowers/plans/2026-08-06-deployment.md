@@ -516,6 +516,7 @@ docker compose -f docker-compose.prod.yml up -d --build caddy         # прав
 |---|---|
 | Сертификат не выпускается | DNS не распространился либо 80-й закрыт в панели Selectel. `dig +short домен`, затем `logs caddy` |
 | `TelegramConflictError` в логах бота | тот же токен поллит кто-то ещё. Остановить локальный `runbot`: `pkill -f runbot` |
+| `TelegramNetworkError: Request timeout` при старте бота | адрес `api.telegram.org`, который отдал DNS, заблокирован. В прод-описании у `bot` закреплён рабочий (`extra_hosts`); если и он перестанет отвечать, перебрать адреса командой из комментария там же |
 | Сборка падает без внятной ошибки | не хватило памяти. `free -h` — подкачка из этапа 1 должна быть включена |
 | `git clone` просит пароль | deploy key не добавлен или добавлен не в тот репозиторий. Проверить `ssh -T git@github.com` с сервера |
 | Админка без стилей | не собралась статика. `logs backend` на строку про static files, при необходимости `up -d --build backend bot` |

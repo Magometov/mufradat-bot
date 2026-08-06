@@ -44,6 +44,13 @@ services:
       POSTGRES_PORT: 5432
       DJANGO_DEBUG: "false"
     command: ["python", "manage.py", "runbot"]
+    # Часть адресов api.telegram.org недоступна с российского хостинга: DNS отдаёт
+    # 149.154.166.110, и соединение с ним не устанавливается. Адрес ниже — тот же API,
+    # он отвечает. Если однажды перестанет, рабочий ищется перебором:
+    # for ip in 149.154.167.220 149.154.175.50 149.154.171.5 91.108.56.130; do
+    #     timeout 3 bash -c "</dev/tcp/$ip/443" && echo "$ip ок" || echo "$ip нет"; done
+    extra_hosts:
+      - "api.telegram.org:149.154.167.220"
     depends_on:
       db:
         condition: service_healthy
