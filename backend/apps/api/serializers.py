@@ -6,4 +6,4 @@ from apps.vocabulary.models import Entry
 class EntrySerializer(serializers.ModelSerializer):
     class Meta:
         model = Entry
-        fields = ("id", "kind", "arabic", "translation_ru", "transliteration", "image")
+        fields = ("id", "arabic", "translation_ru", "transliteration", "image")

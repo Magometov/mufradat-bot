@@ -4,7 +4,6 @@ import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 
-from apps.vocabulary.enums import Kind
 from apps.vocabulary.models import Entry
 
 pytestmark = pytest.mark.django_db
@@ -22,15 +21,15 @@ def client() -> APIClient:
     return APIClient()
 
 
-def test_words_and_phrases_come_together(client: APIClient) -> None:
-    """Колода плоская: приложение получает всё и само фильтрует и тасует."""
-    Entry.objects.create(kind=Kind.WORD, arabic="بَيْت", translation_ru="дом")
-    Entry.objects.create(kind=Kind.PHRASE, arabic="مَا اسْمُكَ؟", translation_ru="как тебя зовут?")
+def test_deck_is_one_flat_list(client: APIClient) -> None:
+    """Деления на слова и фразы нет: приложение получает всё одним списком и тасует."""
+    Entry.objects.create(arabic="بَيْت", translation_ru="дом")
+    Entry.objects.create(arabic="مَا اسْمُكَ؟", translation_ru="как тебя зовут?")
 
     body = client.get(ENTRIES).json()
 
     assert len(body) == 2
-    assert {item["kind"] for item in body} == {"word", "phrase"}
+    assert "kind" not in body[0]
 
 
 def test_entry_has_everything_for_both_sides(client: APIClient) -> None:
@@ -41,7 +40,6 @@ def test_entry_has_everything_for_both_sides(client: APIClient) -> None:
     assert body == [
         {
             "id": entry.pk,
-            "kind": "word",
             "arabic": "بَيْت",
             "translation_ru": "дом",
             "transliteration": "bayt",

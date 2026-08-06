@@ -1,6 +1,5 @@
 import pytest
 
-from apps.vocabulary.enums import Kind
 from apps.vocabulary.models import Entry
 
 pytestmark = pytest.mark.django_db
@@ -16,7 +15,7 @@ def staff_client(client, django_user_model):
 
 
 def test_changelist_opens(staff_client) -> None:
-    Entry.objects.create(kind=Kind.WORD, arabic="بَيْت", translation_ru="дом")
+    Entry.objects.create(arabic="بَيْت", translation_ru="дом")
 
     response = staff_client.get("/admin/vocabulary/entry/")
 
@@ -29,11 +28,10 @@ def test_add_form_opens(staff_client) -> None:
 
 
 def test_word_is_added_through_admin(staff_client) -> None:
-    """Ввод с компьютера идёт через админку — форма должна сохранять единицу."""
+    """Ввод с компьютера идёт через админку — форма должна сохранять слово."""
     response = staff_client.post(
         "/admin/vocabulary/entry/add/",
         {
-            "kind": Kind.WORD,
             "arabic": "كِتَاب",
             "translation_ru": "книга",
             "transliteration": "kitab",
@@ -45,8 +43,8 @@ def test_word_is_added_through_admin(staff_client) -> None:
 
 
 def test_search_by_russian(staff_client) -> None:
-    Entry.objects.create(kind=Kind.WORD, arabic="كِتَاب", translation_ru="книга")
-    Entry.objects.create(kind=Kind.WORD, arabic="بَيْت", translation_ru="дом")
+    Entry.objects.create(arabic="كِتَاب", translation_ru="книга")
+    Entry.objects.create(arabic="بَيْت", translation_ru="дом")
 
     body = staff_client.get("/admin/vocabulary/entry/?q=книга").content.decode()
 

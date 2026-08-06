@@ -5,7 +5,7 @@ from aiogram.types import Message
 
 from apps.bot import texts
 from apps.bot.keyboards import open_app
-from apps.bot.parsing import ParsedEntry, ParseError, parse_entry
+from apps.bot.parsing import ParseError, parse_entry
 from apps.bot.permissions import is_admin
 from apps.vocabulary.models import Entry
 
@@ -23,25 +23,44 @@ async def handle_text(message: Message) -> None:
         await message.answer(texts.ONLY_ADMIN_ADDS, reply_markup=open_app())
         return
 
-    try:
-        parsed = parse_entry(message.text)
-    except ParseError as error:
-        await message.answer(f"{error}\n\n{texts.ENTRY_FORMAT_HINT}")
+    lines = [line.strip() for line in message.text.splitlines()]
+    lines = [line for line in lines if line]
+
+    if not lines:
+        await message.answer(texts.ENTRY_FORMAT_HINT)
         return
 
-    await _save(message, parsed)
+    await message.answer(await _save(lines))
 
 
-async def _save(message: Message, parsed: ParsedEntry) -> None:
-    entry, created = await Entry.objects.aget_or_create(
-        arabic=parsed.arabic,
-        translation_ru=parsed.translation_ru,
-        defaults={"kind": parsed.kind, "transliteration": parsed.transliteration},
-    )
+async def _save(lines: list[str]) -> str:
+    """Сохраняет каждую строку и собирает отчёт по всему сообщению.
 
-    if not created:
-        await message.answer(texts.already_exists(entry.arabic, entry.translation_ru))
-        return
+    Одна плохая строка не отменяет остальные: список от ИИ приходит целиком, и
+    переписывать его из-за одной опечатки незачем — вернуть надо именно её.
+    """
+    added: list[str] = []
+    existing: list[str] = []
+    failures: list[str] = []
 
-    logger.info("добавлено: %s — %s", entry.arabic, entry.translation_ru)
-    await message.answer(texts.added(entry.arabic, entry.translation_ru, entry.get_kind_display()))
+    for line in lines:
+        try:
+            parsed = parse_entry(line)
+        except ParseError as error:
+            failures.append(texts.failure_line(line, str(error)))
+            continue
+
+        entry, created = await Entry.objects.aget_or_create(
+            arabic=parsed.arabic,
+            translation_ru=parsed.translation_ru,
+            defaults={"transliteration": parsed.transliteration},
+        )
+        card = texts.card_line(entry.arabic, entry.translation_ru)
+
+        if created:
+            logger.info("добавлено: %s — %s", entry.arabic, entry.translation_ru)
+            added.append(card)
+        else:
+            existing.append(card)
+
+    return texts.report(added, existing, failures)

@@ -1,12 +1,9 @@
 from django.db import models
 
-from apps.vocabulary.enums import Kind
-
 
 class Entry(models.Model):
-    """Единица заучивания: слово или фраза."""
+    """Слово — то, что учится карточкой."""
 
-    kind = models.CharField("Тип", max_length=8, choices=Kind, default=Kind.WORD)
     arabic = models.TextField("Арабское", help_text="С огласовками")
     translation_ru = models.TextField("Перевод")
     transliteration = models.TextField("Транслитерация", blank=True, default="")
@@ -14,8 +11,8 @@ class Entry(models.Model):
     created_at = models.DateTimeField("Добавлено", auto_now_add=True, db_index=True)
 
     class Meta:
-        verbose_name = "Единица"
-        verbose_name_plural = "Единицы"
+        verbose_name = "Слово"
+        verbose_name_plural = "Слова"
         constraints = [
             models.UniqueConstraint(
                 fields=["arabic", "translation_ru"],

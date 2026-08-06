@@ -54,7 +54,7 @@ def test_open_app_button_points_at_webapp(settings) -> None:
     assert keyboard.inline_keyboard[0][0].web_app.url == APP_URL
 
 
-async def test_admin_gets_the_entry_format_and_the_prompt_button(settings) -> None:
+async def test_admin_gets_the_entry_format_and_both_prompt_buttons(settings) -> None:
     settings.ADMIN_TELEGRAM_ID = 111
     message = FakeMessage(from_user=FakeUser(id=111))
 
@@ -62,7 +62,10 @@ async def test_admin_gets_the_entry_format_and_the_prompt_button(settings) -> No
 
     text, keyboard = message.answers[0]
     assert "بَيْت | дом" in text
-    assert keyboard.keyboard[0][0].text == texts.AI_PROMPT_BUTTON
+    assert [button.text for button in keyboard.keyboard[0]] == [
+        texts.AI_WORDS_BUTTON,
+        texts.AI_PHRASES_BUTTON,
+    ]
 
 
 async def test_user_is_invited_to_the_app(settings) -> None:

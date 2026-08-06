@@ -1,12 +1,16 @@
 import re
 from dataclasses import dataclass
 
-from apps.vocabulary.enums import Kind
-
 SEPARATOR = "|"
 
 _ARABIC = re.compile(r"[؀-ۿ]")
 _CYRILLIC = re.compile(r"[Ѐ-ӿ]")
+
+# ИИ охотно нумерует список и выделяет слова жирным, а промпт — это просьба, не
+# гарантия. Без чистки «1.» и «**» уезжали внутрь арабского поля и вставали в колоду
+# молча: карточка показывала «1. بَيْت».
+_LIST_MARKER = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s+")
+_DECORATION = str.maketrans("", "", "*`")
 
 
 class ParseError(Exception):
@@ -18,7 +22,6 @@ class ParsedEntry:
     arabic: str
     translation_ru: str
     transliteration: str
-    kind: str
 
 
 def parse_entry(text: str) -> ParsedEntry:
@@ -27,7 +30,8 @@ def parse_entry(text: str) -> ParsedEntry:
     Порядок частей не важен: арабский, русский и латиница лежат в разных диапазонах
     Unicode, поэтому сторона определяется алфавитом, а не позицией.
     """
-    parts = [part.strip() for part in text.split(SEPARATOR)]
+    line = _LIST_MARKER.sub("", text)
+    parts = [part.translate(_DECORATION).strip() for part in line.split(SEPARATOR)]
     parts = [part for part in parts if part]
 
     if len(parts) < 2:
@@ -48,9 +52,6 @@ def parse_entry(text: str) -> ParsedEntry:
         arabic=arabic[0],
         translation_ru=translation,
         transliteration=transliteration,
-        # Фразы почти всегда состоят из нескольких слов; если ошибётся, тип правится
-        # в админке.
-        kind=Kind.PHRASE if " " in arabic[0] else Kind.WORD,
     )
 
 

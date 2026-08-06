@@ -7,13 +7,17 @@ from aiogram.types import (
 )
 from django.conf import settings
 
-from apps.bot.texts import AI_PROMPT_BUTTON, OPEN_APP_BUTTON
+from apps.bot.texts import AI_PHRASES_BUTTON, AI_WORDS_BUTTON, OPEN_APP_BUTTON
 
 
 def admin_menu() -> ReplyKeyboardMarkup:
-    """Клавиатура админа: промпт нужен несколько раз в неделю, пусть будет под рукой."""
+    """Клавиатура админа: промпты нужны несколько раз в неделю, пусть будут под рукой.
+
+    Две кнопки в один ряд: расширить колоду новыми словами и закрепить имеющиеся
+    фразами. Задачи разные, поэтому и промпты разные.
+    """
     return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text=AI_PROMPT_BUTTON)]],
+        keyboard=[[KeyboardButton(text=AI_WORDS_BUTTON), KeyboardButton(text=AI_PHRASES_BUTTON)]],
         resize_keyboard=True,
     )
 

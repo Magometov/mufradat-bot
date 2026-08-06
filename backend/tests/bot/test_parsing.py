@@ -1,7 +1,6 @@
 import pytest
 
 from apps.bot.parsing import ParseError, parse_entry
-from apps.vocabulary.enums import Kind
 
 
 def test_arabic_first() -> None:
@@ -18,6 +17,34 @@ def test_translation_first() -> None:
 
     assert parsed.arabic == "بَيْت"
     assert parsed.translation_ru == "дом"
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "1. بَيْت | дом | bayt",
+        "1) بَيْت | дом | bayt",
+        "- بَيْت | дом | bayt",
+        "• بَيْت | дом | bayt",
+        "**بَيْت** | дом | bayt",
+        "`بَيْت` | **дом** | bayt",
+    ],
+)
+def test_ai_list_decoration_does_not_reach_the_card(line: str) -> None:
+    """ИИ нумерует список и выделяет слова жирным. Без чистки «1.» и «**» вставали
+    в колоду внутри арабского поля, и карточка молча показывала «1. بَيْت».
+    """
+    parsed = parse_entry(line)
+
+    assert parsed.arabic == "بَيْت"
+    assert parsed.translation_ru == "дом"
+
+
+def test_dash_inside_translation_survives() -> None:
+    """Чистится только маркер в начале строки, а не дефисы внутри перевода."""
+    parsed = parse_entry("مَكْتَب | письменный стол — рабочий")
+
+    assert parsed.translation_ru == "письменный стол — рабочий"
 
 
 def test_transliteration_third() -> None:
@@ -48,14 +75,12 @@ def test_translation_may_contain_latin() -> None:
     assert parsed.transliteration == ""
 
 
-def test_phrase_is_detected_by_spaces() -> None:
+def test_multiword_arabic_is_a_card_too() -> None:
+    """Деления на слова и фразы нет: многословное арабское — такая же карточка."""
     parsed = parse_entry("مَا اسْمُكَ؟ | как тебя зовут? (к мужчине)")
 
-    assert parsed.kind == Kind.PHRASE
-
-
-def test_single_word_is_a_word() -> None:
-    assert parse_entry("بَيْت | дом").kind == Kind.WORD
+    assert parsed.arabic == "مَا اسْمُكَ؟"
+    assert parsed.translation_ru == "как тебя зовут? (к мужчине)"
 
 
 def test_missing_separator() -> None:
