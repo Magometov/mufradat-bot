@@ -1,0 +1,10 @@
+/** Карточка, как её отдаёт `GET /api/v1/entries/`. */
+export interface IEntry {
+    id: number;
+    arabic: string;
+    translation_ru: string;
+    /** Приходит пустой строкой, а не `null`, когда транслитерации нет. */
+    transliteration: string;
+    /** Полный URL или `null`. */
+    image: string | null;
+}

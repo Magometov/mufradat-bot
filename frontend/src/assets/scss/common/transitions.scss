@@ -1,0 +1,35 @@
+// Переходы между экранами и карточками. В компонентах их нет намеренно: классы Vue
+// глобальные.
+
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
+}
+
+// Перелистывание: карточка уезжает в сторону хода, следующая приходит с другой.
+// Уезжающая и приезжающая накладываются, поэтому обе позиционирует сцена прогона.
+.slide-forward-enter-active,
+.slide-forward-leave-active,
+.slide-back-enter-active,
+.slide-back-leave-active {
+    transition:
+        transform 0.26s ease,
+        opacity 0.26s ease;
+}
+
+.slide-forward-enter-from,
+.slide-back-leave-to {
+    transform: translateX(30%);
+    opacity: 0;
+}
+
+.slide-forward-leave-to,
+.slide-back-enter-from {
+    transform: translateX(-30%);
+    opacity: 0;
+}

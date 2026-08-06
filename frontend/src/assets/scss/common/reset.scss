@@ -1,0 +1,39 @@
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    // 1rem = 10px, поэтому размеры кратны 0.2rem.
+    font-size: 62.5%;
+}
+
+body {
+    margin: 0;
+    font-family: var(--font-ui);
+    font-size: 1.6rem;
+    line-height: 1.4;
+    color: var(--base-900);
+    background: var(--base-0);
+    -webkit-font-smoothing: antialiased;
+}
+
+h1,
+p {
+    margin: 0;
+}
+
+img {
+    display: block;
+}
+
+button {
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+}
+
+#app {
+    min-height: 100dvh;
+}

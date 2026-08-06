@@ -1,0 +1,26 @@
+@use 'mixins' as *;
+
+:root {
+    @include palette-light;
+
+    --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    // Огласовки читаются только шрифтом насх; свой не везём, берём системный.
+    --font-arabic: 'SF Arabic', 'Geeza Pro', 'Noto Naskh Arabic', 'Traditional Arabic', serif;
+}
+
+// Вне Telegram тему задаёт система.
+@media (prefers-color-scheme: dark) {
+    :root {
+        @include palette-dark;
+    }
+}
+
+// Внутри Telegram тему задаёт клиент: `useTelegram` ставит `data-theme` и поверх
+// вписывает точные цвета из `themeParams`.
+:root[data-theme='light'] {
+    @include palette-light;
+}
+
+:root[data-theme='dark'] {
+    @include palette-dark;
+}

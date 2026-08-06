@@ -1,0 +1,30 @@
+// Палитра лежит в миксинах, потому что применяется трижды: системная тема,
+// принудительный светлый и принудительный тёмный от Telegram.
+
+@mixin palette-light {
+    color-scheme: light;
+
+    --base-0: #ffffff;
+    --base-50: #f4f5f7;
+    --base-200: #e2e5ea;
+    --base-500: #7d8794;
+    --base-900: #16181d;
+
+    --primary-500: #2f7de1;
+    --primary-700: #1f5cab;
+    --on-primary: #ffffff;
+}
+
+@mixin palette-dark {
+    color-scheme: dark;
+
+    --base-0: #17191c;
+    --base-50: #21242a;
+    --base-200: #32363e;
+    --base-500: #8d97a5;
+    --base-900: #f2f4f7;
+
+    --primary-500: #4f97ef;
+    --primary-700: #2f7de1;
+    --on-primary: #ffffff;
+}
