@@ -1,9 +1,11 @@
 from dataclasses import dataclass, field
 from typing import Any
 
+from aiogram.types import MenuButtonDefault, MenuButtonWebApp
+
 from apps.bot import texts
 from apps.bot.handlers.start import handle_start
-from apps.bot.keyboards import open_app
+from apps.bot.keyboards import menu_button, open_app
 from apps.bot.permissions import is_admin
 
 APP_URL = "https://example.test/app"
@@ -66,6 +68,47 @@ async def test_admin_gets_the_entry_format_and_both_prompt_buttons(settings) -> 
         texts.AI_WORDS_BUTTON,
         texts.AI_PHRASES_BUTTON,
     ]
+
+
+def test_menu_button_opens_the_app(settings) -> None:
+    settings.WEBAPP_URL = APP_URL
+
+    button = menu_button()
+
+    assert isinstance(button, MenuButtonWebApp)
+    assert button.web_app.url == APP_URL
+
+
+def test_menu_button_falls_back_to_commands_without_url(settings) -> None:
+    """Иначе на сброшенном адресе «Меню» осталось бы вести на мёртвую страницу."""
+    settings.WEBAPP_URL = ""
+
+    assert isinstance(menu_button(), MenuButtonDefault)
+
+
+async def test_admin_also_gets_the_app_button(settings) -> None:
+    """Админу кнопка из open_app не приходит, но колоду смотреть ему тоже нужно."""
+    settings.ADMIN_TELEGRAM_ID = 111
+    settings.WEBAPP_URL = APP_URL
+    message = FakeMessage(from_user=FakeUser(id=111))
+
+    await handle_start(message)
+
+    _, keyboard = message.answers[0]
+    app_button = keyboard.keyboard[1][0]
+    assert app_button.text == texts.OPEN_APP_BUTTON
+    assert app_button.web_app.url == APP_URL
+
+
+async def test_admin_keyboard_is_only_prompts_without_url(settings) -> None:
+    settings.ADMIN_TELEGRAM_ID = 111
+    settings.WEBAPP_URL = ""
+    message = FakeMessage(from_user=FakeUser(id=111))
+
+    await handle_start(message)
+
+    _, keyboard = message.answers[0]
+    assert len(keyboard.keyboard) == 1
 
 
 async def test_user_is_invited_to_the_app(settings) -> None:

@@ -7,6 +7,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.bot.handlers import add, prompt, start
+from apps.bot.keyboards import menu_button
 
 
 class Command(BaseCommand):
@@ -33,6 +34,9 @@ class Command(BaseCommand):
         dispatcher.include_router(add.router)
 
         me = await bot.get_me()
+        # Кнопка «Меню» задаётся у Telegram один раз и хранится на его стороне, поэтому
+        # ставим её при каждом запуске: так адрес приложения не расходится с .env.
+        await bot.set_chat_menu_button(menu_button=menu_button())
         self.stdout.write(f"Бот @{me.username} запущен")
         try:
             await dispatcher.start_polling(bot)
