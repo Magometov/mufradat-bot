@@ -1,0 +1,31 @@
+# Адрес берётся из переменной DOMAIN. Домен — сертификат выпускается сам; для проверки
+# на своей машине ставится «:80», и тогда Caddy работает без https.
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Картинки карточек и статика админки уходят файлами, минуя Django.
+	handle_path /m/* {
+		root * /var/www/media
+		file_server
+	}
+
+	handle_path /s/* {
+		root * /var/www/static
+		file_server
+	}
+
+	# API и админка — в Django. Caddy сам добавляет X-Forwarded-Proto, поэтому Django
+	# собирает адреса картинок с правильной схемой.
+	@django path /api/* /admin/*
+	handle @django {
+		reverse_proxy backend:8000
+	}
+
+	# Всё остальное — собранное приложение. try_files нужен, чтобы прямой заход по
+	# любому пути отдавал index.html, а не 404.
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

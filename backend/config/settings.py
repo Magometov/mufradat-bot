@@ -13,6 +13,8 @@ DEBUG = getenv("DJANGO_DEBUG", "").lower() == "true"
 
 ALLOWED_HOSTS = ["*"]
 
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",

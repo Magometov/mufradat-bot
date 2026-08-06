@@ -1,17 +1,16 @@
 [project]
 name = "mufradat-bot"
 version = "0.1.0"
-description = "Telegram Mini App for learning Arabic vocabulary with spaced repetition"
+description = "Telegram Mini App for learning Arabic vocabulary"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "django>=6.0,<6.1",
     "psycopg[binary]>=3.3,<3.4",
     "pillow>=12.3,<13",
-    "pyyaml>=6,<7",
     "python-dotenv>=1.2,<2",
-    "pydantic>=2.13,<3",
     "aiogram>=3.30,<4",
     "djangorestframework>=3.17,<4",
+    "gunicorn>=23,<24",
 ]
 
 [project.optional-dependencies]
@@ -20,10 +19,6 @@ dev = [
     "pytest-asyncio>=1.4,<2",
     "pytest-django>=4.12,<5",
     "ruff>=0.16,<0.17",
-]
-# Fallback diacritizer: pulls torch (~1-2 GB), so it stays out of the default set.
-tashkeel = [
-    "arabic-diacritizer>=1.0,<2",
 ]
 
 # Проект не библиотека: колесо собирать не нужно, uv ставит только зависимости.
