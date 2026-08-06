@@ -12,8 +12,9 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 
-COPY backend/ backend/
+# Содержимое backend/ ложится прямо в /app: внутри образа вложенность ни к чему,
+# manage.py вызывается без пути, а gunicorn — без --chdir.
+COPY backend/ ./
 
-ENTRYPOINT ["/app/backend/docker-entrypoint.sh"]
-CMD ["gunicorn", "--chdir", "backend", "config.wsgi:application", \
-     "--bind", "0.0.0.0:8000", "--workers", "3"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]

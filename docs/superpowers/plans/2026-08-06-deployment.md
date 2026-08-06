@@ -430,7 +430,7 @@ curl -sI https://ВАШ-ДОМЕН.ru/admin/login/ | head -1
 ```bash
 ssh mufradat
 cd ~/mufradat
-docker compose -f docker-compose.prod.yml exec backend python backend/manage.py createsuperuser
+docker compose -f docker-compose.prod.yml exec backend python manage.py createsuperuser
 ```
 
 - [ ] **Шаг 2: Добавить пробное слово с картинкой**

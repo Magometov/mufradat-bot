@@ -26,8 +26,8 @@ services:
       POSTGRES_PORT: 5432
       DJANGO_DEBUG: "false"
     volumes:
-      - media:/app/backend/media
-      - static:/app/backend/static
+      - media:/app/media
+      - static:/app/static
     depends_on:
       db:
         condition: service_healthy
@@ -43,7 +43,7 @@ services:
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       DJANGO_DEBUG: "false"
-    command: ["python", "backend/manage.py", "runbot"]
+    command: ["python", "manage.py", "runbot"]
     depends_on:
       db:
         condition: service_healthy
