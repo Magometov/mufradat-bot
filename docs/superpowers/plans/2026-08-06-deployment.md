@@ -72,33 +72,70 @@ ssh root@IP-СЕРВЕРА
 apt update && apt upgrade -y
 ```
 
-- [ ] **Шаг 2: Создать рабочего пользователя без пароля**
+- [ ] **Шаг 2: Создать рабочего пользователя и дать ему sudo без пароля**
 
 ```bash
 adduser --disabled-password --gecos "" mufradat
 usermod -aG sudo mufradat
 rsync --archive --chown=mufradat:mufradat ~/.ssh /home/mufradat/
+echo 'mufradat ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/90-mufradat
+chmod 440 /etc/sudoers.d/90-mufradat
 ```
 
-Пароля у пользователя нет намеренно: вход только по ключу.
+Пароля у пользователя нет намеренно: вход только по ключу. Но тогда и `sudo` спросить
+пароль не сможет — отсюда `NOPASSWD`. Так же поступает cloud-init со своим пользователем
+`ubuntu`. Цена честная: у кого есть ssh-ключ, у того есть root. Ключ — единственная дверь
+на сервер, так что второго замка на ней всё равно нет.
 
-- [ ] **Шаг 3: Проверить, что вход по паролю выключен**
+- [ ] **Шаг 3: Прописать сервер в свой ssh-config**
 
-```bash
-sshd -T | grep -i passwordauthentication
+На своей машине, в `~/.ssh/config`:
+
+```
+Host mufradat
+    HostName IP-СЕРВЕРА
+    User mufradat
 ```
 
-Ожидается `passwordauthentication no`. Если `yes`:
+- [ ] **Шаг 4: Проверить вход новым пользователем, не закрывая сессию root**
+
+Из **второго** окна терминала:
 
 ```bash
-echo 'PasswordAuthentication no' > /etc/ssh/sshd_config.d/99-no-password.conf
+ssh mufradat 'whoami && sudo whoami'
+```
+
+Ожидается `mufradat` и `root`. Пока это не сработало, сессию root не закрывать: следующий
+шаг выключает вход root'ом, и при ошибке в ключах сервер останется без входа вообще.
+
+- [ ] **Шаг 5: Закрыть вход по паролю и вход root'ом**
+
+В сессии root:
+
+```bash
+printf 'PasswordAuthentication no\nPermitRootLogin no\n' > /etc/ssh/sshd_config.d/99-hardening.conf
 systemctl reload ssh
+sshd -T | grep -E "passwordauthentication|permitrootlogin"
 ```
 
-Отдельный файл в `sshd_config.d/` нужен потому, что на Ubuntu 24.04 настройки из этого
-каталога перекрывают правку самого `sshd_config`.
+Ожидается `passwordauthentication no` и `permitrootlogin no`. Отдельный файл в
+`sshd_config.d/` нужен потому, что на Ubuntu 24.04 настройки из этого каталога перекрывают
+правку самого `sshd_config`.
 
-- [ ] **Шаг 4: Добавить 2 ГБ подкачки**
+`fail2ban` не ставим: подбирать нечего, когда вход по паролю выключен.
+
+- [ ] **Шаг 6: Проверить автообновления безопасности**
+
+```bash
+cat /etc/apt/apt.conf.d/20auto-upgrades
+systemctl is-enabled unattended-upgrades
+```
+
+Ожидается по единице в обеих строках и `enabled`. На Ubuntu 24.04 это включено из коробки;
+если нет — `apt install -y unattended-upgrades`. Сервер никто не сторожит, заплатки
+безопасности должны ставиться сами.
+
+- [ ] **Шаг 7: Добавить 2 ГБ подкачки**
 
 ```bash
 fallocate -l 2G /swapfile
@@ -112,7 +149,7 @@ free -h
 Ожидается строка `Swap:` с 2,0Gi. Подкачка — страховка для сборки фронтенда: `npm ci` и
 `vite build` на дешёвой линейке с общим ядром — самый жадный шаг за всё развёртывание.
 
-- [ ] **Шаг 5: Поставить Docker из официального репозитория**
+- [ ] **Шаг 8: Поставить Docker из официального репозитория**
 
 ```bash
 apt install -y ca-certificates curl
@@ -130,7 +167,7 @@ usermod -aG docker mufradat
 В репозитории Ubuntu (`docker.io` + `docker-compose-v2`) версии старее; нам нужны compose v2
 и buildx как есть.
 
-- [ ] **Шаг 6: Включить файрвол**
+- [ ] **Шаг 9: Включить файрвол**
 
 ```bash
 ufw allow 22/tcp
@@ -144,23 +181,29 @@ ufw status
 опубликованные контейнерами, идут мимо ufw. Базу защищает то, что в прод-описании её порт
 не публикуется, а не эти правила.
 
-- [ ] **Шаг 7: Прописать сервер в свой ssh-config**
+- [ ] **Шаг 10: Короткая команда для прод-стека (по желанию)**
 
-На своей машине, в `~/.ssh/config`:
+Оболочка — обычный bash, ставить ничего не нужно. Решение владельца: никаких zsh и
+надстроек. Единственное, что окупается, — две строки в `.bashrc`:
 
+```bash
+cat >> /home/mufradat/.bashrc <<'EOF'
+bind '"\e[A": history-search-backward'
+bind '"\e[B": history-search-forward'
+alias dc='docker compose -f ~/mufradat/docker-compose.prod.yml --project-directory ~/mufradat'
+EOF
 ```
-Host mufradat
-    HostName IP-СЕРВЕРА
-    User mufradat
-```
+
+Стрелка вверх листает только команды, начинавшиеся на набранное. `dc ps` вместо
+`docker compose -f docker-compose.prod.yml ps` — эта длинная команда набирается десятки раз.
 
 **Проверка этапа:**
 
 ```bash
-ssh mufradat 'docker compose version && free -h | grep Swap'
+ssh mufradat 'docker compose version; free -h | grep Swap; sudo ufw status | head -6'
 ```
 
-Ожидается версия compose v2 и 2 ГБ подкачки, без запроса пароля.
+Ожидается версия compose v2, 2 ГБ подкачки и открытые 22, 80, 443 — всё без запроса пароля.
 
 ---
 
