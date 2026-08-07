@@ -1,3 +1,4 @@
+import base64
 import csv
 from io import StringIO
 from pathlib import Path
@@ -8,7 +9,7 @@ from django.core.management.base import CommandError
 
 from apps.vocabulary.management.commands import generate_images
 from apps.vocabulary.models import Entry
-from apps.vocabulary.pictures import PROMPTS, STYLE
+from apps.vocabulary.pictures import _PEOPLE, _THINGS, MODESTY, PROMPTS, STYLE
 
 pytestmark = pytest.mark.django_db
 
@@ -23,6 +24,12 @@ JPEG = b"\xff\xd8\xff\xe0 fake jpeg"
 @pytest.fixture(autouse=True)
 def media(settings, tmp_path: Path) -> None:
     settings.MEDIA_ROOT = tmp_path
+
+
+@pytest.fixture(autouse=True)
+def no_waiting(monkeypatch) -> None:
+    """Пауза между попытками нужна в бою, а тесты она только тормозит."""
+    monkeypatch.setattr(generate_images, "PAUSE", 0)
 
 
 @pytest.fixture
@@ -147,6 +154,92 @@ def test_one_broken_card_does_not_stop_the_run(key, calls, monkeypatch) -> None:
     book.refresh_from_db()
     assert bool(book.image)
     assert "Сорвалось: 1" in output
+
+
+def test_torn_connection_is_retried(key, monkeypatch) -> None:
+    """Соединение до fal рвётся через раз, а генерация уже оплачена — надо добить."""
+    tries: list[int] = []
+
+    def flaky(url: str) -> bytes:
+        tries.append(1)
+        if len(tries) < 3:
+            raise OSError("[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred")
+        return JPEG
+
+    monkeypatch.setattr(generate_images, "generate", lambda prompt, api_key: "https://x.test/p.jpg")
+    monkeypatch.setattr(generate_images, "download", flaky)
+    entry = Entry.objects.create(arabic="جَمَل", translation_ru="верблюд")
+
+    run()
+
+    entry.refresh_from_db()
+    assert len(tries) == 3
+    assert bool(entry.image)
+
+
+def test_rejected_key_is_not_retried(key, monkeypatch) -> None:
+    """Повторять 401 — только жечь деньги: ключ от повторов не починится."""
+    tries: list[int] = []
+
+    def unauthorised(prompt: str, api_key: str) -> str:
+        tries.append(1)
+        raise generate_images.urllib.error.HTTPError("u", 401, "no", {}, None)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(generate_images, "generate", unauthorised)
+    Entry.objects.create(arabic="جَمَل", translation_ru="верблюд")
+
+    with pytest.raises(CommandError, match="не принят"):
+        run()
+
+    assert len(tries) == 1
+
+
+def test_picture_arrives_inside_the_answer(key, monkeypatch) -> None:
+    """`sync_mode` отдаёт картинку data-ссылкой: за ней не надо ходить на CDN."""
+    encoded = base64.b64encode(JPEG).decode()
+    monkeypatch.setattr(
+        generate_images,
+        "generate",
+        lambda prompt, api_key: f"data:image/jpeg;base64,{encoded}",
+    )
+    entry = Entry.objects.create(arabic="جَمَل", translation_ru="верблюд")
+
+    run()
+
+    entry.refresh_from_db()
+    assert entry.image.read() == JPEG
+
+
+@pytest.mark.parametrize(
+    "word",
+    [
+        "девочка",  # женщина в подлежащем
+        "дети",  # девочка может появиться, а в переводе её нет
+        "семья",
+        "отец",  # ребёнок на руках может оказаться девочкой
+        "полицейский",  # мужской род в русском, женщина в картинке
+        "готовит (о еде)",
+        "женатый",
+    ],
+)
+def test_people_cards_carry_the_modesty_rule(word: str) -> None:
+    """Правило нужно и там, где женщины нет в переводе, — иначе её нарисуют без хиджаба."""
+    assert MODESTY in PROMPTS[word]
+
+
+@pytest.mark.parametrize("word", ["кошка", "верблюд", "книга", "яблоко", "мечеть"])
+def test_cards_without_people_stay_clean(word: str) -> None:
+    """«Волос не видно» рядом с кошкой даёт лысую кошку — предметам правило вредит."""
+    assert MODESTY not in PROMPTS[word]
+
+
+def test_no_card_is_in_both_halves() -> None:
+    assert set(_PEOPLE) & set(_THINGS) == set()
+
+
+def test_both_halves_add_up_to_the_dictionary() -> None:
+    """Иначе карточка выпала бы из словаря молча и осталась без картинки."""
+    assert len(PROMPTS) == len(_PEOPLE) + len(_THINGS)
 
 
 @pytest.fixture(scope="module")

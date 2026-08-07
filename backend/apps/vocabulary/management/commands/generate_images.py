@@ -1,4 +1,6 @@
+import base64
 import json
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -20,6 +22,10 @@ SIZE = "square_hd"
 
 TIMEOUT = 120
 
+# Сколько раз пробовать одну карточку и с какой паузой между попытками.
+ATTEMPTS = 4
+PAUSE = 3.0
+
 
 def generate(prompt: str, key: str) -> str:
     """Просит нарисовать картинку по готовому промпту и отдаёт адрес файла.
@@ -33,6 +39,10 @@ def generate(prompt: str, key: str) -> str:
             "image_size": SIZE,
             "num_images": 1,
             "output_format": "jpeg",
+            # Картинка приезжает прямо в этом ответе, а не ссылкой на CDN. Второе
+            # соединение — до fal.media — с российского хостинга рвётся примерно
+            # на каждой второй карточке, и оплаченная генерация уходила в мусор.
+            "sync_mode": True,
         }
     ).encode()
     request = urllib.request.Request(
@@ -50,6 +60,13 @@ def generate(prompt: str, key: str) -> str:
 
 
 def download(url: str) -> bytes:
+    """Достаёт файл: из `data:`-ссылки — прямо из ответа, иначе качает."""
+    if url.startswith("data:"):
+        head, _, payload = url.partition(",")
+        if ";base64" not in head:
+            raise ValueError(f"в ответе не base64, а {head}")
+        return base64.b64decode(payload)
+
     request = urllib.request.Request(url, headers={"User-Agent": "mufradat-bot/0.1"})
     with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
         kind = response.headers.get("Content-Type", "")
@@ -61,6 +78,32 @@ def download(url: str) -> bytes:
         raise ValueError("пустой файл")
 
     return data
+
+
+def draw(prompt: str, key: str) -> bytes:
+    """Рисует картинку, повторяя попытку при сетевом обрыве.
+
+    Повтор здесь не роскошь: соединение с российского хостинга до fal рвётся на
+    полпути (`SSL: UNEXPECTED_EOF_WHILE_READING`), а брошенная попытка — это
+    оплаченная генерация в мусор. Ошибки ключа и денег (4xx) не повторяем: они
+    от повторов не лечатся, только тратят.
+    """
+    last: OSError | None = None
+
+    for attempt in range(1, ATTEMPTS + 1):
+        try:
+            return download(generate(prompt, key))
+        except urllib.error.HTTPError as error:
+            if error.code < 500:
+                raise
+            last = error
+        except OSError as error:
+            last = error
+
+        if attempt < ATTEMPTS:
+            time.sleep(PAUSE * attempt)
+
+    raise last if last else OSError("не удалось нарисовать")
 
 
 class Command(BaseCommand):
@@ -103,13 +146,13 @@ class Command(BaseCommand):
                 continue
 
             try:
-                data = download(generate(prompt, key))
+                data = draw(prompt, key)
             except urllib.error.HTTPError as error:
                 if error.code in (401, 403):
                     raise CommandError(f"Ключ fal.ai не принят ({error.code})") from error
                 broken.append((entry, f"HTTP {error.code}"))
                 continue
-            except (urllib.error.URLError, TimeoutError, ValueError, KeyError) as error:
+            except (OSError, ValueError, KeyError) as error:
                 broken.append((entry, str(error)))
                 continue
 

@@ -8,6 +8,10 @@
 как в базе, вместе с пометкой в скобках: «врач (муж. род)» и «врач (жен. род)»
 должны получить разные картинки.
 
+Промпты разделены на два словаря не для порядка, а по делу: к тем, где есть люди,
+приписывается `MODESTY`, и приписывать его ко всему подряд нельзя — «волос не
+видно» рядом с кошкой даёт лысую кошку.
+
 Чего здесь нет намеренно:
   * числительных — «пять» рисуется пятью предметами, модель так не умеет;
   * служебных слов и вопросов — «из», «под», «почему» не изображаются;
@@ -24,9 +28,17 @@ STYLE = (
     "simple clean plain background, gentle cartoon style, no text, no letters"
 )
 
-#: Женские фигуры — в хиджабе. Приписано в сами промпты, а не в `STYLE`: в стиле
-#: это относилось бы и к карточкам, где людей нет вовсе.
-PROMPTS: dict[str, str] = {
+#: Правило для карточек с людьми, требование владельца. Сформулировано правилом,
+#: а не описанием подлежащего, потому что женщина появляется и там, где её нет
+#: в переводе: «дети», «семья», «отец с ребёнком», «полицейский».
+MODESTY = (
+    "every girl and every woman in the picture is a muslim wearing a hijab "
+    "headscarf that fully covers her head and all of her hair, not a single "
+    "strand of hair visible, modest loose long-sleeved clothing"
+)
+
+#: Карточки с людьми: к ним приписывается `MODESTY`.
+_PEOPLE: dict[str, str] = {
     # --- Люди -----------------------------------------------------------------
     "мальчик": "one cheerful boy standing, full figure",
     "мальчики": "three cheerful boys standing together",
@@ -91,6 +103,35 @@ PROMPTS: dict[str, str] = {
     "тёти (со стороны отца)": "three aunts wearing hijabs standing together",
     "дядя (со стороны матери)": "an uncle with his young nephew beside him",
     "тётя (со стороны матери)": "an aunt wearing a hijab with her young niece beside her",
+    # --- Действия -------------------------------------------------------------
+    "кушает": "a boy eating a meal at a table",
+    "читает": "a boy reading an open book",
+    "пьёт": "a boy drinking water from a glass",
+    "пишет": "a boy writing in a notebook with a pen",
+    "молится": "a muslim man praying on a prayer rug",
+    "бежит": "a boy running fast",
+    "совершает малое омовение": "a man washing his hands and arms at a tap for ablution",
+    "сидит": "a boy sitting on a chair",
+    "открывает": "a hand opening a wooden door",
+    "закрывает": "a hand closing a wooden door",
+    "смеётся": "a boy laughing happily",
+    "играет": "a boy playing with a ball",
+    "ходит, идёт": "a boy walking along a path",
+    "нюхает": "a boy smelling a flower",
+    "готовит (о еде)": "a woman wearing a hijab cooking at a stove",
+    "спит": "a boy sleeping in a bed",
+    "садится верхом, едет (на чём-либо)": "a boy riding on a horse",
+    "работает": "a man working at a desk",
+    "отправляется в путешествие": "a traveller with a suitcase at an airport",
+    # --- Состояния ------------------------------------------------------------
+    "счастливый": "a boy with a wide happy smile",
+    "печальный": "a boy with a sad downcast face",
+    "больной": "a boy lying sick in bed with a thermometer",
+    "женатый": "a groom and a bride in a hijab standing together",
+}
+
+#: Карточки без людей: правило скромности им не нужно и только мешает.
+_THINGS: dict[str, str] = {
     # --- Животные -------------------------------------------------------------
     "верблюд": "one camel standing on desert sand",
     "верблюды": "a herd of camels on desert sand",
@@ -207,29 +248,10 @@ PROMPTS: dict[str, str] = {
     "Турция": "the flag of Turkey on a flagpole",
     "Египет": "the flag of Egypt on a flagpole",
     "Сирия": "the flag of Syria on a flagpole",
-    # --- Действия -------------------------------------------------------------
-    "кушает": "a boy eating a meal at a table",
-    "читает": "a boy reading an open book",
-    "пьёт": "a boy drinking water from a glass",
-    "пишет": "a boy writing in a notebook with a pen",
-    "молится": "a muslim man praying on a prayer rug",
-    "бежит": "a boy running fast",
-    "совершает малое омовение": "a man washing his hands and arms at a tap for ablution",
-    "сидит": "a boy sitting on a chair",
-    "открывает": "a hand opening a wooden door",
-    "закрывает": "a hand closing a wooden door",
-    "смеётся": "a boy laughing happily",
-    "играет": "a boy playing with a ball",
-    "ходит, идёт": "a boy walking along a path",
-    "нюхает": "a boy smelling a flower",
-    "готовит (о еде)": "a woman wearing a hijab cooking at a stove",
-    "спит": "a boy sleeping in a bed",
-    "садится верхом, едет (на чём-либо)": "a boy riding on a horse",
-    "работает": "a man working at a desk",
-    "отправляется в путешествие": "a traveller with a suitcase at an airport",
-    # --- Состояния ------------------------------------------------------------
-    "счастливый": "a boy with a wide happy smile",
-    "печальный": "a boy with a sad downcast face",
-    "больной": "a boy lying sick in bed with a thermometer",
-    "женатый": "a groom and a bride in a hijab standing together",
+}
+
+#: Промптам с людьми правило скромности приписывается само — забыть его нельзя.
+PROMPTS: dict[str, str] = {
+    **_THINGS,
+    **{word: f"{prompt}, {MODESTY}" for word, prompt in _PEOPLE.items()},
 }
