@@ -9,9 +9,12 @@ COMPOSE := docker compose -f docker-compose.prod.yml
 # один — оставить второй на старом коде, поэтому они всегда идут парой.
 PYTHON := backend bot
 
-# Аргументы целей: `make logs S=bot N=100`.
+# Аргументы целей: `make logs S=bot N=100`, `make images LIMIT=10`.
+# У `LIMIT` значения по умолчанию нет намеренно: пустая переменная означает
+# «рисовать всё», а число здесь молча урезало бы прогон.
 S ?=
 N ?= 50
+LIMIT ?=
 
 .DEFAULT_GOAL := help
 
@@ -60,6 +63,10 @@ migrate: ## Применить миграции в контейнере
 .PHONY: themes
 themes: ## Расставить темы карточек по правилам
 	$(COMPOSE) exec backend python manage.py assign_themes
+
+.PHONY: images
+images: ## Нарисовать картинки карточкам: make images [LIMIT=10]
+	$(COMPOSE) exec backend python manage.py generate_images $(if $(LIMIT),--limit $(LIMIT),)
 
 .PHONY: superuser
 superuser: ## Создать суперпользователя админки
