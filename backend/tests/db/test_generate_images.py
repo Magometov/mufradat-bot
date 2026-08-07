@@ -10,7 +10,7 @@ from django.core.management.base import CommandError
 
 from apps.vocabulary.management.commands import generate_images
 from apps.vocabulary.models import Entry
-from apps.vocabulary.pictures import _REST, _WITH_WOMEN, MODESTY, PROMPTS, STYLE
+from apps.vocabulary.pictures import _REST, _WITH_WOMEN, DIGIT_STYLE, MODESTY, PROMPTS, STYLE
 
 pytestmark = pytest.mark.django_db
 
@@ -91,7 +91,7 @@ def test_style_is_appended_to_every_prompt(key, calls) -> None:
 
     run()
 
-    assert calls == [f"{PROMPTS['верблюд']}, {STYLE}"]
+    assert calls == [PROMPTS["верблюд"]]
 
 
 def test_words_outside_the_dictionary_are_left_alone(key, calls) -> None:
@@ -126,7 +126,7 @@ def test_only_takes_the_named_cards(key, calls) -> None:
 
     run("--only", str(camel.pk))
 
-    assert calls == [f"{PROMPTS['верблюд']}, {STYLE}"]
+    assert calls == [PROMPTS["верблюд"]]
 
 
 def test_limit_stops_early(key, calls) -> None:
@@ -267,6 +267,31 @@ def test_no_prompt_mentions_kinship() -> None:
     assert [word for word, prompt in PROMPTS.items() if kinship.search(prompt)] == []
 
 
+@pytest.mark.parametrize(
+    "word,digit",
+    [("пять (муж. род)", "5"), ("три книги", "3"), ("второй", "2"), ("десять мужчин", "10")],
+)
+def test_numeral_is_drawn_as_the_sign_itself(word: str, digit: str) -> None:
+    """Считать модель не умеет: на «пять яблок» рисует четыре.
+
+    Знак «5» — одна закорючка, и в нём ошибиться негде. Поэтому числительные
+    рисуются самим знаком, а счётные фразы — знаком рядом с предметом.
+    """
+    assert f"digit {digit}" in PROMPTS[word] or f"number {digit}" in PROMPTS[word]
+
+
+@pytest.mark.parametrize("word", ["пять (муж. род)", "три книги", "первый"])
+def test_numerals_get_their_own_style(word: str) -> None:
+    """В общем стиле стоит `no text`, а для цифры знак и есть содержание карточки."""
+    assert PROMPTS[word].endswith(DIGIT_STYLE)
+    assert not PROMPTS[word].endswith(STYLE)
+
+
+@pytest.mark.parametrize("word", ["верблюд", "девочка", "книга на столе"])
+def test_everything_else_keeps_the_common_style(word: str) -> None:
+    assert PROMPTS[word].endswith(STYLE)
+
+
 def test_no_card_is_in_both_halves() -> None:
     assert set(_WITH_WOMEN) & set(_REST) == set()
 
@@ -293,7 +318,6 @@ def test_every_prompt_matches_a_real_card(snapshot: list[dict[str, str]]) -> Non
 @pytest.mark.parametrize(
     "word",
     [
-        "пять (муж. род)",  # модель ошибается в счёте, а неверное число учит вранью
         "я",
         "почему, зачем",
         "уровень",

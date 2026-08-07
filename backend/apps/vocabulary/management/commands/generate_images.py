@@ -13,7 +13,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Q
 
 from apps.vocabulary.models import Entry
-from apps.vocabulary.pictures import PROMPTS, STYLE
+from apps.vocabulary.pictures import PROMPTS
 
 API = "https://fal.run/fal-ai/flux/schnell"
 
@@ -28,11 +28,7 @@ PAUSE = 3.0
 
 
 def generate(prompt: str, key: str) -> str:
-    """Просит нарисовать картинку по готовому промпту и отдаёт адрес файла.
-
-    Приписку стиля добавляет команда, а не эта функция: иначе то, что уходит в
-    модель, нельзя ни увидеть в `--dry-run`, ни проверить тестом.
-    """
+    """Просит нарисовать картинку по готовому промпту и отдаёт адрес файла."""
     body = json.dumps(
         {
             "prompt": prompt,
@@ -139,7 +135,7 @@ class Command(BaseCommand):
         broken: list[tuple[Entry, str]] = []
 
         for entry in entries:
-            prompt = f"{PROMPTS[entry.translation_ru]}, {STYLE}"
+            prompt = PROMPTS[entry.translation_ru]
             self.stdout.write(f"  {entry.pk:>4}  {entry.translation_ru:34} {prompt}")
 
             if options["dry_run"]:
