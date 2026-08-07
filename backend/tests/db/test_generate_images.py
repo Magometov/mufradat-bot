@@ -1,5 +1,6 @@
 import base64
 import csv
+import re
 from io import StringIO
 from pathlib import Path
 
@@ -9,7 +10,7 @@ from django.core.management.base import CommandError
 
 from apps.vocabulary.management.commands import generate_images
 from apps.vocabulary.models import Entry
-from apps.vocabulary.pictures import _PEOPLE, _THINGS, MODESTY, PROMPTS, STYLE
+from apps.vocabulary.pictures import _REST, _WITH_WOMEN, MODESTY, PROMPTS, STYLE
 
 pytestmark = pytest.mark.django_db
 
@@ -213,33 +214,66 @@ def test_picture_arrives_inside_the_answer(key, monkeypatch) -> None:
 @pytest.mark.parametrize(
     "word",
     [
-        "девочка",  # женщина в подлежащем
-        "дети",  # девочка может появиться, а в переводе её нет
-        "семья",
-        "отец",  # ребёнок на руках может оказаться девочкой
-        "полицейский",  # мужской род в русском, женщина в картинке
+        "девочка",
+        "бабушки",
+        "дочери",
+        "семья",  # женщина в составе, хотя в переводе её нет
+        "дети",  # девочка названа в промпте явно
         "готовит (о еде)",
-        "женатый",
+        "мать",
     ],
 )
-def test_people_cards_carry_the_modesty_rule(word: str) -> None:
-    """Правило нужно и там, где женщины нет в переводе, — иначе её нарисуют без хиджаба."""
+def test_cards_with_women_carry_the_clothing_rule(word: str) -> None:
     assert MODESTY in PROMPTS[word]
 
 
-@pytest.mark.parametrize("word", ["кошка", "верблюд", "книга", "яблоко", "мечеть"])
-def test_cards_without_people_stay_clean(word: str) -> None:
-    """«Волос не видно» рядом с кошкой даёт лысую кошку — предметам правило вредит."""
+@pytest.mark.parametrize(
+    "word",
+    [
+        "сыновья",  # приписка тут добавляла дочерей в кадр
+        "отец",
+        "полицейский",
+        "мальчик",
+        "кошка",  # «волос не видно» рядом с кошкой даёт лысую кошку
+        "книга",
+    ],
+)
+def test_cards_without_women_stay_clean(word: str) -> None:
     assert MODESTY not in PROMPTS[word]
 
 
+def test_clothing_rule_names_no_people() -> None:
+    """Модель рисует существительные, которые видит.
+
+    Первая версия приписки начиналась словами «every girl and every woman in the
+    picture», и модель добавляла девочек туда, где их не просили: у «сыновей»
+    появились дочери, у «бабушек» — внучки.
+    """
+    assert not re.search(r"\b(girl|woman|women|female|child)\w*", MODESTY, re.IGNORECASE)
+
+
+def test_no_prompt_mentions_kinship() -> None:
+    """Слово о родстве тянет за собой вторую сторону.
+
+    «Grandmother» приводит в кадр внучку, «father with sons» — детей обоего пола.
+    Поэтому в промптах возраст, пол и количество, а не родственная связь.
+    """
+    kinship = re.compile(
+        r"\b(grandmother|grandfather|father|mother|son|daughter|brother|sister|"
+        r"uncle|aunt|niece|nephew|famil|wife|husband)\w*",
+        re.IGNORECASE,
+    )
+
+    assert [word for word, prompt in PROMPTS.items() if kinship.search(prompt)] == []
+
+
 def test_no_card_is_in_both_halves() -> None:
-    assert set(_PEOPLE) & set(_THINGS) == set()
+    assert set(_WITH_WOMEN) & set(_REST) == set()
 
 
 def test_both_halves_add_up_to_the_dictionary() -> None:
     """Иначе карточка выпала бы из словаря молча и осталась без картинки."""
-    assert len(PROMPTS) == len(_PEOPLE) + len(_THINGS)
+    assert len(PROMPTS) == len(_WITH_WOMEN) + len(_REST)
 
 
 @pytest.fixture(scope="module")
@@ -256,9 +290,16 @@ def test_every_prompt_matches_a_real_card(snapshot: list[dict[str, str]]) -> Non
     assert sorted(key for key in PROMPTS if key not in translations) == []
 
 
-@needs_snapshot
-def test_first_batch_is_two_hundred_cards(snapshot: list[dict[str, str]]) -> None:
-    """Ровно 200: столько владелец согласился рисовать в первую партию."""
-    covered = [row for row in snapshot if row["translation_ru"] in PROMPTS]
-
-    assert len(covered) == 200
+@pytest.mark.parametrize(
+    "word",
+    [
+        "пять (муж. род)",  # модель ошибается в счёте, а неверное число учит вранью
+        "я",
+        "почему, зачем",
+        "уровень",
+        "национальность, гражданство",
+    ],
+)
+def test_undrawable_words_have_no_prompt(word: str) -> None:
+    """Список этих слов — решение, а не недоделка: см. причины в pictures."""
+    assert word not in PROMPTS

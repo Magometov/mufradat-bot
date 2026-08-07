@@ -156,6 +156,11 @@ class Command(BaseCommand):
                 broken.append((entry, str(error)))
                 continue
 
+            # Старый файл нужно убрать руками: Django не перезаписывает, а кладёт
+            # рядом копию со случайным суффиксом, и том раздувается орфанами.
+            if entry.image:
+                entry.image.delete(save=False)
+
             entry.image.save(f"{entry.pk}.jpg", ContentFile(data), save=True)
             drawn += 1
 
