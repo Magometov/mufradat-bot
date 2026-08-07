@@ -38,7 +38,8 @@ export interface IUseRun {
     hasPrev: ComputedRef<boolean>;
     hasNext: ComputedRef<boolean>;
     restore: () => void;
-    start: () => void;
+    /** Прогон по переданным карточкам: всей колоде или одной теме. */
+    start: (selected: IEntry[]) => void;
     next: () => void;
     prev: () => void;
     finish: () => void;

@@ -1,10 +1,7 @@
 <script setup lang="ts">
     // #region Imports
-    // Utils
-    import { plural } from '../../utils/plural';
-
-    // Vue
-    import { computed } from 'vue';
+    // Types
+    import type { ITheme } from '../../types/theme';
 
     // Components
     import UiButton from '../ui/UiButton.vue';
@@ -14,6 +11,7 @@
     const props = withDefaults(
         defineProps<{
             total: number;
+            themes: ITheme[];
         }>(),
         {},
     );
@@ -21,26 +19,23 @@
 
     // #region Emits
     const emit = defineEmits<{
-        start: [];
+        start: [theme: string | null];
     }>();
-    // #endregion
-
-    // #region Data
-    const WORD_FORMS: [string, string, string] = ['слово', 'слова', 'слов'];
-    // #endregion
-
-    // #region Computed
-    const deckSize = computed<string>(
-        () => `В колоде ${props.total} ${plural(props.total, WORD_FORMS)}`,
-    );
     // #endregion
 
     // #region Methods
     /**
      * Просит начать прогон по всей колоде.
      */
-    function handleStart(): void {
-        emit('start');
+    function handleStartAll(): void {
+        emit('start', null);
+    }
+
+    /**
+     * Просит начать прогон по одной теме.
+     */
+    function handleStartTheme(slug: string): void {
+        emit('start', slug);
     }
     // #endregion
 </script>
@@ -53,9 +48,19 @@
             Колода пуста. Добавь слова через бота или админку.
         </p>
 
-        <div v-else :class="$style.StartScreen__action">
-            <p :class="$style.StartScreen__size">{{ deckSize }}</p>
-            <UiButton @click="handleStart">Начать тренировку</UiButton>
+        <div v-else :class="$style.StartScreen__choice">
+            <UiButton @click="handleStartAll">Все слова</UiButton>
+
+            <div v-if="props.themes.length > 0" :class="$style.StartScreen__themes">
+                <UiButton
+                    v-for="theme in props.themes"
+                    :key="theme.slug"
+                    variant="soft"
+                    @click="handleStartTheme(theme.slug)"
+                >
+                    {{ theme.name }}
+                </UiButton>
+            </div>
         </div>
     </section>
 </template>
@@ -81,16 +86,23 @@
             text-align: center;
         }
 
-        &__action {
+        &__choice {
             display: flex;
             flex-direction: column;
-            gap: 1.2rem;
+            gap: 2rem;
         }
 
-        &__size {
-            color: var(--base-500);
-            font-size: 1.4rem;
-            text-align: center;
+        // Две колонки: длинные названия переносятся, кнопки тянутся по высоте строки.
+        &__themes {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+
+            // Тем нечётное число, и последняя иначе висела бы половинкой в левой
+            // колонке. Условие на `nth-child(odd)` держит вид и при чётном списке.
+            > *:last-child:nth-child(odd) {
+                grid-column: 1 / -1;
+            }
         }
     }
 </style>

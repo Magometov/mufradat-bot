@@ -44,6 +44,7 @@ def test_entry_has_everything_for_both_sides(client: APIClient) -> None:
             "translation_ru": "дом",
             "transliteration": "bayt",
             "image": None,
+            "themes": [],
         }
     ]
 

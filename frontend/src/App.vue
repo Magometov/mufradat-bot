@@ -2,9 +2,10 @@
     // #region Imports
     // Types
     import type { IEntry } from './types/entry';
+    import type { ITheme } from './types/theme';
 
     // Vue
-    import { onMounted, ref } from 'vue';
+    import { computed, onMounted, ref } from 'vue';
 
     // Composables
     import { useRun } from './composables/useRun';
@@ -17,10 +18,13 @@
     // #endregion
 
     // #region Data
-    const ENTRIES_URL = `${import.meta.env.VITE_API_URL ?? ''}/api/v1/entries/`;
+    const API_URL = import.meta.env.VITE_API_URL ?? '';
+    const ENTRIES_URL = `${API_URL}/api/v1/entries/`;
+    const THEMES_URL = `${API_URL}/api/v1/themes/`;
 
     // Колода целиком: постраничности у эндпоинта нет намеренно, прогон — снимок.
     const entries = ref<IEntry[]>([]);
+    const themes = ref<ITheme[]>([]);
     const isLoading = ref(true);
     const error = ref('');
 
@@ -29,19 +33,34 @@
     const { init } = useTelegram();
     // #endregion
 
+    // #region Computed
+    // Тема без карточек дала бы кнопку в пустой прогон, поэтому её на главной нет.
+    const filledThemes = computed<ITheme[]>(() =>
+        themes.value.filter((theme) =>
+            entries.value.some((entry) => entry.themes.includes(theme.slug)),
+        ),
+    );
+    // #endregion
+
     // #region Methods
     /**
-     * Забирает колоду одним запросом и поднимает незакрытый прогон.
+     * Забирает колоду и темы и поднимает незакрытый прогон.
+     *
+     * Оба запроса уходят разом: они не зависят друг от друга, а главная нужна собранной.
      */
-    async function fetchEntries(): Promise<void> {
+    async function fetchDeck(): Promise<void> {
         isLoading.value = true;
         error.value = '';
 
         try {
-            const response = await fetch(ENTRIES_URL);
-            if (!response.ok) throw new Error(String(response.status));
+            const responses = await Promise.all([fetch(ENTRIES_URL), fetch(THEMES_URL)]);
+            const failed = responses.find((response) => !response.ok);
+            if (failed !== undefined) throw new Error(String(failed.status));
 
-            entries.value = (await response.json()) as IEntry[];
+            const [deck, list] = await Promise.all(responses.map((response) => response.json()));
+
+            entries.value = deck as IEntry[];
+            themes.value = list as ITheme[];
             restore();
         } catch {
             error.value = 'Колода не загрузилась. Проверь связь и попробуй снова.';
@@ -49,12 +68,24 @@
             isLoading.value = false;
         }
     }
+
+    /**
+     * Начинает прогон по всей колоде или по одной теме.
+     */
+    function handleStart(theme: string | null): void {
+        const selected =
+            theme === null
+                ? entries.value
+                : entries.value.filter((entry) => entry.themes.includes(theme));
+
+        start(selected);
+    }
     // #endregion
 
     // #region Lifecycle
     onMounted(() => {
         init();
-        fetchEntries();
+        fetchDeck();
     });
     // #endregion
 </script>
@@ -66,7 +97,7 @@
 
             <div v-else-if="error" key="error" :class="$style.App__error">
                 <p :class="$style.App__note">{{ error }}</p>
-                <UiButton @click="fetchEntries">Попробовать снова</UiButton>
+                <UiButton @click="fetchDeck">Попробовать снова</UiButton>
             </div>
 
             <RunController
@@ -82,7 +113,13 @@
                 @finish="finish"
             />
 
-            <StartScreen v-else key="start" :total="entries.length" @start="start" />
+            <StartScreen
+                v-else
+                key="start"
+                :total="entries.length"
+                :themes="filledThemes"
+                @start="handleStart"
+            />
         </Transition>
     </main>
 </template>

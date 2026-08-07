@@ -7,4 +7,6 @@ export interface IEntry {
     transliteration: string;
     /** Полный URL или `null`. */
     image: string | null;
+    /** Коды тем карточки. Фильтр по теме считает приложение, поэтому они едут с колодой. */
+    themes: string[];
 }

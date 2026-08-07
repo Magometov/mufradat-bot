@@ -1,4 +1,7 @@
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
+
+from apps.vocabulary.themes import Theme
 
 
 class Entry(models.Model):
@@ -8,6 +11,12 @@ class Entry(models.Model):
     translation_ru = models.TextField("Перевод")
     transliteration = models.TextField("Транслитерация", blank=True, default="")
     image = models.ImageField("Картинка", upload_to="entries/", blank=True, null=True)
+    themes = ArrayField(
+        models.CharField(max_length=32, choices=Theme.choices),
+        verbose_name="Темы",
+        default=list,
+        blank=True,
+    )
     created_at = models.DateTimeField("Добавлено", auto_now_add=True, db_index=True)
 
     class Meta:
