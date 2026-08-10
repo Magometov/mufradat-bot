@@ -8,7 +8,7 @@ class EntrySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Entry
-        fields = ("id", "arabic", "translation_ru", "transliteration", "image", "themes")
+        fields = ("id", "arabic", "translation_ru", "transliteration", "is_word", "image", "themes")
 
 
 class ThemeSerializer(serializers.Serializer):

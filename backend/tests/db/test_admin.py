@@ -125,6 +125,66 @@ def test_themes_are_saved_from_admin_form(staff_client) -> None:
     assert Entry.objects.get(translation_ru="книга").themes == ["nouns", "questions"]
 
 
+def test_changelist_offers_the_word_filter(staff_client) -> None:
+    """С фильтра начинается правка пачкой, поэтому он нужен в боковой колонке."""
+    body = staff_client.get("/admin/vocabulary/entry/").content.decode()
+
+    assert "?is_word__exact=1" in body
+    assert "?is_word__exact=0" in body
+
+
+def test_word_mark_is_edited_by_checkbox(staff_client) -> None:
+    body = staff_client.get("/admin/vocabulary/entry/add/").content.decode()
+
+    assert 'type="checkbox" name="is_word"' in body
+
+
+def test_action_marks_selected_cards_as_words(staff_client) -> None:
+    """Правка пачкой: отфильтровал, выделил, отметил — как с темами."""
+    entry = Entry.objects.create(arabic="هَذَا بَيْتٌ", translation_ru="это дом")
+
+    staff_client.post(
+        "/admin/vocabulary/entry/",
+        {"action": "mark_as_words", "_selected_action": [str(entry.pk)]},
+    )
+
+    entry.refresh_from_db()
+    assert entry.is_word is True
+
+
+def test_action_marks_selected_cards_as_phrases(staff_client) -> None:
+    entry = Entry.objects.create(arabic="كِتَاب", translation_ru="книга", is_word=True)
+
+    staff_client.post(
+        "/admin/vocabulary/entry/",
+        {"action": "mark_as_phrases", "_selected_action": [str(entry.pk)]},
+    )
+
+    entry.refresh_from_db()
+    assert entry.is_word is False
+
+
+def test_word_mark_is_saved_from_admin_form(staff_client) -> None:
+    response = staff_client.post(
+        "/admin/vocabulary/entry/add/",
+        {"arabic": "كِتَاب", "translation_ru": "книга", "transliteration": "kitab", "is_word": "on"},
+    )
+
+    assert response.status_code == 302
+    assert Entry.objects.get(translation_ru="книга").is_word is True
+
+
+def test_card_added_without_the_mark_is_a_phrase(staff_client) -> None:
+    """Галочку владелец ставит сам — без неё карточка считается фразой."""
+    response = staff_client.post(
+        "/admin/vocabulary/entry/add/",
+        {"arabic": "هَذَا بَيْتٌ", "translation_ru": "это дом"},
+    )
+
+    assert response.status_code == 302
+    assert Entry.objects.get(translation_ru="это дом").is_word is False
+
+
 def test_word_without_themes_still_saves(staff_client) -> None:
     """Бот добавляет слова без темы, и админка не должна требовать больше бота."""
     response = staff_client.post(

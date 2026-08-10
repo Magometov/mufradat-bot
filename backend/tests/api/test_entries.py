@@ -22,14 +22,14 @@ def client() -> APIClient:
 
 
 def test_deck_is_one_flat_list(client: APIClient) -> None:
-    """Деления на слова и фразы нет: приложение получает всё одним списком и тасует."""
-    Entry.objects.create(arabic="بَيْت", translation_ru="дом")
+    """Слова и фразы приезжают одним списком: делит их приложение, а не адрес."""
+    Entry.objects.create(arabic="بَيْت", translation_ru="дом", is_word=True)
     Entry.objects.create(arabic="مَا اسْمُكَ؟", translation_ru="как тебя зовут?")
 
     body = client.get(ENTRIES).json()
 
     assert len(body) == 2
-    assert "kind" not in body[0]
+    assert {item["is_word"] for item in body} == {True, False}
 
 
 def test_entry_has_everything_for_both_sides(client: APIClient) -> None:
@@ -43,6 +43,7 @@ def test_entry_has_everything_for_both_sides(client: APIClient) -> None:
             "arabic": "بَيْت",
             "translation_ru": "дом",
             "transliteration": "bayt",
+            "is_word": False,
             "image": None,
             "themes": [],
         }

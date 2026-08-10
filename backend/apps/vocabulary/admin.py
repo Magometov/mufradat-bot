@@ -62,16 +62,29 @@ class EntryForm(forms.ModelForm):
 @admin.register(Entry)
 class EntryAdmin(admin.ModelAdmin):
     form = EntryForm
-    list_display = ("arabic", "translation_ru", "theme_names", "has_image", "created_at")
-    list_filter = (ThemeFilter, HasImageFilter)
+    list_display = ("arabic", "translation_ru", "is_word", "theme_names", "has_image", "created_at")
+    list_filter = ("is_word", ThemeFilter, HasImageFilter)
     search_fields = ("translation_ru", "transliteration")
     readonly_fields = ("created_at",)
+    actions = ("mark_as_words", "mark_as_phrases")
     fieldsets = (
-        (None, {"fields": ("arabic", "translation_ru", "transliteration")}),
+        (None, {"fields": ("arabic", "translation_ru", "transliteration", "is_word")}),
         ("Темы", {"fields": ("themes",)}),
         ("Картинка", {"fields": ("image",)}),
         ("Служебное", {"fields": ("created_at",)}),
     )
+
+    @admin.action(description="Отметить как слова")
+    def mark_as_words(self, request: HttpRequest, queryset: QuerySet[Entry]) -> None:
+        self._mark(request, queryset, is_word=True)
+
+    @admin.action(description="Отметить как фразы")
+    def mark_as_phrases(self, request: HttpRequest, queryset: QuerySet[Entry]) -> None:
+        self._mark(request, queryset, is_word=False)
+
+    def _mark(self, request: HttpRequest, queryset: QuerySet[Entry], *, is_word: bool) -> None:
+        changed = queryset.update(is_word=is_word)
+        self.message_user(request, f"Отмечено {'словом' if is_word else 'фразой'}: {changed}")
 
     @admin.display(boolean=True, description="Картинка")
     def has_image(self, obj: Entry) -> bool:
