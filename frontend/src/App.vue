@@ -7,13 +7,18 @@
     // Vue
     import { computed, onMounted, ref } from 'vue';
 
+    // Utils
+    import { MODE_TITLES } from './utils/modes';
+
     // Composables
     import { useRun } from './composables/useRun';
+    import { useSelection } from './composables/useSelection';
     import { useTelegram } from './composables/useTelegram';
 
     // Components
     import RunController from './components/run/RunController.vue';
-    import StartScreen from './components/start/StartScreen.vue';
+    import StartMode from './components/start/StartMode.vue';
+    import StartSections from './components/start/StartSections.vue';
     import UiButton from './components/ui/UiButton.vue';
     // #endregion
 
@@ -30,16 +35,12 @@
 
     const { card, position, total, hasPrev, hasNext, restore, start, next, prev, finish } =
         useRun(entries);
+    const { mode, sections, choose, cardsFor, reset } = useSelection(entries, themes);
     const { init } = useTelegram();
     // #endregion
 
     // #region Computed
-    // Тема без карточек дала бы кнопку в пустой прогон, поэтому её на главной нет.
-    const filledThemes = computed<ITheme[]>(() =>
-        themes.value.filter((theme) =>
-            entries.value.some((entry) => entry.themes.includes(theme.slug)),
-        ),
-    );
+    const modeTitle = computed<string>(() => (mode.value === null ? '' : MODE_TITLES[mode.value]));
     // #endregion
 
     // #region Methods
@@ -70,15 +71,10 @@
     }
 
     /**
-     * Начинает прогон по всей колоде или по одной теме.
+     * Начинает прогон по всему выбранному режиму или по одному его разделу.
      */
     function handleStart(theme: string | null): void {
-        const selected =
-            theme === null
-                ? entries.value
-                : entries.value.filter((entry) => entry.themes.includes(theme));
-
-        start(selected);
+        start(cardsFor(theme));
     }
     // #endregion
 
@@ -113,13 +109,16 @@
                 @finish="finish"
             />
 
-            <StartScreen
-                v-else
-                key="start"
-                :total="entries.length"
-                :themes="filledThemes"
-                @start="handleStart"
+            <StartSections
+                v-else-if="mode"
+                key="sections"
+                :title="modeTitle"
+                :sections="sections"
+                @select="handleStart"
+                @back="reset"
             />
+
+            <StartMode v-else key="mode" :total="entries.length" @select="choose" />
         </Transition>
     </main>
 </template>
