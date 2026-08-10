@@ -32,25 +32,18 @@ from apps.vocabulary.pictures import numbers, phrases, words
 #: Общий стиль колоды. Без него у каждой картинки свой фон и своя манера.
 #: `no text` обязателен — модель иначе лезет подписывать рисунок исковерканными
 #: буквами.
-STYLE = (
-    "children's book illustration, soft watercolor, warm friendly colours, "
-    "simple clean plain background, gentle cartoon style, no text, no letters"
-)
+STYLE = "cartoon illustration, Islamic setting, plain background, no text"
 
 #: Стиль для числительных: там знак и есть содержание карточки, и запрет на текст
 #: из общего стиля прямо противоречил бы задаче.
 DIGIT_STYLE = (
-    "children's book illustration, soft watercolor, warm friendly colours, "
-    "simple clean plain background, gentle cartoon style, "
-    "the digit is the only symbol in the picture, no words, no letters"
+    "cartoon illustration, Islamic setting, plain background, "
+    "the digit is the only symbol in the picture"
 )
 
 #: Одежда женских фигур, требование владельца. Ни одного существительного о людях:
 #: назвать здесь «girl» или «woman» — значит попросить модель её нарисовать.
-MODESTY = (
-    "hijab headscarf covering the whole head and every strand of hair, "
-    "modest loose long-sleeved clothing"
-)
+MODESTY = "in a hijab and modest long clothing"
 
 #: Откуда что берётся и каким стилем рисуется.
 _SOURCES = ((words, STYLE), (phrases, STYLE), (numbers, DIGIT_STYLE))
