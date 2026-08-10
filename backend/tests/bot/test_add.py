@@ -55,12 +55,30 @@ async def test_reversed_order_is_saved_the_same(settings) -> None:
 
 
 async def test_multiword_arabic_is_the_same_kind_of_card(settings) -> None:
-    """Фраза больше не отдельный тип — сохраняется так же, как одно слово."""
+    """Фраза — такая же карточка: отдельной сущности под неё нет, только галочка."""
     settings.ADMIN_TELEGRAM_ID = ADMIN_ID
 
     await handle_text(admin_message("مَا اسْمُكَ؟ | как тебя зовут? (к мужчине)"))
 
     assert await Entry.objects.filter(arabic="مَا اسْمُكَ؟").aexists()
+
+
+async def test_one_word_card_is_marked_a_word(settings) -> None:
+    """Галочку ставит бот: руками её пришлось бы ставить каждой новой карточке."""
+    settings.ADMIN_TELEGRAM_ID = ADMIN_ID
+
+    await handle_text(admin_message("بَيْت | дом | bayt"))
+
+    assert (await Entry.objects.aget(arabic="بَيْت")).is_word is True
+
+
+async def test_phrase_card_is_left_without_the_mark(settings) -> None:
+    """Иначе прогон «только слова» собирал бы предложения из урока."""
+    settings.ADMIN_TELEGRAM_ID = ADMIN_ID
+
+    await handle_text(admin_message("هَذَا بَيْتٌ | это дом"))
+
+    assert (await Entry.objects.aget(arabic="هَذَا بَيْتٌ")).is_word is False
 
 
 async def test_duplicate_is_reported_not_saved_twice(settings) -> None:

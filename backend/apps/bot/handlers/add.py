@@ -7,6 +7,7 @@ from apps.bot import texts
 from apps.bot.keyboards import open_app
 from apps.bot.parsing import ParseError, parse_entry
 from apps.bot.permissions import is_admin
+from apps.vocabulary.kind import is_word
 from apps.vocabulary.models import Entry
 
 logger = logging.getLogger(__name__)
@@ -53,7 +54,10 @@ async def _save(lines: list[str]) -> str:
         entry, created = await Entry.objects.aget_or_create(
             arabic=parsed.arabic,
             translation_ru=parsed.translation_ru,
-            defaults={"transliteration": parsed.transliteration},
+            defaults={
+                "transliteration": parsed.transliteration,
+                "is_word": is_word(parsed.arabic, parsed.translation_ru),
+            },
         )
         card = texts.card_line(entry.arabic, entry.translation_ru)
 

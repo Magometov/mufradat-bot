@@ -66,6 +66,10 @@ migrate: ## Применить миграции в контейнере
 themes: ## Расставить темы карточек по правилам
 	$(COMPOSE) exec backend python manage.py assign_themes
 
+.PHONY: words
+words: ## Отметить отдельные слова: make words [ARGS=--dry-run]
+	$(COMPOSE) exec backend python manage.py mark_words $(ARGS)
+
 .PHONY: images
 images: ## Картинки карточкам: make images [LIMIT=10] [ARGS=--replace]
 	$(COMPOSE) exec backend python manage.py generate_images $(if $(LIMIT),--limit $(LIMIT),) $(ARGS)

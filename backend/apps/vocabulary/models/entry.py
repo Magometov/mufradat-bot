@@ -10,6 +10,11 @@ class Entry(models.Model):
     arabic = models.TextField("Арабское", help_text="С огласовками")
     translation_ru = models.TextField("Перевод")
     transliteration = models.TextField("Транслитерация", blank=True, default="")
+    is_word = models.BooleanField(
+        "Отдельное слово",
+        default=False,
+        help_text="Снятая галочка означает фразу: карточка не попадёт в прогон по словам",
+    )
     image = models.ImageField("Картинка", upload_to="entries/", blank=True, null=True)
     themes = ArrayField(
         models.CharField(max_length=32, choices=Theme.choices),
