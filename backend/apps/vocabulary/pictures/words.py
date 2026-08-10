@@ -8,6 +8,8 @@
   * числительных — модель ошибается в счёте, а неверное число учит вранью;
   * служебных слов и вопросов — «из», «для», «почему» не изображаются;
   * относительных признаков без пары и абстракций — «уровень», «гражданство»;
+  * превосходной степени — «самый большой»: она держится на сравнении, а сравнение
+    в кадре учит не слову, а разнице между предметами;
   * всего, что требует надписи, — «имя», «первый»: в стиле стоит `no text`.
 """
 
@@ -299,4 +301,15 @@ REST: dict[str, str] = {
     "фотографии": "several printed photographs scattered on a table",
     "раздел, глава": "an open book with a ribbon bookmark between chapters",
     "разделы, главы": "several open books with ribbon bookmarks",
+    # --- Третий диалог ---------------------------------------------------------
+    "ванна": "one bathroom with a washbasin and a tap, seen from inside",
+    "ванны": "several bathrooms with washbasins and taps",
+    "молельная комната": "a small prayer room with one prayer rug on the floor",
+    "молельные комнаты": "several small prayer rooms with prayer rugs on the floor",
+    "пальто (верхняя одежда)": "one long winter overcoat on a hanger",
+    "очки": "one pair of eyeglasses with a thin frame",
+    "очки (мн. ч.)": "several pairs of eyeglasses lying side by side",
+    "призыв на молитву": "one man on the balcony of a minaret, hands cupped at his mouth",
+    # Позвать за собой — жест, а жест рисуется: «скорей» держится на нём одном.
+    "скорей, давай": "one boy beckoning with his raised hand, calling others to follow",
 }

@@ -159,6 +159,10 @@ WITH_WOMEN: dict[str, str] = {
     "семья живёт в большом доме": "one man, one woman, one boy and one girl by a large house",
     "я люблю свою семью": "one adult man embracing one adult woman and two children",
     "он любит свою семью": "one adult man embracing one adult woman and two children",
+    # --- Третий диалог ---------------------------------------------------------
+    "девочка молится в молельной комнате": (
+        "one muslim girl wearing a hijab, kneeling on a prayer rug in a small prayer room"
+    ),
 }
 
 #: Предметы, животные и картинки, где люди только мужского пола.
@@ -611,4 +615,14 @@ REST: dict[str, str] = {
     "что в чемодане?": "an open suitcase with a questioning gesture above it",
     "сколько книг на парте?": "books on a school desk with a questioning gesture beside",
     "дом моего дедушки старый": "one old weathered house seen from outside",
+    # --- Третий диалог ---------------------------------------------------------
+    "это призыв на молитву": "one man on the balcony of a minaret, hands cupped at his mouth",
+    "пойдём скорее в мечеть": "two men hurrying towards a mosque, one beckoning the other",
+    # Пропажу видно по пустому месту: вешалка без пальто, футляр без очков.
+    "где пальто?": "one empty coat hanger with a questioning gesture beside it",
+    "вот пальто": "a hand holding out one long winter overcoat",
+    "где очки?": "one open empty eyeglass case with a questioning gesture beside it",
+    "вот очки": "a hand holding out one pair of eyeglasses",
+    "мальчик в ванной": "a boy washing his hands at a washbasin in a bathroom",
+    "эта мечеть большая": "one very large mosque with a wide dome and tall minarets",
 }
