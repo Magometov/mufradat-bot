@@ -67,6 +67,25 @@ def test_country_and_nationality_go_to_greetings() -> None:
     assert themes_for("египтянка") == [Theme.GREETINGS]
 
 
+def test_lesson_theme_lies_on_top_of_the_meaning() -> None:
+    """Урок — происхождение карточки, а не её смысл: обе темы остаются.
+
+    Иначе слово выпало бы из привычного прогона: «мать» — из «Семьи», а «ванна» —
+    из «Существительных».
+    """
+    assert themes_for("мать") == [Theme.FAMILY, Theme.DIALOG_3]
+    assert themes_for("ванна") == [Theme.NOUNS, Theme.DIALOG_3]
+
+
+def test_lesson_theme_ignores_the_grammar_note() -> None:
+    """«Пальто» и «пальто (мн. ч.)» — одно слово урока, перечислять оба незачем."""
+    assert Theme.DIALOG_3 in themes_for("пальто (мн. ч.)")
+
+
+def test_card_outside_the_lesson_stays_clean() -> None:
+    assert Theme.DIALOG_3 not in themes_for("верблюд")
+
+
 def test_themes_come_in_button_order() -> None:
     """Порядок важен: он же уходит в API и определяет порядок кнопок."""
     themes = themes_for("сколько мальчиков в семье?")

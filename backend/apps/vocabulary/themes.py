@@ -11,3 +11,4 @@ class Theme(models.TextChoices):
     ANTONYMS = "antonyms", "Антонимы"
     NOUNS = "nouns", "Существительные"
     QUESTIONS = "questions", "Вопросы и предлоги"
+    DIALOG_3 = "dialog3", "Третий диалог"

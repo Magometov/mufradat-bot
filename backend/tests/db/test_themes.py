@@ -42,6 +42,7 @@ def test_theme_order_is_declaration_order() -> None:
         "antonyms",
         "nouns",
         "questions",
+        "dialog3",
     ]
 
 
