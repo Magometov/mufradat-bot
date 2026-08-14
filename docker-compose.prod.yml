@@ -29,6 +29,9 @@ services:
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       BOT_API_TOKEN: ${BOT_API_TOKEN}
+      # Журнал входов: токеном сверяется подпись Telegram, по id не пишутся свои заходы.
+      BOT_TOKEN: ${BOT_TOKEN}
+      ADMIN_TELEGRAM_ID: ${ADMIN_TELEGRAM_ID}
     volumes:
       - media:/app/media
       - static:/app/static

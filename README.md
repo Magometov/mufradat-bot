@@ -5,14 +5,13 @@
 ## Стек
 
 Python 3.12, Django 6.0 + DRF, aiogram 3, Postgres 16, Vue 3 + Vite, Caddy, Docker Compose.
-Зависимости python — через `uv`, версии общие, но каждый контейнер ставит свою группу:
-`backend` или `bot`.
 
 ## Структура
 
 ```
 backend/               Django: колода, админка, API
     apps/vocabulary/   модели Word + WordForm и Phrase, админка
+    apps/common/       общее для всего: журнал входов, сверка подписи Telegram
     apps/api/          DRF: GET /api/v1/cards/ — вся колода одним ответом
     config/            настройки, urls, wsgi
 bot/                   aiogram: приветствие и заглушка. Django не использует
@@ -24,8 +23,8 @@ docker-compose.yml     разработка: в контейнере тольк�
 docker-compose.prod.yml  сервер: db, backend, bot, caddy
 ```
 
-Колоду наполняет админка. Бот к базе не обращается: ему нужны `BOT_TOKEN`,
-`WEBAPP_URL` и путь к признаку техработ.
+Колоду наполняют админка и бот. К базе бот не обращается: он пишет через служебные
+ручки бэкенда, закрытые общим секретом. Переменные окружения — в `.env.example`.
 
 ## Техработы
 

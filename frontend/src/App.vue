@@ -9,6 +9,7 @@
 
     // Utils
     import { MODE_TITLES } from './utils/modes';
+    import { logVisit } from './utils/visit';
 
     // Composables
     import { useRun } from './composables/useRun';
@@ -26,6 +27,7 @@
     const API_URL = import.meta.env.VITE_API_URL ?? '';
     const CARDS_URL = `${API_URL}/api/v1/cards/`;
     const THEMES_URL = `${API_URL}/api/v1/themes/`;
+    const VISITS_URL = `${API_URL}/api/v1/visits/`;
 
     // Колода целиком: постраничности у эндпоинта нет намеренно, прогон — снимок.
     const entries = ref<IEntry[]>([]);
@@ -36,7 +38,7 @@
     const { card, position, total, hasPrev, hasNext, restore, start, next, prev, finish } =
         useRun(entries);
     const { mode, sections, choose, cardsFor, reset } = useSelection(entries, themes);
-    const { init } = useTelegram();
+    const { initData, init } = useTelegram();
     // #endregion
 
     // #region Computed
@@ -81,6 +83,7 @@
     // #region Lifecycle
     onMounted(() => {
         init();
+        logVisit(VISITS_URL, initData);
         fetchDeck();
     });
     // #endregion

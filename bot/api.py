@@ -12,6 +12,7 @@ FORMS = "/api/v1/internal/forms/"
 PHRASES = "/api/v1/internal/phrases/"
 LESSON = "/api/v1/internal/lesson/"
 MOVE = "/api/v1/internal/lesson/move/"
+VISITS = "/api/v1/visits/"
 
 
 class Occupied(Exception):
@@ -78,7 +79,8 @@ async def _send(method: str, path: str, **kwargs: object) -> dict:
     if response.is_error:
         raise BackendError(f"{response.status_code}: {_reason(response)}")
 
-    return response.json()
+    # Пустой ответ — это 204: ручке нечего сказать, кроме того, что она сделала своё.
+    return response.json() if response.content else {}
 
 
 async def _add(path: str, fields: dict[str, object], image: bytes | None) -> dict:
@@ -136,6 +138,11 @@ async def add_phrase(
     )
 
     return int(body["phrase"])
+
+
+async def log_visit(*, telegram_id: int, username: str) -> None:
+    """Отмечает вход в журнал. Ручка та же, что у приложения: источник для нас один."""
+    await _send("POST", VISITS, json={"telegram_id": telegram_id, "username": username})
 
 
 async def lesson() -> Lesson:

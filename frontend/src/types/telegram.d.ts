@@ -14,6 +14,8 @@ export interface ITelegramWebApp {
     expand: () => void;
     /** Вне клиента Telegram приходит `unknown` — по этому и отличаем. */
     platform: string;
+    /** Подписанные Telegram данные о том, кто открыл приложение. В браузере — пусто. */
+    initData: string;
     colorScheme: 'light' | 'dark';
     themeParams: ITelegramThemeParams;
     onEvent: (event: 'themeChanged', handler: () => void) => void;

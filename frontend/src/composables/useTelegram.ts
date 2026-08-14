@@ -20,7 +20,7 @@ const THEME_MAP: Record<keyof ITelegramThemeParams, string> = {
  * Связь с клиентом Telegram. Вне Telegram приложение работает как обычная страница —
  * это единственный способ отлаживать его в браузере.
  */
-export function useTelegram(): { init: () => void } {
+export function useTelegram(): { initData: string; init: () => void } {
     const webApp = window.Telegram?.WebApp ?? null;
 
     // Скрипт Telegram создаёт `WebApp` на любой странице, и вне клиента отдаёт
@@ -57,5 +57,7 @@ export function useTelegram(): { init: () => void } {
 
     onUnmounted(() => client?.offEvent('themeChanged', applyTheme));
 
-    return { init };
+    // Берётся у `webApp`, а не у `client`: вне Telegram строка и так пустая, а сверять
+    // платформу тут нечего — подпись проверит бэкенд.
+    return { initData: webApp?.initData ?? '', init };
 }

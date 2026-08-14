@@ -14,6 +14,12 @@ DEBUG = getenv("DJANGO_DEBUG", "").lower() == "true"
 # Общий секрет с ботом: им подписаны служебные ручки, которыми бот пишет карточки.
 BOT_API_TOKEN = getenv("BOT_API_TOKEN")
 
+# Токен бота — им Telegram подписывает данные о том, кто открыл приложение: без сверки
+# подписи id и ник в журнале входов значили бы не больше, чем присланная кем угодно строка.
+BOT_TOKEN = getenv("BOT_TOKEN")
+# Заходы владельца в журнал не пишутся.
+ADMIN_TELEGRAM_ID = int(getenv("ADMIN_TELEGRAM_ID") or 0)
+
 ALLOWED_HOSTS = ["*"]
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -28,6 +34,7 @@ INSTALLED_APPS = [
     "django.contrib.postgres",
     "rest_framework",
     # apps
+    "apps.common",
     "apps.vocabulary",
 ]
 
