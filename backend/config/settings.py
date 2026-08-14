@@ -11,6 +11,9 @@ load_dotenv(BASE_DIR.parent / ".env")
 SECRET_KEY = getenv("DJANGO_SECRET_KEY")
 DEBUG = getenv("DJANGO_DEBUG", "").lower() == "true"
 
+# Общий секрет с ботом: им подписаны служебные ручки, которыми бот пишет карточки.
+BOT_API_TOKEN = getenv("BOT_API_TOKEN")
+
 ALLOWED_HOSTS = ["*"]
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

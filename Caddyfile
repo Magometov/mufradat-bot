@@ -53,6 +53,13 @@
 		file_server
 	}
 
+	# Служебные ручки бота. Бот ходит к Django внутри сети докера, поэтому запрет
+	# снаружи ему ничего не стоит, а токен остаётся вторым слоем, а не единственным.
+	@internal path /api/v1/internal/*
+	handle @internal {
+		respond 404
+	}
+
 	# API и админка — в Django. Caddy сам добавляет X-Forwarded-Proto, поэтому Django
 	# собирает адреса картинок с правильной схемой.
 	@django path /api/* /admin/*

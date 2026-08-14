@@ -28,6 +28,7 @@ services:
       POSTGRES_NAME: ${POSTGRES_NAME}
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
+      BOT_API_TOKEN: ${BOT_API_TOKEN}
     volumes:
       - media:/app/media
       - static:/app/static
@@ -45,6 +46,9 @@ services:
       BOT_TOKEN: ${BOT_TOKEN}
       ADMIN_TELEGRAM_ID: ${ADMIN_TELEGRAM_ID}
       WEBAPP_URL: ${WEBAPP_URL}
+      BOT_API_TOKEN: ${BOT_API_TOKEN}
+      BACKEND_URL: ${BACKEND_URL:-http://backend:8000}
+      FAL_KEY: ${FAL_KEY}
     volumes:
       - ./flags:/flags:ro
     # Часть адресов api.telegram.org недоступна с российского хостинга: DNS отдаёт

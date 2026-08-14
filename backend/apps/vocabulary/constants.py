@@ -11,8 +11,9 @@ class Number(models.IntegerChoices):
 
 
 class Theme(models.TextChoices):
-    """Разделы колоды: по ним собраны кнопки на главной."""
+    """Разделы колоды: по ним собраны кнопки на главной, порядок здесь — порядок кнопок."""
 
+    LAST_LESSON = "last_lesson", "Из последнего урока"
     NUMBERS = "numbers", "Цифры"
     FAMILY = "family", "Семья"
     GREETINGS = "greetings", "Знакомство"
@@ -20,4 +21,3 @@ class Theme(models.TextChoices):
     ANTONYMS = "antonyms", "Антонимы"
     NOUNS = "nouns", "Существительные"
     QUESTIONS = "questions", "Вопросы и предлоги"
-    DIALOG_3 = "dialog3", "Третий диалог"
