@@ -12,6 +12,7 @@ S ?=
 N ?= 50
 OUT ?= backup-$(shell date +%F-%H%M).sql
 ONLY ?=
+DIR ?= plans/ready
 
 .DEFAULT_GOAL := help
 
@@ -94,6 +95,10 @@ deploy: ## Забрать код, пересобрать, применить м�
 .PHONY: redraw
 redraw: ## Нарисовать черновики: make redraw [ONLY="w322 w324"]
 	$(COMPOSE) exec backend python manage.py redraw $(if $(ONLY),--only $(ONLY),)
+
+.PHONY: redraw-ready
+redraw-ready: ## Взять готовые файлы в черновики: make redraw-ready [DIR=plans/ready]
+	$(COMPOSE) exec backend python manage.py redraw --ready $(DIR)
 
 .PHONY: redraw-apply
 redraw-apply: ## Перенести черновики в карточки: make redraw-apply [ONLY="w322"]

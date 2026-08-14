@@ -148,6 +148,11 @@ class Command(BaseCommand):
             action="store_true",
             help="Не рисовать, а перенести готовые черновики в карточки",
         )
+        parser.add_argument(
+            "--ready",
+            metavar="КАТАЛОГ",
+            help="Взять готовые файлы <номер>.jpg в черновики вместо рисования",
+        )
 
     def handle(self, *_: Any, **options: Any) -> None:
         plan = self._plan(Path(options["plan"]))
@@ -159,7 +164,40 @@ class Command(BaseCommand):
             self._apply(plan, chosen, drafts)
             return
 
+        if options["ready"]:
+            self._ready(Path(options["ready"]), set(chosen), drafts)
+            return
+
         self._draw(plan, self._todo(chosen, drafts, options["only"]), drafts)
+
+    def _ready(self, source: Path, chosen: set[str], drafts: Path) -> None:
+        """Кладёт готовые файлы в черновики.
+
+        Счёт предметов модель не держит: от пяти врёт всегда. Такие кадры собраны кодом
+        из картинок самой колоды, и рисовать их заново нечем — они приходят готовыми.
+        """
+        if not source.is_dir():
+            raise CommandError(f"каталога нет: {source.resolve()}")
+
+        taken, skipped = 0, []
+
+        for file in sorted(source.glob("*.jpg")):
+            if file.stem not in chosen:
+                skipped.append((file.stem, "нет в плане"))
+                continue
+
+            (drafts / file.name).write_bytes(file.read_bytes())
+            taken += 1
+            self.stdout.write(f"{file.stem}: взят в черновики")
+
+        self.stdout.write("")
+        self.stdout.write(f"взято: {taken}")
+        self.stdout.write(f"смотреть: {settings.MEDIA_URL}{DRAFTS}/<номер>.jpg")
+
+        if skipped:
+            self.stdout.write(f"пропущено: {len(skipped)}")
+            for name, reason in skipped:
+                self.stdout.write(f"  {name} — {reason}")
 
     def _plan(self, path: Path) -> dict[str, str]:
         """Читает план. Кривой план — остановка: рисовать наугад дороже, чем не рисовать."""
