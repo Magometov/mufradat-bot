@@ -1,22 +1,16 @@
-# Команды сервера и локальной разработки. `make` без аргументов покажет список.
-#
-# Compose-файл зафиксирован, а не выбирается переменной: на сервере эти команды
-# набираются десятками раз, и перепутать описание дороже, чем не иметь выбора.
-# Локальные цели ниже собраны отдельно и прод-стек не трогают.
+# Команды сервера. Все цели работают с прод-стеком; `make` без аргументов покажет
+# список. Compose-файл зафиксирован, а не выбирается переменной: на сервере эти
+# команды набираются десятками раз, и перепутать файл дороже, чем не иметь выбора.
 COMPOSE := docker compose -f docker-compose.prod.yml
 
-# `backend` и `bot` собираются из одного образа `mufradat-backend`. Пересобрать
-# один — оставить второй на старом коде, поэтому они всегда идут парой.
-PYTHON := backend bot
+# `backend` и `bot` собираются из одного образа. Пересобрать один — оставить второй
+# на старом коде, поэтому они всегда идут парой.
+APP := backend bot
 
-# Аргументы целей: `make logs S=bot N=100`, `make images LIMIT=10 ARGS=--replace`.
-# Флаги команде передаются через `ARGS`, а не напрямую: `make images --replace`
-# отдал бы `--replace` самому make. У `LIMIT` значения по умолчанию нет намеренно:
-# пустая переменная означает «рисовать всё», а число молча урезало бы прогон.
+# Аргументы целей: `make logs S=bot N=100`, `make backup OUT=db.sql`.
 S ?=
 N ?= 50
-LIMIT ?=
-ARGS ?=
+OUT ?= backup-$(shell date +%F-%H%M).sql
 
 .DEFAULT_GOAL := help
 
@@ -33,7 +27,7 @@ build: ## Пересобрать и поднять все контейнеры
 
 .PHONY: back
 back: ## Пересобрать только бэкенд — backend и bot вместе
-	$(COMPOSE) up -d --build $(PYTHON)
+	$(COMPOSE) up -d --build $(APP)
 
 .PHONY: front
 front: ## Пересобрать только фронтенд
@@ -58,52 +52,23 @@ restart: ## Перезапустить сервис: make restart S=bot
 
 # --- Сервер: заглушка на время работ ---------------------------------------------
 
-# Значение правится в .env и читается ботом и Caddy при запуске, поэтому оба
-# пересоздаются. Одной целью, а не двумя: заглушка, включённая наполовину, — это
-# закрытый сайт при живом боте, и заметно это станет не сразу.
+# Признак — файл, который Caddy и бот проверяют на каждом обращении. Поэтому включение
+# и снятие мгновенные и не требуют ни правки .env, ни пересоздания контейнеров.
 .PHONY: maintenance-on
 maintenance-on: ## Включить заглушку «Технические работы» в боте и на сайте
-	@$(call set-maintenance,true)
-	$(COMPOSE) up -d bot caddy
+	@mkdir -p flags && touch flags/maintenance
 	@echo "Заглушка включена."
 
 .PHONY: maintenance-off
 maintenance-off: ## Снять заглушку
-	@$(call set-maintenance,false)
-	$(COMPOSE) up -d bot caddy
+	@rm -f flags/maintenance
 	@echo "Заглушка снята."
-
-# Строка либо правится на месте, либо дописывается: цель должна работать и на .env,
-# заведённом до появления переменной.
-define set-maintenance
-	if grep -q '^MAINTENANCE=' .env; then \
-		sed -i 's/^MAINTENANCE=.*/MAINTENANCE=$(1)/' .env; \
-	else \
-		echo 'MAINTENANCE=$(1)' >> .env; \
-	fi
-endef
 
 # --- Сервер: Django ------------------------------------------------------------
 
 .PHONY: migrate
 migrate: ## Применить миграции в контейнере
 	$(COMPOSE) exec backend python manage.py migrate
-
-.PHONY: themes
-themes: ## Расставить темы карточек по правилам
-	$(COMPOSE) exec backend python manage.py assign_themes
-
-.PHONY: dump
-dump: ## Выгрузить слова для правки: make dump > words.tsv
-	$(COMPOSE) exec -T backend python manage.py dump_words
-
-.PHONY: apply
-apply: ## Применить правки: make apply < words.tsv [ARGS=--dry-run]
-	$(COMPOSE) exec -T backend python manage.py apply_words $(ARGS)
-
-.PHONY: images
-images: ## Картинки карточкам: make images [LIMIT=10] [ARGS=--replace]
-	$(COMPOSE) exec backend python manage.py generate_images $(if $(LIMIT),--limit $(LIMIT),) $(ARGS)
 
 .PHONY: superuser
 superuser: ## Создать суперпользователя админки
@@ -119,6 +84,16 @@ deploy: ## Забрать код, пересобрать, применить м�
 	$(COMPOSE) up -d --build
 	$(COMPOSE) exec backend python manage.py migrate
 
+# --- Сервер: база --------------------------------------------------------------
+
+# Пароль и имя базы берутся из окружения самого контейнера, поэтому в команде их нет.
+# Имя файла по умолчанию с датой: перезаписать вчерашний дамп сегодняшним — потерять
+# единственную точку возврата.
+.PHONY: backup
+backup: ## Дамп базы в файл: make backup [OUT=db.sql]
+	@$(COMPOSE) exec -T db sh -c 'pg_dump -U $$POSTGRES_USER $$POSTGRES_DB' > $(OUT)
+	@ls -lh $(OUT)
+
 # --- Сервер: наблюдение --------------------------------------------------------
 
 .PHONY: ps
@@ -130,7 +105,7 @@ logs: ## Логи: make logs [S=bot] [N=100]
 	$(COMPOSE) logs --tail=$(N) $(S)
 
 .PHONY: tail
-tail: ## Логи потоком: make tail [S=backend]
+tail: ## Логи потоком: make tail [S=backend] [N=100]
 	$(COMPOSE) logs -f --tail=$(N) $(S)
 
 # --- Сервер: место на диске ----------------------------------------------------

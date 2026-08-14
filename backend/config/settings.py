@@ -26,7 +26,6 @@ INSTALLED_APPS = [
     "rest_framework",
     # apps
     "apps.vocabulary",
-    "apps.bot",
 ]
 
 MIDDLEWARE = [
@@ -90,19 +89,6 @@ STATIC_ROOT = Path(BASE_DIR) / "static"
 
 MEDIA_URL = "/m/"
 MEDIA_ROOT = Path(BASE_DIR) / "media"
-
-# --- Telegram --------------------------------------------------------------
-BOT_TOKEN = getenv("BOT_TOKEN")
-ADMIN_TELEGRAM_ID = int(getenv("ADMIN_TELEGRAM_ID") or 0)
-WEBAPP_URL = getenv("WEBAPP_URL")
-
-# Заглушка на время работ: бот отвечает всем одним сообщением, кнопка приложения
-# убирается. Читается при запуске, поэтому включение требует перезапуска бота.
-#
-# Сравнение строгое, в отличие от DEBUG выше: ту же переменную читает Caddy, а он
-# регистр сравнить не умеет. Будь здесь `.lower()`, значение «True» закрыло бы бота
-# при открытом сайте — заглушка наполовину, и заметно это стало бы не сразу.
-MAINTENANCE = getenv("MAINTENANCE") == "true"
 
 # Без этого записи уровня INFO из наших модулей не видны в консоли.
 LOGGING = {

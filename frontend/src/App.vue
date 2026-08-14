@@ -24,7 +24,7 @@
 
     // #region Data
     const API_URL = import.meta.env.VITE_API_URL ?? '';
-    const ENTRIES_URL = `${API_URL}/api/v1/entries/`;
+    const CARDS_URL = `${API_URL}/api/v1/cards/`;
     const THEMES_URL = `${API_URL}/api/v1/themes/`;
 
     // Колода целиком: постраничности у эндпоинта нет намеренно, прогон — снимок.
@@ -54,7 +54,7 @@
         error.value = '';
 
         try {
-            const responses = await Promise.all([fetch(ENTRIES_URL), fetch(THEMES_URL)]);
+            const responses = await Promise.all([fetch(CARDS_URL), fetch(THEMES_URL)]);
             const failed = responses.find((response) => !response.ok);
             if (failed !== undefined) throw new Error(String(failed.status));
 

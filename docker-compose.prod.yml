@@ -20,11 +20,14 @@ services:
       dockerfile: backend/Dockerfile
     image: mufradat-backend
     restart: always
-    env_file: .env
     environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_DEBUG: "false"
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_NAME: ${POSTGRES_NAME}
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
-      DJANGO_DEBUG: "false"
     volumes:
       - media:/app/media
       - static:/app/static
@@ -35,15 +38,15 @@ services:
   bot:
     build:
       context: .
-      dockerfile: backend/Dockerfile
-    image: mufradat-backend
+      dockerfile: bot/Dockerfile
+    image: mufradat-bot
     restart: always
-    env_file: .env
     environment:
-      POSTGRES_HOST: db
-      POSTGRES_PORT: 5432
-      DJANGO_DEBUG: "false"
-    command: ["python", "manage.py", "runbot"]
+      BOT_TOKEN: ${BOT_TOKEN}
+      ADMIN_TELEGRAM_ID: ${ADMIN_TELEGRAM_ID}
+      WEBAPP_URL: ${WEBAPP_URL}
+    volumes:
+      - ./flags:/flags:ro
     # Часть адресов api.telegram.org недоступна с российского хостинга: DNS отдаёт
     # 149.154.166.110, и соединение с ним не устанавливается. Адрес ниже — тот же API,
     # он отвечает. Если однажды перестанет, рабочий ищется перебором:
@@ -51,26 +54,20 @@ services:
     #     timeout 3 bash -c "</dev/tcp/$ip/443" && echo "$ip ок" || echo "$ip нет"; done
     extra_hosts:
       - "api.telegram.org:149.154.167.220"
-    depends_on:
-      db:
-        condition: service_healthy
-      backend:
-        condition: service_started
 
   caddy:
     build: ./frontend
     restart: always
     environment:
       DOMAIN: ${DOMAIN}
-      # Пусто или отсутствует — значит работаем как обычно: подстановка ниже не даёт
-      # Caddy споткнуться на несуществующем имени сниппета.
-      MAINTENANCE: ${MAINTENANCE:-false}
     ports:
       - "80:80"
       - "443:443"
       - "443:443/udp"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Признак техработ: Caddy и бот только читают, ставит и снимает его make.
+      - ./flags:/flags:ro
       - media:/var/www/media:ro
       - static:/var/www/static:ro
       - caddy-data:/data

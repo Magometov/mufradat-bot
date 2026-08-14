@@ -1,8 +1,8 @@
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 
-from apps.vocabulary.models.card import Card
-from apps.vocabulary.themes import Theme
+from apps.vocabulary.constants import Theme
+from apps.vocabulary.models.base import Card
 
 
 class Phrase(Card):

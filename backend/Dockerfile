@@ -10,7 +10,7 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev --group backend
 
 # Содержимое backend/ ложится прямо в /app: внутри образа вложенность ни к чему,
 # manage.py вызывается без пути, а gunicorn — без --chdir.

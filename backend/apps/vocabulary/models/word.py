@@ -1,15 +1,8 @@
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 
-from apps.vocabulary.models.card import Card
-from apps.vocabulary.themes import Theme
-
-
-class Number(models.IntegerChoices):
-    """Число формы. Значения растут по величине, чтобы формы сортировались сами."""
-
-    SINGULAR = 1, "Единственное"
-    PLURAL = 2, "Множественное"
+from apps.vocabulary.constants import Number, Theme
+from apps.vocabulary.models.base import Card
 
 
 class Word(models.Model):

@@ -3,21 +3,27 @@ name = "mufradat-bot"
 version = "0.1.0"
 description = "Telegram Mini App for learning Arabic vocabulary"
 requires-python = ">=3.12,<3.13"
+# Общее у обоих контейнеров — только чтение .env.
 dependencies = [
-    "django>=6.0,<6.1",
-    "psycopg[binary]>=3.3,<3.4",
-    "pillow>=12.3,<13",
     "python-dotenv>=1.2,<2",
-    "aiogram>=3.30,<4",
-    "djangorestframework>=3.17,<4",
-    "gunicorn>=23,<24",
 ]
 
-[project.optional-dependencies]
+# Замок и версии одни на весь проект, а ставит каждый контейнер свою группу:
+# `uv sync --group backend` и `uv sync --group bot`. Так у бота не окажется Django,
+# а у бэкенда — aiogram.
+[dependency-groups]
+backend = [
+    "django>=6.0,<6.1",
+    "djangorestframework>=3.17,<4",
+    "psycopg[binary]>=3.3,<3.4",
+    "pillow>=12.3,<13",
+    "gunicorn>=23,<24",
+]
+bot = [
+    "aiogram>=3.30,<4",
+    "httpx>=0.28,<0.29",
+]
 dev = [
-    "pytest>=9.1,<10",
-    "pytest-asyncio>=1.4,<2",
-    "pytest-django>=4.12,<5",
     "ruff>=0.16,<0.17",
 ]
 
@@ -25,16 +31,10 @@ dev = [
 [tool.uv]
 package = false
 
-[tool.pytest.ini_options]
-DJANGO_SETTINGS_MODULE = "config.settings"
-asyncio_mode = "auto"
-pythonpath = ["backend"]
-testpaths = ["backend/tests"]
-
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-src = ["backend"]
+src = ["backend", "."]
 # ruff format also reformats python blocks inside markdown, which mangles the
 # deliberate fragments in the plans (a bare "app-name," line became a tuple).
 exclude = ["docs"]
