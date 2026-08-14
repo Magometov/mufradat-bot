@@ -21,6 +21,16 @@ ADD_REDRAW = "add:redraw"
 ADD_EDIT = "add:edit"
 ADD_DROP = "add:drop"
 
+# Разбор раздела урока. У темы к данным дописывается её код.
+SORT_GO = "sort:go"
+SORT_LATER = "sort:later"
+SORT_THEME = "sort:theme:"
+SORT_DONE = "sort:done"
+SORT_NONE = "sort:none"
+
+# Тем немного, но в столбик они выглядят списком, а не выбором.
+THEMES_IN_ROW = 2
+
 
 def menu_button() -> MenuButtonWebApp | MenuButtonDefault:
     """Синяя кнопка у поля ввода — вход в приложение, один на всех.
@@ -61,6 +71,41 @@ def confirm() -> InlineKeyboardMarkup:
             ]
         ]
     )
+
+
+def sort() -> InlineKeyboardMarkup:
+    """Разбирать ли остаток раздела сейчас: слова и фразы одного урока идут двумя
+    заходами, и бот сам не отличит прошлый урок от первой половины этого."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="Разобрать", callback_data=SORT_GO),
+                InlineKeyboardButton(text="Позже", callback_data=SORT_LATER),
+            ]
+        ]
+    )
+
+
+def themes(available: list[tuple[str, str]], picked: list[str]) -> InlineKeyboardMarkup:
+    """Темы галочками: нажатие ставит и снимает, «Готово» применяет отмеченные."""
+    buttons = [
+        InlineKeyboardButton(
+            text=f"{'✓ ' if slug in picked else ''}{name}",
+            callback_data=f"{SORT_THEME}{slug}",
+        )
+        for slug, name in available
+    ]
+    rows = [
+        buttons[start : start + THEMES_IN_ROW] for start in range(0, len(buttons), THEMES_IN_ROW)
+    ]
+    rows.append(
+        [
+            InlineKeyboardButton(text="Готово", callback_data=SORT_DONE),
+            InlineKeyboardButton(text="Оставить без темы", callback_data=SORT_NONE),
+        ]
+    )
+
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def review() -> InlineKeyboardMarkup:

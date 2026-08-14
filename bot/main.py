@@ -10,7 +10,7 @@ from aiogram.exceptions import TelegramUnauthorizedError
 from aiogram.types import BotCommand, BotCommandScopeChat
 
 from bot import config
-from bot.handlers import add, maintenance, start
+from bot.handlers import add, maintenance, start, themes
 from bot.keyboards import menu_button
 
 logger = logging.getLogger(__name__)
@@ -33,6 +33,7 @@ async def run(token: str) -> None:
     # Заглушка первой: aiogram останавливается на первом подошедшем обработчике.
     dispatcher.include_router(maintenance.router)
     dispatcher.include_router(add.router)
+    dispatcher.include_router(themes.router)
     dispatcher.include_router(start.router)
 
     # Сессию закрываем и когда запуск не удался: иначе aiogram ругается на брошенное

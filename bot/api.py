@@ -1,5 +1,7 @@
 """Обращения к бэкенду: колоду наполняет он, бот только просит."""
 
+from dataclasses import dataclass
+
 import httpx
 
 from bot import config
@@ -8,6 +10,8 @@ TIMEOUT = 30
 
 FORMS = "/api/v1/internal/forms/"
 PHRASES = "/api/v1/internal/phrases/"
+LESSON = "/api/v1/internal/lesson/"
+MOVE = "/api/v1/internal/lesson/move/"
 
 
 class Occupied(Exception):
@@ -16,6 +20,33 @@ class Occupied(Exception):
 
 class BackendError(Exception):
     """Бэкенд не ответил или ответил непонятным."""
+
+
+@dataclass(frozen=True, slots=True)
+class Unit:
+    """Единица разбора: слово со всеми формами или отдельная фраза."""
+
+    kind: str
+    id: int
+    title: str
+
+
+@dataclass(frozen=True, slots=True)
+class Lesson:
+    """Что лежит в разделе урока и по каким темам это можно разложить."""
+
+    units: list[Unit]
+    themes: list[tuple[str, str]]
+
+
+def _headers() -> dict[str, str]:
+    """Заголовок с секретом. Не-латиница в токене — промах в настройках, а не в сети."""
+    token = config.BOT_API_TOKEN or ""
+
+    if not token.isascii():
+        raise BackendError("в BOT_API_TOKEN не латиница — заголовок с таким не отправить")
+
+    return {"X-Bot-Token": token}
 
 
 def _reason(response: httpx.Response) -> str:
@@ -31,27 +62,12 @@ def _reason(response: httpx.Response) -> str:
     return str(body)
 
 
-def _headers() -> dict[str, str]:
-    """Заголовок с секретом. Не-латиница в токене — промах в настройках, а не в сети."""
-    token = config.BOT_API_TOKEN or ""
-
-    if not token.isascii():
-        raise BackendError("в BOT_API_TOKEN не латиница — заголовок с таким не отправить")
-
-    return {"X-Bot-Token": token}
-
-
-async def _post(path: str, fields: dict[str, object], image: bytes | None = None) -> dict:
-    """Шлёт запрос служебной ручке. Пустые поля не отправляет: у них есть значения по умолчанию."""
-    payload = {name: value for name, value in fields.items() if value is not None}
-    headers = _headers()
-    # Картинка едет файлом в том же запросе: до согласия владельца она нигде не лежит.
-    files = {"image": ("card.jpg", image, "image/jpeg")} if image else None
-
+async def _send(method: str, path: str, **kwargs: object) -> dict:
+    """Зовёт служебную ручку и разбирает ответ."""
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-            response = await client.post(
-                f"{config.BACKEND_URL}{path}", data=payload, files=files, headers=headers
+            response = await client.request(
+                method, f"{config.BACKEND_URL}{path}", headers=_headers(), **kwargs
             )
     except httpx.HTTPError as error:
         raise BackendError(f"не дозвонился до бэкенда: {error}") from error
@@ -65,6 +81,17 @@ async def _post(path: str, fields: dict[str, object], image: bytes | None = None
     return response.json()
 
 
+async def _add(path: str, fields: dict[str, object], image: bytes | None) -> dict:
+    """Добавляет карточку. Пустые поля не отправляет: у них есть значения по умолчанию."""
+    return await _send(
+        "POST",
+        path,
+        data={name: value for name, value in fields.items() if value is not None},
+        # Картинка едет файлом в том же запросе: до согласия владельца она нигде не лежит.
+        files={"image": ("card.jpg", image, "image/jpeg")} if image else None,
+    )
+
+
 async def add_form(
     *,
     number: int,
@@ -75,7 +102,7 @@ async def add_form(
     image: bytes | None = None,
 ) -> int:
     """Добавляет форму слова и отдаёт номер слова: им цепляется второе число."""
-    body = await _post(
+    body = await _add(
         FORMS,
         {
             "number": number,
@@ -98,7 +125,7 @@ async def add_phrase(
     image: bytes | None = None,
 ) -> int:
     """Добавляет фразу и отдаёт её номер."""
-    body = await _post(
+    body = await _add(
         PHRASES,
         {
             "arabic": arabic,
@@ -109,3 +136,21 @@ async def add_phrase(
     )
 
     return int(body["phrase"])
+
+
+async def lesson() -> Lesson:
+    """Спрашивает, что осталось в разделе урока и куда это можно разложить."""
+    body = await _send("GET", LESSON)
+
+    return Lesson(
+        units=[Unit(unit["kind"], int(unit["id"]), unit["title"]) for unit in body["units"]],
+        themes=[(theme["slug"], theme["name"]) for theme in body["themes"]],
+    )
+
+
+async def move(*, kind: str, unit: int, themes: list[str]) -> None:
+    """Выносит единицу из раздела урока. Пустой список тем — оставить без тем.
+
+    Ходит JSON, а не формой: пустой список полем формы не передать вовсе.
+    """
+    await _send("POST", MOVE, json={"kind": kind, "id": unit, "themes": themes})

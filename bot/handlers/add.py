@@ -11,6 +11,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import BufferedInputFile, CallbackQuery, Message
 
 from bot import api, config, images, keyboards, parsing, texts
+from bot.handlers import themes
 from bot.parsing import Card, Group, Problem
 
 logger = logging.getLogger(__name__)
@@ -175,8 +176,9 @@ async def _advance(state: FSMContext) -> None:
 
 
 async def _finish(bot: Bot, chat: int, state: FSMContext) -> None:
-    """Отчитывается за партию и забывает её."""
+    """Отчитывается за партию и предлагает разобрать то, что лежало в разделе до неё."""
     data = await state.get_data()
+    lesson: api.Lesson = data["lesson"]
 
     report = [texts.ADDED.format(added=data["added"])]
     if data["skipped"]:
@@ -192,6 +194,9 @@ async def _finish(bot: Bot, chat: int, state: FSMContext) -> None:
     )
     await state.clear()
     await bot.send_message(chat, "\n".join(report))
+
+    if lesson.units:
+        await themes.offer(bot, chat, state, lesson)
 
 
 async def _broken(bot: Bot, chat: int, state: FSMContext, error: Exception) -> None:
@@ -250,9 +255,24 @@ async def handle_lines(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(Add.confirm, F.data == keyboards.ADD_GO)
 async def handle_go(callback: CallbackQuery, state: FSMContext) -> None:
-    """Открывает приёмку: карточки идут по одной."""
+    """Открывает приёмку: карточки идут по одной.
+
+    Здесь же снимается список раздела — до первой записи, иначе новые карточки попали
+    бы в разбор вместе со старыми.
+    """
     data = await state.get_data()
     queue = _queue(data["groups"])
+
+    await callback.answer()
+
+    try:
+        lesson = await api.lesson()
+    except api.BackendError as error:
+        lesson = api.Lesson(units=[], themes=[])
+        logger.warning("раздел не прочитался: %s", error)
+        await callback.bot.send_message(
+            callback.from_user.id, texts.LESSON_UNREAD.format(reason=escape(str(error)))
+        )
 
     await state.update_data(
         queue=queue,
@@ -263,8 +283,8 @@ async def handle_go(callback: CallbackQuery, state: FSMContext) -> None:
         skipped=[],
         dropped=[],
         image=None,
+        lesson=lesson,
     )
-    await callback.answer()
     await _show(callback.bot, callback.from_user.id, state)
 
 
