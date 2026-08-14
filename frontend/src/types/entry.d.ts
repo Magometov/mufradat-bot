@@ -1,6 +1,7 @@
 /** Карточка, как её отдаёт `GET /api/v1/entries/`. */
 export interface IEntry {
-    id: number;
+    /** Формы слов и фразы лежат в разных таблицах, буква разводит их номера: `w12`, `p7`. */
+    id: string;
     arabic: string;
     translation_ru: string;
     /** Приходит пустой строкой, а не `null`, когда транслитерации нет. */

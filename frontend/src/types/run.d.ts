@@ -4,7 +4,7 @@ import type { IEntry } from './entry';
 
 /** Карточка в прогоне: что показывать и какой стороной вперёд. */
 export interface IRunItem {
-    id: number;
+    id: string;
     /** Русский вперёд: лицо — перевод, оборот — арабское. */
     isReversed: boolean;
 }

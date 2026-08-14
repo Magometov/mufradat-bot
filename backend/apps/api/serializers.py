@@ -1,14 +1,16 @@
 from rest_framework import serializers
 
-from apps.vocabulary.models import Entry
 
+class CardSerializer(serializers.Serializer):
+    """Карточка колоды: форма слова и фраза едут в приложение одинаково."""
 
-class EntrySerializer(serializers.ModelSerializer):
-    """Сериализатор для слов."""
-
-    class Meta:
-        model = Entry
-        fields = ("id", "arabic", "translation_ru", "transliteration", "is_word", "image", "themes")
+    id = serializers.CharField()
+    arabic = serializers.CharField()
+    translation_ru = serializers.CharField()
+    transliteration = serializers.CharField()
+    is_word = serializers.BooleanField()
+    image = serializers.CharField(allow_null=True)
+    themes = serializers.ListField(child=serializers.CharField())
 
 
 class ThemeSerializer(serializers.Serializer):

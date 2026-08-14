@@ -12,8 +12,12 @@ from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Q
 
-from apps.vocabulary.models import Entry
+from apps.vocabulary.cards import card_id, split_ids
+from apps.vocabulary.models import Phrase, WordForm
 from apps.vocabulary.pictures import PROMPTS
+
+# Карточка колоды: форма слова или фраза. Рисуются они одинаково — по переводу.
+Card = WordForm | Phrase
 
 API = "https://fal.run/fal-ai/flux/schnell"
 
@@ -109,7 +113,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser: ArgumentParser) -> None:
         parser.add_argument("--limit", type=int, help="Обработать не больше N карточек")
-        parser.add_argument("--only", help="Только эти карточки: --only 12,34")
+        parser.add_argument("--only", help="Только эти карточки: --only w12,p7")
         parser.add_argument(
             "--replace",
             action="store_true",
@@ -126,17 +130,17 @@ class Command(BaseCommand):
         if not key and not options["dry_run"]:
             raise CommandError("Нет FAL_KEY. Положи ключ fal.ai в .env — см. .env.example")
 
-        entries = self._pick_entries(options)
-        if not entries:
+        cards = self._pick_cards(options)
+        if not cards:
             self.stdout.write("Нечего рисовать.")
             return
 
         drawn = 0
-        broken: list[tuple[Entry, str]] = []
+        broken: list[tuple[Card, str]] = []
 
-        for entry in entries:
-            prompt = PROMPTS[entry.translation_ru]
-            self.stdout.write(f"  {entry.pk:>4}  {entry.translation_ru:34} {prompt}")
+        for card in cards:
+            prompt = PROMPTS[card.translation_ru]
+            self.stdout.write(f"  {card_id(card):>5}  {card.translation_ru:34} {prompt}")
 
             if options["dry_run"]:
                 continue
@@ -146,41 +150,51 @@ class Command(BaseCommand):
             except urllib.error.HTTPError as error:
                 if error.code in (401, 403):
                     raise CommandError(f"Ключ fal.ai не принят ({error.code})") from error
-                broken.append((entry, f"HTTP {error.code}"))
+                broken.append((card, f"HTTP {error.code}"))
                 continue
             except (OSError, ValueError, KeyError) as error:
-                broken.append((entry, str(error)))
+                broken.append((card, str(error)))
                 continue
 
             # Старый файл нужно убрать руками: Django не перезаписывает, а кладёт
             # рядом копию со случайным суффиксом, и том раздувается орфанами.
-            if entry.image:
-                entry.image.delete(save=False)
+            if card.image:
+                card.image.delete(save=False)
 
-            entry.image.save(f"{entry.pk}.jpg", ContentFile(data), save=True)
+            card.image.save(f"{card_id(card)}.jpg", ContentFile(data), save=True)
             drawn += 1
 
-        self._report(len(entries), drawn, broken, options["dry_run"])
+        self._report(len(cards), drawn, broken, options["dry_run"])
 
-    def _pick_entries(self, options: dict[str, Any]) -> list[Entry]:
-        entries = Entry.objects.filter(translation_ru__in=PROMPTS).order_by("pk")
+    def _pick_cards(self, options: dict[str, Any]) -> list[Card]:
+        """Карточки под рисование: и формы слов, и фразы — промпт ищется по переводу."""
+        forms = WordForm.objects.filter(translation_ru__in=PROMPTS).order_by("pk")
+        phrases = Phrase.objects.filter(translation_ru__in=PROMPTS).order_by("pk")
 
         if options["only"]:
-            wanted = [int(part) for part in options["only"].split(",") if part.strip()]
-            entries = entries.filter(pk__in=wanted)
+            try:
+                wanted_forms, wanted_phrases = split_ids(options["only"])
+            except ValueError as error:
+                raise CommandError(str(error)) from error
+            forms = forms.filter(pk__in=wanted_forms)
+            phrases = phrases.filter(pk__in=wanted_phrases)
 
         # Пропуск уже нарисованного делает команду возобновляемой: прогон можно
         # прервать на любой карточке и добрать остаток следующим запуском.
         if not options["replace"]:
-            entries = entries.filter(Q(image="") | Q(image__isnull=True))
+            empty = Q(image="") | Q(image__isnull=True)
+            forms = forms.filter(empty)
+            phrases = phrases.filter(empty)
 
-        return list(entries[: options["limit"]] if options["limit"] else entries)
+        cards: list[Card] = [*forms, *phrases]
+
+        return cards[: options["limit"]] if options["limit"] else cards
 
     def _report(
         self,
         total: int,
         drawn: int,
-        broken: list[tuple[Entry, str]],
+        broken: list[tuple[Card, str]],
         is_dry_run: bool,
     ) -> None:
         self.stdout.write("")
@@ -191,5 +205,5 @@ class Command(BaseCommand):
 
         if broken:
             self.stdout.write(self.style.WARNING(f"Сорвалось: {len(broken)}"))
-            for entry, reason in broken:
-                self.stdout.write(f"  {entry.pk}  {entry.translation_ru} — {reason}")
+            for card, reason in broken:
+                self.stdout.write(f"  {card_id(card)}  {card.translation_ru} — {reason}")

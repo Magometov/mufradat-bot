@@ -11,7 +11,7 @@ Python 3.12, Django 6.0 + DRF, aiogram 3, Postgres 16, Vue 3 + Vite, Caddy, Dock
 
 ```
 backend/
-    apps/vocabulary/   единственная модель Entry и админка
+    apps/vocabulary/   модели Word + WordForm и Phrase, админка
     apps/bot/          aiogram: приветствие и разбор ввода
     apps/api/          DRF: GET /api/v1/entries/ — вся колода одним ответом
     config/            настройки, urls, wsgi

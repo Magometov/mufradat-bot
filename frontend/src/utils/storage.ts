@@ -1,6 +1,8 @@
 import type { IRunItem, ISavedRun } from '../types/run';
 
-const KEY = 'mufradat.run';
+// Номер в ключе — версия формата. Карточки переехали в две таблицы и сменили номера
+// с чисел на строки: старый прогон не упал бы, а молча подставил чужие карточки.
+const KEY = 'mufradat.run.2';
 
 /**
  * Похожа ли запись на карточку прогона.
@@ -10,7 +12,7 @@ function isRunItem(value: unknown): value is IRunItem {
 
     const candidate = value as Record<string, unknown>;
 
-    return typeof candidate.id === 'number' && typeof candidate.isReversed === 'boolean';
+    return typeof candidate.id === 'string' && typeof candidate.isReversed === 'boolean';
 }
 
 /**

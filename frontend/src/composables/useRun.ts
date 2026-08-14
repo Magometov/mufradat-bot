@@ -23,7 +23,7 @@ export function useRun(entries: Ref<IEntry[]>): IUseRun {
     const run = ref<ISavedRun | null>(null);
 
     // Прогон хранит номер и направление — запись колоды подбирается здесь.
-    const byId = computed<Map<number, IEntry>>(
+    const byId = computed<Map<string, IEntry>>(
         () => new Map(entries.value.map((entry) => [entry.id, entry])),
     );
 

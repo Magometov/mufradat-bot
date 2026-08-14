@@ -9,5 +9,8 @@ _NOTE = re.compile(r"\([^)]*\)")
 
 
 def is_word(arabic: str, translation_ru: str) -> bool:
-    """Отдельное слово — карточка, где одно слово хотя бы с одной стороны."""
+    """Отдельное слово — карточка, где одно слово хотя бы с одной стороны.
+
+    От ответа зависит таблица: слово ложится в `Word` с формой, фраза — в `Phrase`.
+    """
     return len(arabic.split()) == 1 or len(_NOTE.sub(" ", translation_ru).split()) == 1
