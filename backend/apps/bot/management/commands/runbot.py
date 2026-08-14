@@ -6,7 +6,7 @@ from aiogram.enums import ParseMode
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from apps.bot.handlers import add, start
+from apps.bot.handlers import add, maintenance, start
 from apps.bot.keyboards import menu_button
 
 
@@ -27,6 +27,10 @@ class Command(BaseCommand):
             default=DefaultBotProperties(parse_mode=ParseMode.HTML),
         )
         dispatcher = Dispatcher()
+        # Заглушка идёт первой и берёт на себя всё: aiogram останавливается на первом
+        # подошедшем обработчике, поэтому до разбора карточек дело не доходит.
+        if settings.MAINTENANCE:
+            dispatcher.include_router(maintenance.router)
         # Порядок важен: команды разбираются раньше свободного текста, иначе «/start»
         # уедет в разбор карточки.
         dispatcher.include_router(start.router)
@@ -36,7 +40,8 @@ class Command(BaseCommand):
         # Кнопка «Меню» задаётся у Telegram один раз и хранится на его стороне, поэтому
         # ставим её при каждом запуске: так адрес приложения не расходится с .env.
         await bot.set_chat_menu_button(menu_button=menu_button())
-        self.stdout.write(f"Бот @{me.username} запущен")
+        state = " — ТЕХРАБОТЫ" if settings.MAINTENANCE else ""
+        self.stdout.write(f"Бот @{me.username} запущен{state}")
         try:
             await dispatcher.start_polling(bot)
         finally:

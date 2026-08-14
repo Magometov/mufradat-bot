@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ru">
+    <head>
+        <meta charset="utf-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+        />
+        <title>مفردات — технические работы</title>
+        <!-- Страница самостоятельная: ни скриптов, ни сборки. Её отдаёт Caddy, когда
+             приложение как раз пересобирается, и зависеть в этот момент от собранных
+             файлов нельзя. Палитра и размер шрифта повторены руками по scss: те
+             переменные живут в бандле, которого здесь нет. -->
+        <style>
+            :root {
+                color-scheme: light;
+
+                --base-0: #ffffff;
+                --base-50: #f4f5f7;
+                --base-200: #e2e5ea;
+                --base-500: #7d8794;
+                --base-900: #16181d;
+
+                --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                --font-arabic: 'SF Arabic', 'Geeza Pro', 'Noto Naskh Arabic', serif;
+            }
+
+            @media (prefers-color-scheme: dark) {
+                :root {
+                    color-scheme: dark;
+
+                    --base-0: #17191c;
+                    --base-50: #21242a;
+                    --base-200: #32363e;
+                    --base-500: #8d97a5;
+                    --base-900: #f2f4f7;
+                }
+            }
+
+            *,
+            *::before,
+            *::after {
+                box-sizing: border-box;
+            }
+
+            html {
+                /* 1rem = 10px, как в reset.scss: размеры ниже кратны 0.2rem. */
+                font-size: 62.5%;
+            }
+
+            body {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+                margin: 0;
+                padding: 2.4rem;
+                background: var(--base-0);
+                color: var(--base-900);
+                font-family: var(--font-ui);
+                font-size: 1.6rem;
+                text-align: center;
+                -webkit-font-smoothing: antialiased;
+            }
+
+            h1,
+            p {
+                margin: 0;
+            }
+
+            .Card {
+                display: flex;
+                flex-direction: column;
+                gap: 1.6rem;
+                max-width: 42rem;
+                padding: 3.2rem 2.4rem;
+                border: 1px solid var(--base-200);
+                border-radius: 2rem;
+                background: var(--base-50);
+            }
+
+            .Card__greeting {
+                font-family: var(--font-arabic);
+                font-size: 2.4rem;
+                line-height: 1.8;
+            }
+
+            .Card__title {
+                font-size: 2.2rem;
+                font-weight: 600;
+            }
+
+            .Card__text {
+                color: var(--base-500);
+                font-size: 1.6rem;
+                line-height: 1.5;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="Card">
+            <p class="Card__greeting" dir="rtl" lang="ar">السلام عليكم ورحمة الله وبركاته</p>
+            <h1 class="Card__title">Технические работы</h1>
+            <p class="Card__text">
+                Колода переезжает на новый лад. Карточки скоро вернутся — загляни чуть позже 🙏
+            </p>
+        </div>
+    </body>
+</html>

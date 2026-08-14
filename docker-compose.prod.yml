@@ -62,6 +62,9 @@ services:
     restart: always
     environment:
       DOMAIN: ${DOMAIN}
+      # Пусто или отсутствует — значит работаем как обычно: подстановка ниже не даёт
+      # Caddy споткнуться на несуществующем имени сниппета.
+      MAINTENANCE: ${MAINTENANCE:-false}
     ports:
       - "80:80"
       - "443:443"

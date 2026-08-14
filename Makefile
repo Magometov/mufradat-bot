@@ -56,6 +56,33 @@ down: ## Остановить стек. Данные в томах остают�
 restart: ## Перезапустить сервис: make restart S=bot
 	$(COMPOSE) restart $(S)
 
+# --- Сервер: заглушка на время работ ---------------------------------------------
+
+# Значение правится в .env и читается ботом и Caddy при запуске, поэтому оба
+# пересоздаются. Одной целью, а не двумя: заглушка, включённая наполовину, — это
+# закрытый сайт при живом боте, и заметно это станет не сразу.
+.PHONY: maintenance-on
+maintenance-on: ## Включить заглушку «Технические работы» в боте и на сайте
+	@$(call set-maintenance,true)
+	$(COMPOSE) up -d bot caddy
+	@echo "Заглушка включена."
+
+.PHONY: maintenance-off
+maintenance-off: ## Снять заглушку
+	@$(call set-maintenance,false)
+	$(COMPOSE) up -d bot caddy
+	@echo "Заглушка снята."
+
+# Строка либо правится на месте, либо дописывается: цель должна работать и на .env,
+# заведённом до появления переменной.
+define set-maintenance
+	if grep -q '^MAINTENANCE=' .env; then \
+		sed -i 's/^MAINTENANCE=.*/MAINTENANCE=$(1)/' .env; \
+	else \
+		echo 'MAINTENANCE=$(1)' >> .env; \
+	fi
+endef
+
 # --- Сервер: Django ------------------------------------------------------------
 
 .PHONY: migrate
