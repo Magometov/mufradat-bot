@@ -32,6 +32,8 @@ services:
       # Журнал входов: токеном сверяется подпись Telegram, по id не пишутся свои заходы.
       BOT_TOKEN: ${BOT_TOKEN}
       ADMIN_TELEGRAM_ID: ${ADMIN_TELEGRAM_ID}
+      # Временно, под разовую перерисовку картинок командой `redraw`. Убрать вместе с ней.
+      FAL_KEY: ${FAL_KEY}
     volumes:
       - media:/app/media
       - static:/app/static
