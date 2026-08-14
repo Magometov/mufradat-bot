@@ -1,16 +1,17 @@
-"""Добавление карточек владельцем: вставка, разбор, подтверждение, запись."""
+"""Добавление карточек владельцем: вставка, разбор, приёмка по одной, запись."""
 
 import logging
+from dataclasses import dataclass, replace
 from html import escape
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import BufferedInputFile, CallbackQuery, Message
 
-from bot import api, config, keyboards, parsing, texts
-from bot.parsing import Group, Problem
+from bot import api, config, images, keyboards, parsing, texts
+from bot.parsing import Card, Group, Problem
 
 logger = logging.getLogger(__name__)
 
@@ -25,19 +26,32 @@ PHRASES = "phrases"
 KINDS = {keyboards.ADD_WORDS: WORDS, keyboards.ADD_PHRASES: PHRASES}
 FORMATS = {WORDS: texts.WORDS_FORMAT, PHRASES: texts.PHRASES_FORMAT}
 PARSERS = {WORDS: parsing.parse_words, PHRASES: parsing.parse_phrases}
+SINGLE = {WORDS: parsing.one_word, PHRASES: parsing.one_phrase}
 UNITS = {WORDS: "слов", PHRASES: "фраз"}
+NUMBERS = {parsing.SINGULAR: "единственное", parsing.PLURAL: "множественное"}
+
+
+@dataclass(slots=True)
+class Pending:
+    """Карточка в очереди на приёмку и номер её единицы: формы ложатся в одно слово."""
+
+    card: Card
+    unit: int
 
 
 class Add(StatesGroup):
-    """Чего диалог ждёт: сначала строки, потом согласие на запись."""
+    """Чего диалог ждёт: строки, согласия, решения по карточке, промпта, правки."""
 
     lines = State()
     confirm = State()
+    review = State()
+    prompt = State()
+    edit = State()
 
 
-async def _answer(callback: CallbackQuery, text: str) -> None:
-    """Отвечает в тот же чат: сообщение с кнопкой боту могло стать недоступным."""
-    await callback.bot.send_message(callback.from_user.id, text)
+def _names(titles: list[str]) -> str:
+    """Перечисление переводов в отчёте."""
+    return ", ".join(f"«{escape(title)}»" for title in titles)
 
 
 def _problems(problems: list[Problem]) -> str:
@@ -47,52 +61,153 @@ def _problems(problems: list[Problem]) -> str:
 
 def _preview(kind: str, groups: list[Group]) -> str:
     """Список разобранного: по строке на слово или фразу."""
+    cards = [card for group in groups for card in group.cards]
     listing = "\n".join(
         f"{number}. {escape(group.title)}" for number, group in enumerate(groups, start=1)
     )
+    text = texts.PREVIEW.format(
+        units=UNITS[kind], found=len(groups), cards=len(cards), listing=listing
+    )
 
-    return texts.PREVIEW.format(
-        units=UNITS[kind],
-        found=len(groups),
-        cards=sum(len(group.cards) for group in groups),
-        listing=listing,
+    plain = sum(1 for card in cards if not card.prompt)
+
+    return text if not plain else f"{text}\n\n{texts.PLAIN.format(plain=plain)}"
+
+
+def _queue(groups: list[Group]) -> list[Pending]:
+    """Разворачивает единицы в очередь карточек, помня, какая к какой единице."""
+    return [Pending(card, unit) for unit, group in enumerate(groups) for card in group.cards]
+
+
+def _caption(position: int, total: int, card: Card, reason: str) -> str:
+    """Подпись карточки на приёмке: где мы, что это и чем нарисовано."""
+    head = f"{position}/{total} · {escape(card.translation_ru)}"
+    if card.number is not None:
+        head = f"{head} · {NUMBERS[card.number]}"
+
+    body = escape(card.arabic)
+    if card.transliteration:
+        body = f"{body} · {escape(card.transliteration)}"
+
+    lines = [head, body]
+    if card.prompt:
+        lines.append(f"<i>{escape(card.prompt)}</i>")
+    if reason:
+        lines.append(texts.NO_DRAW.format(reason=escape(reason)))
+
+    return "\n".join(lines)
+
+
+async def _show(bot: Bot, chat: int, state: FSMContext) -> None:
+    """Рисует картинку к первой карточке очереди и показывает её на приёмку."""
+    data = await state.get_data()
+    queue: list[Pending] = data["queue"]
+
+    if not queue:
+        await _finish(bot, chat, state)
+        return
+
+    card = queue[0].card
+    image: bytes | None = None
+    reason = ""
+
+    if card.prompt:
+        await bot.send_chat_action(chat, "upload_photo")
+        try:
+            image = await images.draw(card.prompt)
+        except images.DrawFailed as error:
+            reason = str(error)
+            logger.warning("картинка не вышла: %s", error)
+
+    await state.update_data(image=image)
+    await state.set_state(Add.review)
+
+    caption = _caption(data["done"] + 1, data["total"], card, reason)
+
+    if image is None:
+        await bot.send_message(chat, caption, reply_markup=keyboards.review())
+        return
+
+    await bot.send_photo(
+        chat,
+        BufferedInputFile(image, filename="card.jpg"),
+        caption=caption,
+        reply_markup=keyboards.review(),
     )
 
 
-async def _write(kind: str, group: Group) -> tuple[int, list[str]]:
-    """Пишет карточки одной единицы. Формы одного слова цепляются к одному номеру."""
-    written = 0
-    skipped: list[str] = []
-    word: int | None = None
+async def _store(state: FSMContext, image: bytes | None) -> None:
+    """Пишет первую карточку очереди в колоду и считает исход."""
+    data = await state.get_data()
+    pending: Pending = data["queue"][0]
+    card = pending.card
+    words: dict[int, int] = data["words"]
 
-    for card in group.cards:
-        try:
-            if kind == PHRASES:
-                await api.add_phrase(
-                    arabic=card.arabic,
-                    translation_ru=card.translation_ru,
-                    transliteration=card.transliteration,
-                )
-            else:
-                word = await api.add_form(
-                    number=card.number or parsing.SINGULAR,
-                    arabic=card.arabic,
-                    translation_ru=card.translation_ru,
-                    transliteration=card.transliteration,
-                    word=word,
-                )
-        except api.Occupied:
-            skipped.append(card.translation_ru)
-            continue
+    try:
+        if data["kind"] == PHRASES:
+            await api.add_phrase(
+                arabic=card.arabic,
+                translation_ru=card.translation_ru,
+                transliteration=card.transliteration,
+                image=image,
+            )
+        else:
+            words[pending.unit] = await api.add_form(
+                number=card.number or parsing.SINGULAR,
+                arabic=card.arabic,
+                translation_ru=card.translation_ru,
+                transliteration=card.transliteration,
+                word=words.get(pending.unit),
+                image=image,
+            )
+    except api.Occupied:
+        await state.update_data(skipped=[*data["skipped"], card.translation_ru])
+        return
 
-        written += 1
+    await state.update_data(added=data["added"] + 1, words=words)
 
-    return written, skipped
+
+async def _advance(state: FSMContext) -> None:
+    """Убирает решённую карточку из очереди."""
+    data = await state.get_data()
+
+    await state.update_data(queue=data["queue"][1:], done=data["done"] + 1, image=None)
+
+
+async def _finish(bot: Bot, chat: int, state: FSMContext) -> None:
+    """Отчитывается за партию и забывает её."""
+    data = await state.get_data()
+
+    report = [texts.ADDED.format(added=data["added"])]
+    if data["skipped"]:
+        report.append(texts.SKIPPED.format(skipped=_names(data["skipped"])))
+    if data["dropped"]:
+        report.append(texts.DROPPED.format(dropped=_names(data["dropped"])))
+
+    logger.info(
+        "партия закрыта: добавлено %s, пропущено %s, отброшено %s",
+        data["added"],
+        len(data["skipped"]),
+        len(data["dropped"]),
+    )
+    await state.clear()
+    await bot.send_message(chat, "\n".join(report))
+
+
+async def _broken(bot: Bot, chat: int, state: FSMContext, error: Exception) -> None:
+    """Обрыв записи: дальше идти нельзя, но что легло — уже в колоде."""
+    data = await state.get_data()
+
+    logger.warning("запись оборвалась после %s карточек: %s", data["added"], error)
+    await state.clear()
+    await bot.send_message(
+        chat, texts.BROKEN.format(reason=escape(str(error)), added=data["added"])
+    )
 
 
 @router.message(Command("add"))
 async def handle_add(message: Message, state: FSMContext) -> None:
-    """Начинает добавление командой — на случай, когда приветствие уже уехало вверх."""
+    """Начинает добавление командой — она же выход из брошенного диалога."""
     await state.clear()
     await message.answer(texts.PICK, reply_markup=keyboards.pick())
 
@@ -118,8 +233,7 @@ async def handle_lines(message: Message, state: FSMContext) -> None:
         return
 
     data = await state.get_data()
-    kind = data["kind"]
-    parsed = PARSERS[kind](message.text)
+    parsed = PARSERS[data["kind"]](message.text)
 
     if parsed.problems:
         await message.answer(texts.PROBLEMS.format(problems=_problems(parsed.problems)))
@@ -131,46 +245,115 @@ async def handle_lines(message: Message, state: FSMContext) -> None:
 
     await state.update_data(groups=parsed.groups)
     await state.set_state(Add.confirm)
-    await message.answer(_preview(kind, parsed.groups), reply_markup=keyboards.confirm())
+    await message.answer(_preview(data["kind"], parsed.groups), reply_markup=keyboards.confirm())
 
 
 @router.callback_query(Add.confirm, F.data == keyboards.ADD_GO)
 async def handle_go(callback: CallbackQuery, state: FSMContext) -> None:
-    """Пишет разобранное в колоду и отчитывается."""
+    """Открывает приёмку: карточки идут по одной."""
     data = await state.get_data()
-    kind: str = data["kind"]
-    groups: list[Group] = data["groups"]
+    queue = _queue(data["groups"])
 
-    await state.clear()
+    await state.update_data(
+        queue=queue,
+        total=len(queue),
+        done=0,
+        words={},
+        added=0,
+        skipped=[],
+        dropped=[],
+        image=None,
+    )
+    await callback.answer()
+    await _show(callback.bot, callback.from_user.id, state)
+
+
+@router.callback_query(Add.review, F.data.in_({keyboards.ADD_KEEP, keyboards.ADD_PLAIN}))
+async def handle_keep(callback: CallbackQuery, state: FSMContext) -> None:
+    """Кладёт карточку в колоду — с нарисованным или без него."""
+    data = await state.get_data()
+    image = data["image"] if callback.data == keyboards.ADD_KEEP else None
+
     await callback.answer()
 
-    added = 0
-    skipped: list[str] = []
-
     try:
-        for group in groups:
-            written, occupied = await _write(kind, group)
-            added += written
-            skipped += occupied
+        await _store(state, image)
     except api.BackendError as error:
-        logger.warning("запись оборвалась после %s карточек: %s", added, error)
-        await _answer(callback, texts.BROKEN.format(reason=escape(str(error)), added=added))
+        await _broken(callback.bot, callback.from_user.id, state, error)
         return
 
-    logger.info("владелец добавил карточек: %s, пропущено: %s", added, len(skipped))
+    await _advance(state)
+    await _show(callback.bot, callback.from_user.id, state)
 
-    report = [texts.ADDED.format(added=added)]
-    if skipped:
-        names = ", ".join(f"«{escape(name)}»" for name in skipped)
-        report.append(texts.SKIPPED.format(skipped=names))
-    report.append(texts.NO_PICTURES)
 
-    await _answer(callback, "\n".join(report))
+@router.callback_query(Add.review, F.data == keyboards.ADD_DROP)
+async def handle_drop(callback: CallbackQuery, state: FSMContext) -> None:
+    """Выбрасывает карточку: в колоду она не пойдёт."""
+    data = await state.get_data()
+    pending: Pending = data["queue"][0]
+
+    await state.update_data(dropped=[*data["dropped"], pending.card.translation_ru])
+    await callback.answer()
+    await _advance(state)
+    await _show(callback.bot, callback.from_user.id, state)
+
+
+@router.callback_query(Add.review, F.data == keyboards.ADD_REDRAW)
+async def handle_redraw(callback: CallbackQuery, state: FSMContext) -> None:
+    """Просит новый промпт: старый нарисовал не то."""
+    await state.set_state(Add.prompt)
+    await callback.answer()
+    await callback.bot.send_message(callback.from_user.id, texts.NEW_PROMPT)
+
+
+@router.message(Add.prompt, ~CommandStart())
+async def handle_prompt(message: Message, state: FSMContext) -> None:
+    """Рисует ту же карточку по новому промпту."""
+    if not message.text:
+        await message.answer(texts.WAITING)
+        return
+
+    data = await state.get_data()
+    queue: list[Pending] = data["queue"]
+    queue[0].card = replace(queue[0].card, prompt=message.text.strip())
+
+    await state.update_data(queue=queue)
+    await _show(message.bot, message.chat.id, state)
+
+
+@router.callback_query(Add.review, F.data == keyboards.ADD_EDIT)
+async def handle_edit(callback: CallbackQuery, state: FSMContext) -> None:
+    """Просит строку заново: в самой карточке что-то не так."""
+    await state.set_state(Add.edit)
+    await callback.answer()
+    await callback.bot.send_message(callback.from_user.id, texts.RESEND)
+
+
+@router.message(Add.edit, ~CommandStart())
+async def handle_resend(message: Message, state: FSMContext) -> None:
+    """Заменяет карточку присланной строкой и рисует к ней заново."""
+    if not message.text:
+        await message.answer(texts.WAITING)
+        return
+
+    data = await state.get_data()
+
+    try:
+        card = SINGLE[data["kind"]](message.text)
+    except parsing.Broken as error:
+        await message.answer(texts.BAD_LINE.format(reason=escape(str(error))))
+        return
+
+    queue: list[Pending] = data["queue"]
+    queue[0].card = card
+
+    await state.update_data(queue=queue)
+    await _show(message.bot, message.chat.id, state)
 
 
 @router.callback_query(F.data == keyboards.ADD_CANCEL)
 async def handle_cancel(callback: CallbackQuery, state: FSMContext) -> None:
-    """Бросает добавление из любого места диалога."""
+    """Бросает добавление. Что уже легло в колоду, там и остаётся."""
     await state.clear()
     await callback.answer()
-    await _answer(callback, texts.CANCELLED)
+    await callback.bot.send_message(callback.from_user.id, texts.CANCELLED)

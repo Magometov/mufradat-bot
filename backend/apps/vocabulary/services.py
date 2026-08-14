@@ -1,5 +1,7 @@
 """Правила колоды: что в неё ложится, что из неё берётся и как разбирают урок."""
 
+from pathlib import Path
+
 from django.core.files.base import File
 from django.db import transaction
 from django.db.models import QuerySet
@@ -15,6 +17,14 @@ Unit = Word | Phrase
 
 class Occupied(Exception):
     """Место занято: такая карточка уже есть или у слова уже есть это число."""
+
+
+def _attach(card: WordForm | Phrase, name: str, image: File | None) -> None:
+    """Кладёт картинку под номером карточки: `w12.jpg` понятнее, чем `card_a1b2.jpg`."""
+    if image is None:
+        return
+
+    card.image.save(f"{name}{card.pk}{Path(image.name or '').suffix or '.jpg'}", image, save=True)
 
 
 def deck() -> list[WordForm | Phrase]:
@@ -48,14 +58,18 @@ def add_form(
         if word is None:
             word = Word.objects.create(themes=[Theme.LAST_LESSON])
 
-        return WordForm.objects.create(
+        # Картинка прикладывается после вставки: имя файла — номер карточки, а он
+        # появляется только вместе со строкой.
+        form = WordForm.objects.create(
             word=word,
             number=number,
             arabic=arabic,
             translation_ru=translation_ru,
             transliteration=transliteration,
-            image=image,
         )
+        _attach(form, "w", image)
+
+        return form
 
 
 def add_phrase(
@@ -69,13 +83,16 @@ def add_phrase(
     if Phrase.objects.filter(arabic=arabic, translation_ru=translation_ru).exists():
         raise Occupied("уже в колоде")
 
-    return Phrase.objects.create(
-        themes=[Theme.LAST_LESSON],
-        arabic=arabic,
-        translation_ru=translation_ru,
-        transliteration=transliteration,
-        image=image,
-    )
+    with transaction.atomic():
+        phrase = Phrase.objects.create(
+            themes=[Theme.LAST_LESSON],
+            arabic=arabic,
+            translation_ru=translation_ru,
+            transliteration=transliteration,
+        )
+        _attach(phrase, "p", image)
+
+        return phrase
 
 
 def lesson_words() -> QuerySet[Word]:

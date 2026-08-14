@@ -41,15 +41,17 @@ def _headers() -> dict[str, str]:
     return {"X-Bot-Token": token}
 
 
-async def _post(path: str, fields: dict[str, object]) -> dict:
+async def _post(path: str, fields: dict[str, object], image: bytes | None = None) -> dict:
     """Шлёт запрос служебной ручке. Пустые поля не отправляет: у них есть значения по умолчанию."""
     payload = {name: value for name, value in fields.items() if value is not None}
     headers = _headers()
+    # Картинка едет файлом в том же запросе: до согласия владельца она нигде не лежит.
+    files = {"image": ("card.jpg", image, "image/jpeg")} if image else None
 
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT) as client:
             response = await client.post(
-                f"{config.BACKEND_URL}{path}", data=payload, headers=headers
+                f"{config.BACKEND_URL}{path}", data=payload, files=files, headers=headers
             )
     except httpx.HTTPError as error:
         raise BackendError(f"не дозвонился до бэкенда: {error}") from error
@@ -70,6 +72,7 @@ async def add_form(
     translation_ru: str,
     transliteration: str,
     word: int | None = None,
+    image: bytes | None = None,
 ) -> int:
     """Добавляет форму слова и отдаёт номер слова: им цепляется второе число."""
     body = await _post(
@@ -81,12 +84,19 @@ async def add_form(
             "transliteration": transliteration,
             "word": word,
         },
+        image,
     )
 
     return int(body["word"])
 
 
-async def add_phrase(*, arabic: str, translation_ru: str, transliteration: str) -> int:
+async def add_phrase(
+    *,
+    arabic: str,
+    translation_ru: str,
+    transliteration: str,
+    image: bytes | None = None,
+) -> int:
     """Добавляет фразу и отдаёт её номер."""
     body = await _post(
         PHRASES,
@@ -95,6 +105,7 @@ async def add_phrase(*, arabic: str, translation_ru: str, transliteration: str) 
             "translation_ru": translation_ru,
             "transliteration": transliteration,
         },
+        image,
     )
 
     return int(body["phrase"])

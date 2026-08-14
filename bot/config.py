@@ -17,6 +17,9 @@ MAINTENANCE_FLAG = Path(getenv("MAINTENANCE_FLAG", "/flags/maintenance"))
 BACKEND_URL = getenv("BACKEND_URL", "http://backend:8000").rstrip("/")
 BOT_API_TOKEN = getenv("BOT_API_TOKEN")
 
+# Чем бот рисует картинки к карточкам.
+FAL_KEY = getenv("FAL_KEY")
+
 
 def setup_logging() -> None:
     """Формат тот же, что у бэкенда."""

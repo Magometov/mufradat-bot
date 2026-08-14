@@ -25,6 +25,10 @@ PHRASE_COLUMNS = 4
 REQUIRED = "русское и арабское обязательны"
 
 
+class Broken(Exception):
+    """Строку не разобрать: причина словами в сообщении."""
+
+
 @dataclass(frozen=True, slots=True)
 class Card:
     """Одна карточка колоды. Без числа — фраза: чисел у неё не бывает."""
@@ -75,12 +79,44 @@ def _rows(text: str) -> list[tuple[int, list[str]]]:
     ]
 
 
-def _columns(line: int, parts: list[str], columns: int) -> Problem | None:
-    """Проверяет, что столбцов столько, сколько ждёт формат."""
-    if len(parts) == columns:
-        return None
+def _word_card(parts: list[str]) -> Card:
+    """Строка слова: пять столбцов, и число из них должно быть узнаваемо."""
+    if len(parts) != WORD_COLUMNS:
+        raise Broken(f"столбцов {len(parts)}, а нужно {WORD_COLUMNS}")
 
-    return Problem(line, f"столбцов {len(parts)}, а нужно {columns}")
+    translation_ru, written, transliteration, arabic, prompt = parts
+
+    if not translation_ru or not arabic:
+        raise Broken(REQUIRED)
+
+    number = NUMBERS.get(written.lower())
+    if number is None:
+        raise Broken(f"число «{written}» не понял: пиши «ед» или «мн»")
+
+    return Card(translation_ru, transliteration, arabic, prompt, number)
+
+
+def _phrase_card(parts: list[str]) -> Card:
+    """Строка фразы: четыре столбца, числа нет."""
+    if len(parts) != PHRASE_COLUMNS:
+        raise Broken(f"столбцов {len(parts)}, а нужно {PHRASE_COLUMNS}")
+
+    translation_ru, transliteration, arabic, prompt = parts
+
+    if not translation_ru or not arabic:
+        raise Broken(REQUIRED)
+
+    return Card(translation_ru, transliteration, arabic, prompt)
+
+
+def _single(text: str) -> list[str]:
+    """Единственная строка вставки, порезанная по разделителю."""
+    rows = _rows(text)
+
+    if len(rows) != 1:
+        raise Broken(f"строк {len(rows)}, а нужна одна")
+
+    return rows[0][1]
 
 
 def parse_words(text: str) -> Parsed:
@@ -89,25 +125,13 @@ def parse_words(text: str) -> Parsed:
     problems: list[Problem] = []
 
     for line, parts in _rows(text):
-        wrong = _columns(line, parts, WORD_COLUMNS)
-        if wrong is not None:
-            problems.append(wrong)
+        try:
+            card = _word_card(parts)
+        except Broken as error:
+            problems.append(Problem(line, str(error)))
             continue
 
-        translation_ru, written, transliteration, arabic, prompt = parts
-
-        if not translation_ru or not arabic:
-            problems.append(Problem(line, REQUIRED))
-            continue
-
-        number = NUMBERS.get(written.lower())
-        if number is None:
-            problems.append(Problem(line, f"число «{written}» не понял: пиши «ед» или «мн»"))
-            continue
-
-        card = Card(translation_ru, transliteration, arabic, prompt, number)
-
-        if number == SINGULAR:
+        if card.number == SINGULAR:
             groups.append(Group([card]))
             continue
 
@@ -130,17 +154,23 @@ def parse_phrases(text: str) -> Parsed:
     problems: list[Problem] = []
 
     for line, parts in _rows(text):
-        wrong = _columns(line, parts, PHRASE_COLUMNS)
-        if wrong is not None:
-            problems.append(wrong)
-            continue
-
-        translation_ru, transliteration, arabic, prompt = parts
-
-        if not translation_ru or not arabic:
-            problems.append(Problem(line, REQUIRED))
-            continue
-
-        groups.append(Group([Card(translation_ru, transliteration, arabic, prompt)]))
+        try:
+            groups.append(Group([_phrase_card(parts)]))
+        except Broken as error:
+            problems.append(Problem(line, str(error)))
 
     return Parsed(groups, problems)
+
+
+def one_word(text: str) -> Card:
+    """Строка слова в одиночку: ею заменяют карточку на приёмке.
+
+    Правила связи здесь не действуют — множественное приходит без соседа сверху,
+    потому что заменяет уже стоящую в очереди форму.
+    """
+    return _word_card(_single(text))
+
+
+def one_phrase(text: str) -> Card:
+    """Строка фразы в одиночку — тем же порядком."""
+    return _phrase_card(_single(text))
