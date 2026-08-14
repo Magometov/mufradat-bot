@@ -11,8 +11,6 @@ APP := backend bot
 S ?=
 N ?= 50
 OUT ?= backup-$(shell date +%F-%H%M).sql
-ONLY ?=
-DIR ?= plans/ready
 
 .DEFAULT_GOAL := help
 
@@ -85,24 +83,6 @@ deploy: ## Забрать код, пересобрать, применить м�
 	git pull
 	$(COMPOSE) up -d --build
 	$(COMPOSE) exec backend python manage.py migrate
-
-# --- Разовая правка картинок ----------------------------------------------------
-#
-# Под ревизию колоды: команда рисует по плану `backend/plans/words.json` в черновики и
-# карточек не трогает, пока не сказано `redraw-apply`. Черновики видны на /m/drafts/.
-# Всё это временное — уходит вместе с командой, когда картинки будут поправлены.
-
-.PHONY: redraw
-redraw: ## Нарисовать черновики: make redraw [ONLY="w322 w324"]
-	$(COMPOSE) exec backend python manage.py redraw $(if $(ONLY),--only $(ONLY),)
-
-.PHONY: redraw-ready
-redraw-ready: ## Взять готовые файлы в черновики: make redraw-ready [DIR=plans/ready]
-	$(COMPOSE) exec backend python manage.py redraw --ready $(DIR)
-
-.PHONY: redraw-apply
-redraw-apply: ## Перенести черновики в карточки: make redraw-apply [ONLY="w322"]
-	$(COMPOSE) exec backend python manage.py redraw --apply $(if $(ONLY),--only $(ONLY),)
 
 # --- Сервер: база --------------------------------------------------------------
 
