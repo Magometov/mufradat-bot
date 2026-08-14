@@ -4,7 +4,6 @@ from aiogram import F, Router
 from aiogram.types import Message
 
 from apps.bot import texts
-from apps.bot.keyboards import open_app
 from apps.bot.parsing import ParseError, parse_entry
 from apps.bot.permissions import is_admin
 from apps.vocabulary.kind import is_word
@@ -21,7 +20,7 @@ async def handle_text(message: Message) -> None:
         return
 
     if not is_admin(message.from_user.id):
-        await message.answer(texts.ONLY_ADMIN_ADDS, reply_markup=open_app())
+        await message.answer(texts.ONLY_ADMIN_ADDS)
         return
 
     lines = [line.strip() for line in message.text.splitlines()]

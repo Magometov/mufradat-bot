@@ -6,7 +6,7 @@ from aiogram.enums import ParseMode
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from apps.bot.handlers import add, prompt, start
+from apps.bot.handlers import add, start
 from apps.bot.keyboards import menu_button
 
 
@@ -27,10 +27,9 @@ class Command(BaseCommand):
             default=DefaultBotProperties(parse_mode=ParseMode.HTML),
         )
         dispatcher = Dispatcher()
-        # Порядок важен: команды и кнопки разбираются раньше свободного текста,
-        # иначе нажатие кнопки уедет в разбор карточки.
+        # Порядок важен: команды разбираются раньше свободного текста, иначе «/start»
+        # уедет в разбор карточки.
         dispatcher.include_router(start.router)
-        dispatcher.include_router(prompt.router)
         dispatcher.include_router(add.router)
 
         me = await bot.get_me()
