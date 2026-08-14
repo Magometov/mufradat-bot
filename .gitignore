@@ -11,5 +11,7 @@ media/
 *.sql
 # Признак техработ — состояние сервера, а не код.
 flags/maintenance
-static/
+# Только STATIC_ROOT: собранное collectstatic. Правило без пути прятало бы и static/
+# самих приложений — их стили тогда не доехали бы до сервера.
+/backend/static/
 .DS_Store

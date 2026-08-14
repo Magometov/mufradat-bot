@@ -1,0 +1,20 @@
+/* Инлайн форм слова. Подключён через Media у WordFormInline. */
+
+/* Огласовки — мелкие значки над буквами: шрифтом админки их не разобрать.
+   Ширина задана явно: у поля админки она в em и на крупном шрифте разъезжается. */
+.WordFormArabic {
+    direction: rtl;
+    text-align: right;
+    font-size: 1.6rem;
+    line-height: 1.6;
+    width: 20rem;
+}
+
+/* Превью над полем файла: видно, что за картинка, не открывая её. */
+.WordFormPreview {
+    display: block;
+    max-width: 16rem;
+    max-height: 8rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.4rem;
+}
