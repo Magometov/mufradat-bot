@@ -55,7 +55,7 @@
 
         <p :class="$style.RunControls__counter">{{ props.position }} / {{ props.total }}</p>
 
-        <UiButton @click="handleNext">{{ props.hasNext ? 'Далее' : 'Готово' }}</UiButton>
+        <UiButton variant="accent" @click="handleNext">{{ props.hasNext ? 'Далее' : 'Готово' }}</UiButton>
     </footer>
 </template>
 

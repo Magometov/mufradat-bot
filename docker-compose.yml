@@ -4,9 +4,9 @@ services:
     container_name: db
     restart: always
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_NAME}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_NAME:-mufradat}
     ports:
       - "${POSTGRES_PORT:-5433}:5432"
     volumes:
@@ -17,5 +17,55 @@ services:
       timeout: 5s
       retries: 10
 
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: mufradat-backend
+    restart: always
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-local-secret-key-change-me}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-true}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_NAME: ${POSTGRES_NAME:-mufradat}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      BOT_API_TOKEN: ${BOT_API_TOKEN:-local-token}
+      BOT_TOKEN: ${BOT_TOKEN:-}
+      ADMIN_TELEGRAM_ID: ${ADMIN_TELEGRAM_ID:-0}
+    volumes:
+      - media:/app/media
+      - static:/app/static
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  caddy:
+    build: ./frontend
+    container_name: mufradat-caddy
+    restart: always
+    environment:
+      DOMAIN: ${DOMAIN:-:80}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./flags:/flags:ro
+      - media:/var/www/media:ro
+      - static:/var/www/static:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - backend
+
 volumes:
   pgdata:
+  media:
+  static:
+  caddy-data:
+  caddy-config:

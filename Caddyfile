@@ -1,92 +1,99 @@
 # Адрес берётся из переменной DOMAIN. Домен — сертификат выпускается сам; для проверки
 # на своей машине ставится «:80», и тогда Caddy работает без https.
 {$DOMAIN} {
-        encode zstd gzip
+    encode zstd gzip
 
-        # Кэширование статики: уменьшает нагрузку и ускоряет повторные загрузки.
-        # Версионированные файлы (с хэшем в имени) кэшируются надолго, остальные — кратко.
-        @versioned_static path /s/*.*
-        handle @versioned_static {
-                header Cache-Control "public, max-age=31536000, immutable"
-                header Access-Control-Allow-Origin "*"
-                root * /srv
-                file_server
-        }
+    # Кэширование статики: уменьшает нагрузку и ускоряет повторные загрузки.
+    # Версионированные файлы (с хэшем в имени) кэшируются надолго, остальные — кратко.
+    @versioned_static path /s/*.*
+    handle @versioned_static {
+        header Cache-Control "public, max-age=31536000, immutable"
+        header Access-Control-Allow-Origin "*"
+        root * /srv
+        file_server
+    }
 
-        @static path /s/*
-        handle @static {
-                header Cache-Control "public, max-age=3600"
-                header Access-Control-Allow-Origin "*"
-                root * /srv
-                file_server
-        }
+    @static path /s/*
+    handle @static {
+        header Cache-Control "public, max-age=3600"
+        header Access-Control-Allow-Origin "*"
+        root * /srv
+        file_server
+    }
 
-        # --- Заглушка на время работ ---------------------------------------------------
-        #
-        # Признак — файл `flags/maintenance` в каталоге проекта. Caddy проверяет его на
-        # каждом запросе, поэтому включение и снятие мгновенные: `touch` и `rm`, без
-        # пересоздания контейнеров. Переменная окружения так не умеет — её читают один раз
-        # при запуске.
-        #
-        # Закрывается приложение и API, но не админка: ею правится как раз то, из-за чего
-        # работы. Заглушка стоит в Caddy, а не в Django, потому что Django в это время
-        # пересобирается и мигрирует, а Caddy остаётся на ногах.
+    # --- Заглушка на время работ ---------------------------------------------------
+    #
+    # Признак — файл `flags/maintenance` в каталоге проекта. Caddy проверяет его на
+    # каждом запросе, поэтому включение и снятие мгновенные: `touch` и `rm`, без
+    # пересоздания контейнеров. Переменная окружения так не умеет — её читают один раз
+    # при запуске.
+    #
+    # Закрывается приложение и API, но не админка: ею правится как раз то, из-за чего
+    # работы. Заглушка стоит в Caddy, а не в Django, потому что Django в это время
+    # пересобирается и мигрирует, а Caddy остаётся на ногах.
 
-        # API отвечает кодом, а не страницей: приложение, открытое до начала работ, должно
-        # понять, что сервер закрыт, а не разбирать HTML как колоду.
-        @closed_api {
-                file {
-                        root /flags
-                        try_files maintenance
-                }
-                path /api/*
+    # API отвечает кодом, а не страницей: приложение, открытое до начала работ, должно
+    # понять, что сервер закрыт, а не разбирать HTML как колоду.
+    @closed_api {
+        file {
+            root /flags
+            try_files maintenance
         }
-        handle @closed_api {
-                respond "Технические работы" 503
-        }
+        path /api/*
+    }
+    handle @closed_api {
+        respond "Технические работы" 503
+    }
 
-        @closed {
-                file {
-                        root /flags
-                        try_files maintenance
-                }
-                not path /admin/* /s/*
+    @closed {
+        file {
+            root /flags
+            try_files maintenance
         }
-        handle @closed {
-                root * /srv
-                rewrite * /maintenance.html
-                file_server
-        }
+        not path /admin/* /s/* /m/*
+    }
+    handle @closed {
+        root * /srv
+        rewrite * /maintenance.html
+        file_server
+    }
 
-        # --- Обычная работа ------------------------------------------------------------
+    # --- Обычная работа ------------------------------------------------------------
 
-        # API и админка — в Django. Caddy сам добавляет X-Forwarded-Proto, поэтому Django
-        # собирает адрес картинок с правильной схемой.
-        @django path /api/* /admin/* /m/*
-        handle @django {
-                reverse_proxy backend:8000 {
-                        header_up Access-Control-Allow-Origin "*"
-                }
-        }
+    # Картинки — файлами, минуя Django. CORS нужен для crossorigin="anonymous"
+    # на <img>: без него браузер врежет картинку при проверке.
+    handle_path /m/* {
+        header Cache-Control "public, max-age=3600"
+        header Access-Control-Allow-Origin "*"
+        root * /var/www/media
+        file_server
+    }
 
-        # Служебные ручки бота. Бот ходит к Django внутри сети докера, поэтому запрет
-        # снаружи ему ничего не стоит, а токен остаётся вторым слоем, а не единственным.
-        @internal path /api/v1/internal/*
-        handle @internal {
-                respond 404
-        }
+    # API и админка — в Django. Caddy сам добавляет X-Forwarded-Proto, поэтому Django
+    # собирает адрес картинок с правильной схемой.
+    @django path /api/* /admin/*
+    handle @django {
+        reverse_proxy backend:8000
+    }
 
-        # Статика приложения — файлами, минуя Django.
-        handle_path /s/* {
-                root * /srv
-                file_server
-        }
+    # Служебные ручки бота. Бот ходит к Django внутри сети докера, поэтому запрет
+    # снаружи ему ничего не стоит, а токен остаётся вторым слоем, а не единственным.
+    @internal path /api/v1/internal/*
+    handle @internal {
+        respond 404
+    }
 
-        # Всё остальное — собранное приложение. try_files нужен, чтобы прямой заход по
-        # любому пути отдавал index.html, а не 404.
-        handle {
-                root * /srv
-                try_files {path} /index.html
-                file_server
-        }
+    # Статика приложения — файлами, минуя Django.
+    handle_path /s/* {
+        root * /srv
+        file_server
+    }
+
+    # Всё остальное — собранное приложение. try_files нужен, чтобы прямой заход по
+    # любому пути отдавал index.html, а не 404.
+    handle {
+        root * /srv
+        try_files {path} /index.html
+        file_server
+    }
 }

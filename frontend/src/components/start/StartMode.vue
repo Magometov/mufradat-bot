@@ -44,7 +44,7 @@
         </p>
 
         <div v-else :class="$style.StartMode__choice">
-            <UiButton @click="handleSelect('words')">{{ MODE_TITLES.words }}</UiButton>
+            <UiButton variant="accent" @click="handleSelect('words')">{{ MODE_TITLES.words }}</UiButton>
 
             <UiButton variant="soft" @click="handleSelect('all')">{{ MODE_TITLES.all }}</UiButton>
         </div>

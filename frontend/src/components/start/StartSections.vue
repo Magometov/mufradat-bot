@@ -41,9 +41,6 @@
     // #endregion
 
     // #region Constants
-    /**
-     * Маппинг slug раздела на иконку.
-     */
     const SECTION_ICONS: Record<string, any> = {
         last_lesson: BookOpen,
         numbers: Hash,
@@ -59,46 +56,28 @@
     // #endregion
 
     // #region Computed
-    /**
-     * Первый раздел — "Из последнего урока", его надо выделить.
-     */
     const lastLessonSection = computed<ITheme | undefined>(() => {
         return props.sections.find((section) => section.slug === 'last_lesson');
     });
 
-    /**
-     * Остальные разделы без "Из последнего урока".
-     */
     const otherSections = computed<ITheme[]>(() => {
         return props.sections.filter((section) => section.slug !== 'last_lesson');
     });
     // #endregion
 
     // #region Methods
-    /**
-     * Прогон по всему выбранному режиму, без деления на разделы.
-     */
     function handleSelectAll(): void {
         emit('select', null);
     }
 
-    /**
-     * Прогон по одному разделу.
-     */
     function handleSelect(slug: string): void {
         emit('select', slug);
     }
 
-    /**
-     * Возвращает к выбору режима.
-     */
     function handleBack(): void {
         emit('back');
     }
 
-    /**
-     * Возвращает иконку для раздела.
-     */
     function getIconForSection(slug: string): any {
         return SECTION_ICONS[slug] || DEFAULT_ICON;
     }
@@ -114,9 +93,8 @@
         </header>
 
         <div :class="$style.StartSections__choice">
-            <!-- Раздел "Из последнего урока" выделен отдельно с акцентным стилем и иконкой -->
             <div v-if="lastLessonSection" :class="$style.StartSections__lastLesson">
-                <UiButton variant="accent" @click="handleSelect(lastLessonSection.slug)">
+                <UiButton variant="accent" size="large" @click="handleSelect(lastLessonSection.slug)">
                     <component :is="getIconForSection(lastLessonSection.slug)" :size="20" :class="$style.StartSections__icon" />
                     {{ lastLessonSection.name }}
                 </UiButton>
@@ -124,7 +102,6 @@
 
             <UiButton variant="soft" size="large" @click="handleSelectAll">Все разделы</UiButton>
 
-            <!-- Остальные разделы сеткой с иконками -->
             <div v-if="otherSections.length > 0" :class="$style.StartSections__list">
                 <UiButton
                     v-for="section in otherSections"
@@ -166,11 +143,10 @@
             gap: 2rem;
         }
 
-        // Выделенный раздел "Из последнего урока" идёт с акцентным стилем и иконкой.
         &__lastLesson {
             margin-bottom: 0.5rem;
 
-            .UiButton--accent {
+            > * {
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -189,7 +165,6 @@
             opacity: 0.8;
         }
 
-        // Кнопка "Все разделы" того же размера, что и "Из последнего урока".
         &__choice > .UiButton--soft {
             display: flex;
             align-items: center;
@@ -198,7 +173,6 @@
             font-weight: 500;
         }
 
-        // Две колонки: длинные названия переносятся, кнопки тянутся по высоте строки.
         &__list {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -211,8 +185,6 @@
                 gap: 0.6rem;
             }
 
-            // Разделов может остаться нечётное число, и последний висел бы половинкой
-            // в левой колонке. Условие на `nth-child(odd)` держит вид и при чётном списке.
             > *:last-child:nth-child(odd) {
                 grid-column: 1 / -1;
             }
