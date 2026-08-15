@@ -116,13 +116,13 @@
         <div :class="$style.StartSections__choice">
             <!-- Раздел "Из последнего урока" выделен отдельно с акцентным стилем и иконкой -->
             <div v-if="lastLessonSection" :class="$style.StartSections__lastLesson">
-                <UiButton variant="primary" @click="handleSelect(lastLessonSection.slug)">
+                <UiButton variant="accent" @click="handleSelect(lastLessonSection.slug)">
                     <component :is="getIconForSection(lastLessonSection.slug)" :size="20" :class="$style.StartSections__icon" />
                     {{ lastLessonSection.name }}
                 </UiButton>
             </div>
 
-            <UiButton variant="soft" @click="handleSelectAll">Все разделы</UiButton>
+            <UiButton variant="soft" size="large" @click="handleSelectAll">Все разделы</UiButton>
 
             <!-- Остальные разделы сеткой с иконками -->
             <div v-if="otherSections.length > 0" :class="$style.StartSections__list">
@@ -170,7 +170,7 @@
         &__lastLesson {
             margin-bottom: 0.5rem;
 
-            .UiButton--primary {
+            .UiButton--accent {
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -187,6 +187,15 @@
         &__iconSmall {
             flex-shrink: 0;
             opacity: 0.8;
+        }
+
+        // Кнопка "Все разделы" того же размера, что и "Из последнего урока".
+        &__choice > .UiButton--soft {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            font-weight: 500;
         }
 
         // Две колонки: длинные названия переносятся, кнопки тянутся по высоте строки.
