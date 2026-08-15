@@ -3,6 +3,9 @@
     // Types
     import type { ITheme } from '../../types/theme';
 
+    // Vue
+    import { computed } from 'vue';
+
     // Components
     import UiButton from '../ui/UiButton.vue';
     // #endregion
@@ -22,6 +25,23 @@
         select: [theme: string | null];
         back: [];
     }>();
+    // #endregion
+
+    // #region Computed
+    /**
+     * Первый раздел — "Из последнего урока", его надо выделить.
+     */
+    const lastLessonSlug = computed<string | null>(() => {
+        const lastLesson = props.sections.find((section) => section.slug === 'last_lesson');
+        return lastLesson ? lastLesson.slug : null;
+    });
+
+    /**
+     * Остальные разделы без "Из последнего урока".
+     */
+    const otherSections = computed<ITheme[]>(() => {
+        return props.sections.filter((section) => section.slug !== 'last_lesson');
+    });
     // #endregion
 
     // #region Methods
@@ -59,9 +79,17 @@
         <div :class="$style.StartSections__choice">
             <UiButton @click="handleSelectAll">Все разделы</UiButton>
 
-            <div v-if="props.sections.length > 0" :class="$style.StartSections__list">
+            <!-- Раздел "Из последнего урока" выделен отдельно -->
+            <div v-if="lastLessonSlug" :class="$style.StartSections__lastLesson">
+                <UiButton variant="primary" @click="handleSelect(lastLessonSlug)">
+                    Из последнего урока
+                </UiButton>
+            </div>
+
+            <!-- Остальные разделы сеткой -->
+            <div v-if="otherSections.length > 0" :class="$style.StartSections__list">
                 <UiButton
-                    v-for="section in props.sections"
+                    v-for="section in otherSections"
                     :key="section.slug"
                     variant="soft"
                     @click="handleSelect(section.slug)"
@@ -110,6 +138,11 @@
             > *:last-child:nth-child(odd) {
                 grid-column: 1 / -1;
             }
+        }
+
+        // Выделенный раздел "Из последнего урока" идёт на всю ширину с акцентным стилем.
+        &__lastLesson {
+            margin-bottom: 0.5rem;
         }
     }
 </style>

@@ -96,6 +96,9 @@
                         :src="props.card.entry.image"
                         :alt="props.card.entry.translation_ru"
                         decoding="async"
+                        loading="lazy"
+                        width="400"
+                        height="260"
                     />
                 </div>
             </div>
