@@ -3,6 +3,29 @@
 {$DOMAIN} {
 	encode zstd gzip
 
+
+# Кэширование статики и медиа: уменьшает нагрузку и ускоряет повторные загрузки.
+# Версионированные файлы (с хэшем в имени) кэшируются надолго, остальные — кратко.
+@versioned_static path /s/*.* /m/*.*
+handle @versioned_static {
+header Cache-Control "public, max-age=31536000, immutable"
+root * /var/www/static
+file_server
+}
+
+@static path /s/*
+handle @static {
+header Cache-Control "public, max-age=3600"
+root * /var/www/static
+file_server
+}
+
+@media path /m/*
+handle @media {
+header Cache-Control "public, max-age=86400, must-revalidate"
+root * /var/www/media
+file_server
+}
 	# --- Заглушка на время работ ---------------------------------------------------
 	#
 	# Признак — файл `flags/maintenance` в каталоге проекта. Caddy проверяет его на
