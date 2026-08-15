@@ -99,7 +99,7 @@
                         loading="lazy"
                         width="400"
                         height="260"
-                        referrerpolicy="no-referrer"
+                        crossorigin="anonymous"
                     />
                 </div>
             </div>

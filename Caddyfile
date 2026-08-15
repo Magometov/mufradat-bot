@@ -3,13 +3,13 @@
 {$DOMAIN} {
         encode zstd gzip
 
-        # Кэширование статики и медиа: уменьшает нагрузку и ускоряет повторные загрузки.
+        # Кэширование статики: уменьшает нагрузку и ускоряет повторные загрузки.
         # Версионированные файлы (с хэшем в имени) кэшируются надолго, остальные — кратко.
-        @versioned_static path /s/*.* /m/*.*
+        @versioned_static path /s/*.*
         handle @versioned_static {
                 header Cache-Control "public, max-age=31536000, immutable"
                 header Access-Control-Allow-Origin "*"
-                root * /var/www/static
+                root * /srv
                 file_server
         }
 
@@ -17,15 +17,7 @@
         handle @static {
                 header Cache-Control "public, max-age=3600"
                 header Access-Control-Allow-Origin "*"
-                root * /var/www/static
-                file_server
-        }
-
-        @media path /m/*
-        handle @media {
-                header Cache-Control "public, max-age=604800, must-revalidate"
-                header Access-Control-Allow-Origin "*"
-                root * /var/www/media
+                root * /srv
                 file_server
         }
 
@@ -58,7 +50,7 @@
                         root /flags
                         try_files maintenance
                 }
-                not path /admin/* /s/* /m/*
+                not path /admin/* /s/*
         }
         handle @closed {
                 root * /srv
@@ -68,15 +60,13 @@
 
         # --- Обычная работа ------------------------------------------------------------
 
-        # Картинки карточек и статика админки уходят файлами, минуя Django.
-        handle_path /m/* {
-                root * /var/www/media
-                file_server
-        }
-
-        handle_path /s/* {
-                root * /var/www/static
-                file_server
+        # API и админка — в Django. Caddy сам добавляет X-Forwarded-Proto, поэтому Django
+        # собирает адрес картинок с правильной схемой.
+        @django path /api/* /admin/* /m/*
+        handle @django {
+                reverse_proxy backend:8000 {
+                        header_up Access-Control-Allow-Origin "*"
+                }
         }
 
         # Служебные ручки бота. Бот ходит к Django внутри сети докера, поэтому запрет
@@ -86,11 +76,10 @@
                 respond 404
         }
 
-        # API и админка — в Django. Caddy сам добавляет X-Forwarded-Proto, поэтому Django
-        # собирает адрес картинок с правильной схемой.
-        @django path /api/* /admin/*
-        handle @django {
-                reverse_proxy backend:8000
+        # Статика приложения — файлами, минуя Django.
+        handle_path /s/* {
+                root * /srv
+                file_server
         }
 
         # Всё остальное — собранное приложение. try_files нужен, чтобы прямой заход по

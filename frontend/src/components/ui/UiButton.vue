@@ -5,16 +5,21 @@
     // #endregion
 
     // #region Props
-    const props = withDefaults(defineProps<IUiButtonProps>(), {
+    const props = withDefaults(defineProps<IUiButtonProps & { size?: 'default' | 'large' }>(), {
         variant: 'primary',
         isDisabled: false,
+        size: 'default',
     });
     // #endregion
 </script>
 
 <template>
     <button
-        :class="[$style.UiButton, $style[`UiButton--${props.variant}`]]"
+        :class="[
+            $style.UiButton,
+            $style[`UiButton--${props.variant}`],
+            $style[`UiButton--${props.size}`],
+        ]"
         :disabled="props.isDisabled"
         type="button"
     >
@@ -63,6 +68,12 @@
             color: var(--base-500);
             font-size: 1.4rem;
             font-weight: 400;
+        }
+
+        &--large {
+            padding: 1.6rem 2.4rem;
+            font-size: 1.7rem;
+            font-weight: 600;
         }
     }
 </style>
