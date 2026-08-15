@@ -45,6 +45,12 @@
             color: var(--on-primary);
         }
 
+        &--accent {
+            background: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-400) 100%);
+            color: var(--on-primary);
+            box-shadow: 0 4px 12px rgba(var(--primary-500-rgb), 0.3);
+        }
+
         &--soft {
             border-color: var(--base-200);
             background: var(--base-50);

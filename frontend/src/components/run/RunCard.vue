@@ -99,6 +99,7 @@
                         loading="lazy"
                         width="400"
                         height="260"
+                        referrerpolicy="no-referrer"
                     />
                 </div>
             </div>
@@ -184,10 +185,14 @@
         // Только максимальные ограничения: растянуть маленький файл — значит сделать
         // мыло заметнее, резкости от этого не появится.
         &__image {
+            display: block;
+            width: auto;
+            height: auto;
             max-width: 100%;
             max-height: 26rem;
             border-radius: 0.8rem;
             object-fit: contain;
+            background: var(--base-50);
         }
     }
 </style>

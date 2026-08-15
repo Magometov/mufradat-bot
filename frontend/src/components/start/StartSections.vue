@@ -8,6 +8,19 @@
 
     // Components
     import UiButton from '../ui/UiButton.vue';
+
+    // Icons
+    import { 
+        BookOpen, 
+        Hash, 
+        Users, 
+        Handshake, 
+        Zap, 
+        ArrowLeftRight, 
+        FileText, 
+        HelpCircle,
+        Layers
+    } from '@lucide/vue';
     // #endregion
 
     // #region Props
@@ -27,13 +40,30 @@
     }>();
     // #endregion
 
+    // #region Constants
+    /**
+     * Маппинг slug раздела на иконку.
+     */
+    const SECTION_ICONS: Record<string, any> = {
+        last_lesson: BookOpen,
+        numbers: Hash,
+        family: Users,
+        greetings: Handshake,
+        verbs: Zap,
+        antonyms: ArrowLeftRight,
+        nouns: FileText,
+        questions: HelpCircle,
+    };
+
+    const DEFAULT_ICON = Layers;
+    // #endregion
+
     // #region Computed
     /**
      * Первый раздел — "Из последнего урока", его надо выделить.
      */
-    const lastLessonSlug = computed<string | null>(() => {
-        const lastLesson = props.sections.find((section) => section.slug === 'last_lesson');
-        return lastLesson ? lastLesson.slug : null;
+    const lastLessonSection = computed<ITheme | undefined>(() => {
+        return props.sections.find((section) => section.slug === 'last_lesson');
     });
 
     /**
@@ -65,6 +95,13 @@
     function handleBack(): void {
         emit('back');
     }
+
+    /**
+     * Возвращает иконку для раздела.
+     */
+    function getIconForSection(slug: string): any {
+        return SECTION_ICONS[slug] || DEFAULT_ICON;
+    }
     // #endregion
 </script>
 
@@ -77,16 +114,17 @@
         </header>
 
         <div :class="$style.StartSections__choice">
-            <UiButton @click="handleSelectAll">Все разделы</UiButton>
-
-            <!-- Раздел "Из последнего урока" выделен отдельно -->
-            <div v-if="lastLessonSlug" :class="$style.StartSections__lastLesson">
-                <UiButton variant="primary" @click="handleSelect(lastLessonSlug)">
-                    Из последнего урока
+            <!-- Раздел "Из последнего урока" выделен отдельно с акцентным стилем и иконкой -->
+            <div v-if="lastLessonSection" :class="$style.StartSections__lastLesson">
+                <UiButton variant="primary" @click="handleSelect(lastLessonSection.slug)">
+                    <component :is="getIconForSection(lastLessonSection.slug)" :size="20" :class="$style.StartSections__icon" />
+                    {{ lastLessonSection.name }}
                 </UiButton>
             </div>
 
-            <!-- Остальные разделы сеткой -->
+            <UiButton variant="soft" @click="handleSelectAll">Все разделы</UiButton>
+
+            <!-- Остальные разделы сеткой с иконками -->
             <div v-if="otherSections.length > 0" :class="$style.StartSections__list">
                 <UiButton
                     v-for="section in otherSections"
@@ -94,6 +132,7 @@
                     variant="soft"
                     @click="handleSelect(section.slug)"
                 >
+                    <component :is="getIconForSection(section.slug)" :size="18" :class="$style.StartSections__iconSmall" />
                     {{ section.name }}
                 </UiButton>
             </div>
@@ -127,22 +166,47 @@
             gap: 2rem;
         }
 
+        // Выделенный раздел "Из последнего урока" идёт с акцентным стилем и иконкой.
+        &__lastLesson {
+            margin-bottom: 0.5rem;
+
+            .UiButton--primary {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 0.8rem;
+                width: 100%;
+                font-weight: 600;
+            }
+        }
+
+        &__icon {
+            flex-shrink: 0;
+        }
+
+        &__iconSmall {
+            flex-shrink: 0;
+            opacity: 0.8;
+        }
+
         // Две колонки: длинные названия переносятся, кнопки тянутся по высоте строки.
         &__list {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 1rem;
 
+            .UiButton--soft {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 0.6rem;
+            }
+
             // Разделов может остаться нечётное число, и последний висел бы половинкой
             // в левой колонке. Условие на `nth-child(odd)` держит вид и при чётном списке.
             > *:last-child:nth-child(odd) {
                 grid-column: 1 / -1;
             }
-        }
-
-        // Выделенный раздел "Из последнего урока" идёт на всю ширину с акцентным стилем.
-        &__lastLesson {
-            margin-bottom: 0.5rem;
         }
     }
 </style>
