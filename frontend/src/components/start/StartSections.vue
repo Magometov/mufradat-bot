@@ -14,14 +14,14 @@
     // Icons
     import {
         ArrowLeftRight,
-        BookOpen,
-        Handshake,
+        Activity,
+        Box,
         Hash,
         HelpCircle,
-        FileText,
         Layers,
+        MessageCircle,
+        Sparkles,
         Users,
-        Zap,
     } from '@lucide/vue';
     // #endregion
 
@@ -43,14 +43,16 @@
     // #endregion
 
     // #region Constants
+    // Значок должен подсказывать содержимое, а не украшать кнопку: рукопожатие у
+    // «Знакомства» и молния у «Глаголов» не подсказывали ничего.
     const SECTION_ICONS: Record<string, Component> = {
-        last_lesson: BookOpen,
+        last_lesson: Sparkles,
         numbers: Hash,
         family: Users,
-        greetings: Handshake,
-        verbs: Zap,
+        greetings: MessageCircle,
+        verbs: Activity,
         antonyms: ArrowLeftRight,
-        nouns: FileText,
+        nouns: Box,
         questions: HelpCircle,
     };
 
@@ -93,7 +95,7 @@
     }
 
     /**
-     * Иконка раздела; у незнакомого кода — общая.
+     * Значок раздела; у незнакомого кода — общий.
      */
     function getIconForSection(slug: string): Component {
         return SECTION_ICONS[slug] ?? DEFAULT_ICON;
@@ -104,7 +106,7 @@
 <template>
     <section :class="$style.StartSections">
         <header :class="$style.StartSections__head">
-            <UiButton variant="ghost" @click="handleBack">← Назад</UiButton>
+            <UiButton variant="ghost" @click="handleBack">←</UiButton>
 
             <h2 :class="$style.StartSections__title">{{ props.title }}</h2>
         </header>
@@ -117,18 +119,13 @@
                 size="large"
                 @click="handleSelect(pinnedSection.slug)"
             >
-                <component
-                    :is="getIconForSection(pinnedSection.slug)"
-                    :size="20"
-                    :class="$style.StartSections__icon"
-                />
+                <component :is="getIconForSection(pinnedSection.slug)" :size="20" />
                 {{ pinnedSection.name }}
             </UiButton>
 
             <UiButton
                 :class="$style.StartSections__button"
-                variant="soft"
-                size="large"
+                variant="plain"
                 @click="handleSelectAll"
             >
                 Все разделы
@@ -139,13 +136,13 @@
                     v-for="section in otherSections"
                     :key="section.slug"
                     :class="$style.StartSections__button"
-                    variant="soft"
+                    variant="plain"
                     @click="handleSelect(section.slug)"
                 >
                     <component
                         :is="getIconForSection(section.slug)"
-                        :size="18"
-                        :class="$style.StartSections__iconSmall"
+                        :size="20"
+                        :class="$style.StartSections__icon"
                     />
                     {{ section.name }}
                 </UiButton>
@@ -164,13 +161,12 @@
         &__head {
             display: flex;
             align-items: center;
-            gap: 0.8rem;
+            gap: 0.4rem;
         }
 
         &__title {
-            margin: 0;
-            font-size: 1.6rem;
-            font-weight: 500;
+            font-size: 1.9rem;
+            font-weight: 600;
         }
 
         &__choice {
@@ -178,32 +174,26 @@
             flex: 1;
             flex-direction: column;
             justify-content: center;
-            gap: 2rem;
+            gap: 1.2rem;
         }
 
         // Раскладка кнопки задаётся здесь, а не через её класс из UiButton: там свой
         // CSS-модуль, и его имена в этом файле не совпадут с настоящими.
         &__button {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.8rem;
             width: 100%;
+            // Подпись переносится, а не режется: «Существительные» в половину ширины
+            // одной строкой не помещается, а сокращать название незачем.
+            text-wrap: balance;
         }
 
         &__icon {
-            flex-shrink: 0;
-        }
-
-        &__iconSmall {
-            flex-shrink: 0;
-            opacity: 0.8;
+            color: var(--muted);
         }
 
         &__list {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 1rem;
+            gap: 1.2rem;
 
             // Нечётная последняя кнопка занимает ряд целиком, иначе рядом дыра.
             > *:last-child:nth-child(odd) {
