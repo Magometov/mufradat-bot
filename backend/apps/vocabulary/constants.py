@@ -13,7 +13,7 @@ class Number(models.IntegerChoices):
 class Theme(models.TextChoices):
     """Разделы колоды: по ним собраны кнопки на главной, порядок здесь — порядок кнопок."""
 
-    LAST_LESSON = "last_lesson", "Из последнего урока"
+    LAST_LESSON = "last_lesson", "Новое в колоде"
     NUMBERS = "numbers", "Цифры"
     FAMILY = "family", "Семья"
     GREETINGS = "greetings", "Знакомство"
