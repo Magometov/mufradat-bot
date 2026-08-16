@@ -1,6 +1,8 @@
 <script setup lang="ts">
     // #region Imports
     // Types
+    import type { Component } from 'vue';
+
     import type { ITheme } from '../../types/theme';
 
     // Vue
@@ -10,16 +12,16 @@
     import UiButton from '../ui/UiButton.vue';
 
     // Icons
-    import { 
-        BookOpen, 
-        Hash, 
-        Users, 
-        Handshake, 
-        Zap, 
-        ArrowLeftRight, 
-        FileText, 
+    import {
+        ArrowLeftRight,
+        BookOpen,
+        Handshake,
+        Hash,
         HelpCircle,
-        Layers
+        FileText,
+        Layers,
+        Users,
+        Zap,
     } from '@lucide/vue';
     // #endregion
 
@@ -41,7 +43,7 @@
     // #endregion
 
     // #region Constants
-    const SECTION_ICONS: Record<string, any> = {
+    const SECTION_ICONS: Record<string, Component> = {
         last_lesson: BookOpen,
         numbers: Hash,
         family: Users,
@@ -52,34 +54,49 @@
         questions: HelpCircle,
     };
 
-    const DEFAULT_ICON = Layers;
+    const DEFAULT_ICON: Component = Layers;
+
+    // Накопитель свежих карточек висит первым и крупнее прочих: его открывают чаще всего.
+    const PINNED = 'last_lesson';
     // #endregion
 
     // #region Computed
-    const lastLessonSection = computed<ITheme | undefined>(() => {
-        return props.sections.find((section) => section.slug === 'last_lesson');
-    });
+    const pinnedSection = computed<ITheme | undefined>(() =>
+        props.sections.find((section) => section.slug === PINNED),
+    );
 
-    const otherSections = computed<ITheme[]>(() => {
-        return props.sections.filter((section) => section.slug !== 'last_lesson');
-    });
+    const otherSections = computed<ITheme[]>(() =>
+        props.sections.filter((section) => section.slug !== PINNED),
+    );
     // #endregion
 
     // #region Methods
+    /**
+     * Просит прогон по всем разделам режима.
+     */
     function handleSelectAll(): void {
         emit('select', null);
     }
 
+    /**
+     * Просит прогон по одному разделу.
+     */
     function handleSelect(slug: string): void {
         emit('select', slug);
     }
 
+    /**
+     * Возвращает на выбор режима.
+     */
     function handleBack(): void {
         emit('back');
     }
 
-    function getIconForSection(slug: string): any {
-        return SECTION_ICONS[slug] || DEFAULT_ICON;
+    /**
+     * Иконка раздела; у незнакомого кода — общая.
+     */
+    function getIconForSection(slug: string): Component {
+        return SECTION_ICONS[slug] ?? DEFAULT_ICON;
     }
     // #endregion
 </script>
@@ -93,23 +110,43 @@
         </header>
 
         <div :class="$style.StartSections__choice">
-            <div v-if="lastLessonSection" :class="$style.StartSections__lastLesson">
-                <UiButton variant="accent" size="large" @click="handleSelect(lastLessonSection.slug)">
-                    <component :is="getIconForSection(lastLessonSection.slug)" :size="20" :class="$style.StartSections__icon" />
-                    {{ lastLessonSection.name }}
-                </UiButton>
-            </div>
+            <UiButton
+                v-if="pinnedSection"
+                :class="$style.StartSections__button"
+                variant="accent"
+                size="large"
+                @click="handleSelect(pinnedSection.slug)"
+            >
+                <component
+                    :is="getIconForSection(pinnedSection.slug)"
+                    :size="20"
+                    :class="$style.StartSections__icon"
+                />
+                {{ pinnedSection.name }}
+            </UiButton>
 
-            <UiButton variant="soft" size="large" @click="handleSelectAll">Все разделы</UiButton>
+            <UiButton
+                :class="$style.StartSections__button"
+                variant="soft"
+                size="large"
+                @click="handleSelectAll"
+            >
+                Все разделы
+            </UiButton>
 
             <div v-if="otherSections.length > 0" :class="$style.StartSections__list">
                 <UiButton
                     v-for="section in otherSections"
                     :key="section.slug"
+                    :class="$style.StartSections__button"
                     variant="soft"
                     @click="handleSelect(section.slug)"
                 >
-                    <component :is="getIconForSection(section.slug)" :size="18" :class="$style.StartSections__iconSmall" />
+                    <component
+                        :is="getIconForSection(section.slug)"
+                        :size="18"
+                        :class="$style.StartSections__iconSmall"
+                    />
                     {{ section.name }}
                 </UiButton>
             </div>
@@ -131,6 +168,7 @@
         }
 
         &__title {
+            margin: 0;
             font-size: 1.6rem;
             font-weight: 500;
         }
@@ -143,17 +181,14 @@
             gap: 2rem;
         }
 
-        &__lastLesson {
-            margin-bottom: 0.5rem;
-
-            > * {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 0.8rem;
-                width: 100%;
-                font-weight: 600;
-            }
+        // Раскладка кнопки задаётся здесь, а не через её класс из UiButton: там свой
+        // CSS-модуль, и его имена в этом файле не совпадут с настоящими.
+        &__button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.8rem;
+            width: 100%;
         }
 
         &__icon {
@@ -165,26 +200,12 @@
             opacity: 0.8;
         }
 
-        &__choice > .UiButton--soft {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            font-weight: 500;
-        }
-
         &__list {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 1rem;
 
-            .UiButton--soft {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 0.6rem;
-            }
-
+            // Нечётная последняя кнопка занимает ряд целиком, иначе рядом дыра.
             > *:last-child:nth-child(odd) {
                 grid-column: 1 / -1;
             }
