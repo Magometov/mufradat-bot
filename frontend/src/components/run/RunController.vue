@@ -4,7 +4,7 @@
     import type { IRunCard, TSlide } from '../../types/run';
 
     // Vue
-    import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+    import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
     // Composables
     import { useSwipe } from '../../composables/useSwipe';
@@ -13,6 +13,9 @@
     import RunCard from './RunCard.vue';
     import RunControls from './RunControls.vue';
     import UiButton from '../ui/UiButton.vue';
+
+    // Icons
+    import { X } from '@lucide/vue';
     // #endregion
 
     // #region Props
@@ -45,6 +48,11 @@
 
     // Клавиши, которые переворачивают карточку. Пробел и Enter — то же, что нажатие.
     const FLIP_KEYS = [' ', 'Enter'] as const;
+    // #endregion
+
+    // #region Computed
+    // Полоса отвечает на «сколько осталось», счётчик внизу — на «где я именно».
+    const progress = computed<string>(() => `${(props.position / props.total) * 100}%`);
     // #endregion
 
     // #region Methods
@@ -131,7 +139,13 @@
 <template>
     <section :class="$style.RunController">
         <header :class="$style.RunController__bar">
-            <UiButton variant="ghost" @click="handleFinish">Завершить</UiButton>
+            <span :class="$style.RunController__track">
+                <i :class="$style.RunController__fill" :style="{ width: progress }"></i>
+            </span>
+
+            <UiButton variant="ghost" aria-label="Завершить прогон" @click="handleFinish">
+                <X :size="22" />
+            </UiButton>
         </header>
 
         <div ref="stage" :class="$style.RunController__stage">
@@ -161,7 +175,24 @@
 
         &__bar {
             display: flex;
-            justify-content: flex-end;
+            align-items: center;
+            gap: 1.8rem;
+        }
+
+        &__track {
+            flex: 1;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--track);
+            overflow: hidden;
+        }
+
+        &__fill {
+            display: block;
+            height: 100%;
+            border-radius: 2px;
+            background: var(--accent);
+            transition: width 0.26s ease;
         }
 
         // Уезжающая и приезжающая карточки лежат здесь одновременно, поэтому высоту
@@ -173,6 +204,12 @@
             // Горизонталь разбираем сами, вертикаль оставляем браузеру и клиенту:
             // иначе сломается и прокрутка длинной карточки, и жесты Telegram.
             touch-action: pan-y;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .RunController__fill {
+            transition: none;
         }
     }
 </style>

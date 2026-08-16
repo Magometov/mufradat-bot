@@ -57,7 +57,7 @@
 
 <template>
     <footer :class="$style.RunControls">
-        <UiButton variant="soft" :is-disabled="!props.hasPrev" @click="handlePrev">
+        <UiButton variant="plain" :is-disabled="!props.hasPrev" @click="handlePrev">
             Назад
         </UiButton>
 
@@ -79,8 +79,8 @@
         gap: 1.2rem;
 
         &__counter {
-            color: var(--base-500);
-            font-size: 1.4rem;
+            color: var(--muted);
+            font-size: 1.5rem;
             font-variant-numeric: tabular-nums;
         }
     }

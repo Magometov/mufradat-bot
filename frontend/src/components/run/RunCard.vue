@@ -48,6 +48,16 @@
          tabindex — не для мыши: без них карточка не доступна ни с клавиатуры, ни
          скринридеру, для которого это была бы просто пара абзацев. -->
     <div :class="$style.RunCard" role="button" tabindex="0" :aria-label="hint">
+        <!-- Карточки под верхней выглядывают по краям: видно, что колода не кончилась. -->
+        <div
+            :class="[$style.RunCard__behind, $style['RunCard__behind--far']]"
+            aria-hidden="true"
+        ></div>
+        <div
+            :class="[$style.RunCard__behind, $style['RunCard__behind--near']]"
+            aria-hidden="true"
+        ></div>
+
         <div :class="[$style.RunCard__inner, props.isFlipped && $style['RunCard__inner--flipped']]">
             <!-- Лицо без модификатора: повёрнут оборот, а лицо лежит как есть. -->
             <div :class="$style.RunCard__face">
@@ -58,7 +68,6 @@
                 >
                     {{ front.text }}
                 </p>
-                <p :class="$style.RunCard__hint">{{ hint }}</p>
             </div>
 
             <div :class="[$style.RunCard__face, $style['RunCard__face--back']]">
@@ -70,23 +79,24 @@
                     {{ back.text }}
                 </p>
 
-                <p v-if="props.card.entry.transliteration" :class="$style.RunCard__translit">
-                    {{ props.card.entry.transliteration }}
-                </p>
+                <span :class="$style.RunCard__rule"></span>
 
                 <!-- Картинка только на обороте: на лице она подменила бы припоминание
                      узнаванием картинки. -->
-                <div v-if="props.card.entry.image" :class="$style.RunCard__frame">
-                    <img
-                        :class="$style.RunCard__image"
-                        :src="props.card.entry.image"
-                        :alt="props.card.entry.translation_ru"
-                        decoding="async"
-                        loading="lazy"
-                        :width="props.card.entry.image_width ?? undefined"
-                        :height="props.card.entry.image_height ?? undefined"
-                    />
-                </div>
+                <img
+                    v-if="props.card.entry.image"
+                    :class="$style.RunCard__image"
+                    :src="props.card.entry.image"
+                    :alt="props.card.entry.translation_ru"
+                    decoding="async"
+                    loading="lazy"
+                    :width="props.card.entry.image_width ?? undefined"
+                    :height="props.card.entry.image_height ?? undefined"
+                />
+
+                <p v-if="props.card.entry.transliteration" :class="$style.RunCard__translit">
+                    {{ props.card.entry.transliteration }}
+                </p>
             </div>
         </div>
     </div>
@@ -106,14 +116,40 @@
         // Обводка только для пришедшего с клавиатуры: карточку нажимают пальцем, и
         // рамка после каждого касания была бы шумом.
         &:focus-visible {
-            outline: 2px solid var(--primary-500);
+            outline: 2px solid var(--accent);
             outline-offset: 2px;
-            border-radius: 2rem;
+            border-radius: 2.4rem;
+        }
+
+        // Тон, а не прозрачность: полупрозрачная белая карточка на светлом фоне в него
+        // же и утекает, а разница тонов держится при любой теме.
+        &__behind {
+            position: absolute;
+            border-radius: 2.4rem;
+            background: var(--behind);
+            box-shadow: 0 0.6rem 1.6rem -0.8rem var(--under);
+        }
+
+        &__behind--far {
+            top: 1.6rem;
+            right: 2.6rem;
+            bottom: 0;
+            left: 2.6rem;
+        }
+
+        &__behind--near {
+            top: 0.8rem;
+            right: 1.4rem;
+            bottom: 0.8rem;
+            left: 1.4rem;
         }
 
         &__inner {
             position: absolute;
-            inset: 0;
+            top: 0;
+            right: 0;
+            bottom: 1.6rem;
+            left: 0;
             transform-style: preserve-3d;
             transition: transform 0.45s ease;
 
@@ -129,12 +165,12 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 1.6rem;
-            padding: 2.4rem;
+            gap: 2rem;
+            padding: 2.6rem;
             overflow-y: auto;
-            border: 1px solid var(--base-200);
-            border-radius: 2rem;
-            background: var(--base-50);
+            border-radius: 2.4rem;
+            background: var(--surface);
+            box-shadow: var(--lift);
             backface-visibility: hidden;
             text-align: center;
 
@@ -145,48 +181,41 @@
 
         &__arabic {
             font-family: var(--font-arabic);
-            font-size: 4.8rem;
-            line-height: 1.8;
+            font-size: 5.2rem;
+            line-height: 1.7;
             word-break: break-word;
-        }
-
-        &__hint {
-            color: var(--base-500);
-            font-size: 1.4rem;
         }
 
         &__translation {
             font-size: 2.8rem;
+            font-weight: 500;
             word-break: break-word;
         }
 
-        &__translit {
-            color: var(--base-500);
-            font-size: 1.8rem;
+        // Короткая черта под ответом: отделяет слово от картинки, не рисуя рамок.
+        &__rule {
+            width: 4.6rem;
+            height: 2px;
+            border-radius: 2px;
+            background: var(--accent);
+            opacity: 0.45;
         }
 
-        // Рамка обнимает фото по его размеру: тогда маленький файл выглядит вставленным
-        // нарочно, а не потерянным в пустом поле.
-        &__frame {
-            display: flex;
-            max-width: 100%;
-            padding: 0.8rem;
-            border: 1px solid var(--base-200);
-            border-radius: 1.6rem;
-            background: var(--base-0);
-        }
-
-        // Только максимальные ограничения: растянуть маленький файл — значит сделать
+        // Рамки нет: карточка и так светлее фона, обводка на ней ничего не отделяет.
+        // Только максимальные ограничения — растянуть маленький файл значит сделать
         // мыло заметнее, резкости от этого не появится.
         &__image {
-            display: block;
             width: auto;
             height: auto;
             max-width: 100%;
-            max-height: 26rem;
-            border-radius: 0.8rem;
+            max-height: 22rem;
+            border-radius: 1.4rem;
             object-fit: contain;
-            background: var(--base-50);
+        }
+
+        &__translit {
+            color: var(--muted);
+            font-size: 1.6rem;
         }
     }
 
