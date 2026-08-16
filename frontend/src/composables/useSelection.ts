@@ -25,7 +25,9 @@ export function useSelection(entries: Ref<IEntry[]>, themes: Ref<ITheme[]>): IUs
 
     // Раздел без карточек дал бы кнопку в пустой прогон: в режиме слов пустых больше.
     const sections = computed<ITheme[]>(() =>
-        themes.value.filter((theme) => deck.value.some((entry) => entry.themes.includes(theme.slug))),
+        themes.value.filter((theme) =>
+            deck.value.some((entry) => entry.themes.includes(theme.slug)),
+        ),
     );
 
     /**
