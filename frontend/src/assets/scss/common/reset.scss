@@ -14,12 +14,13 @@ body {
     font-family: var(--font-ui);
     font-size: 1.6rem;
     line-height: 1.4;
-    color: var(--base-900);
-    background: var(--base-0);
+    color: var(--ink);
+    background: var(--ground);
     -webkit-font-smoothing: antialiased;
 }
 
 h1,
+h2,
 p {
     margin: 0;
 }

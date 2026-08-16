@@ -137,7 +137,7 @@
             calc(1.6rem + env(safe-area-inset-bottom));
 
         &__note {
-            color: var(--base-500);
+            color: var(--muted);
             text-align: center;
         }
 

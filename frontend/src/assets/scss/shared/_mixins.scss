@@ -1,36 +1,45 @@
-// Палитра лежит в миксинах, потому что применяется трижды: системная тема,
-// принудительный светлый и принудительный тёмный от Telegram.
+// Палитра лежит в миксинах, потому что применяется дважды: светлая по умолчанию и
+// тёмная по выбору человека.
+//
+// Слоёв три, а не два: фон, карточки под верхней и сама карточка. Так стопка держится
+// на разнице тонов, а не только на тенях — иначе на светлом фоне она в него утекает.
 
 @mixin palette-light {
     color-scheme: light;
 
-    --base-0: #ffffff;
-    --base-50: #f4f5f7;
-    --base-200: #e2e5ea;
-    --base-500: #7d8794;
-    --base-900: #16181d;
+    --ground: #d7dce4;
+    --behind: #eef1f5;
+    --surface: #ffffff;
 
-    --primary-400: #5a9bec;
-    --primary-500: #2f7de1;
-    --primary-600: #1d6bc9;
-    --primary-700: #1f5cab;
-    --primary-500-rgb: 47, 125, 225;
-    --on-primary: #ffffff;
+    --ink: #111620;
+    --muted: #6d7684;
+
+    --accent: #29356b;
+    --on-accent: #ffffff;
+
+    --track: rgba(17, 22, 32, 0.13);
+    --under: rgba(17, 22, 32, 0.16);
+    --lift: 0 2px 4px rgba(17, 22, 32, 0.1), 0 16px 36px -16px rgba(17, 22, 32, 0.38);
+    --lift-sm: 0 1px 2px rgba(17, 22, 32, 0.08), 0 8px 18px -10px rgba(17, 22, 32, 0.3);
 }
 
 @mixin palette-dark {
     color-scheme: dark;
 
-    --base-0: #17191c;
-    --base-50: #21242a;
-    --base-200: #32363e;
-    --base-500: #8d97a5;
-    --base-900: #f2f4f7;
+    --ground: #1d222a;
+    --behind: #262c34;
+    --surface: #2e353f;
 
-    --primary-400: #6aaef5;
-    --primary-500: #4f97ef;
-    --primary-600: #3a82e0;
-    --primary-700: #2f7de1;
-    --primary-500-rgb: 79, 151, 239;
-    --on-primary: #ffffff;
+    --ink: #e7eaf0;
+    --muted: #858d99;
+
+    // Тёмно-синяя кнопка на тёмном фоне сливается, поэтому акцент здесь светлее фона,
+    // а подпись на нём — тёмная.
+    --accent: #97a6e6;
+    --on-accent: #0a0c10;
+
+    --track: rgba(255, 255, 255, 0.14);
+    --under: rgba(0, 0, 0, 0.55);
+    --lift: 0 2px 4px rgba(0, 0, 0, 0.6), 0 16px 36px -16px rgba(0, 0, 0, 0.9);
+    --lift-sm: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 18px -10px rgba(0, 0, 0, 0.7);
 }
