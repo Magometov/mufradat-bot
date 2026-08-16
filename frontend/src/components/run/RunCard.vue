@@ -83,8 +83,8 @@
                         :alt="props.card.entry.translation_ru"
                         decoding="async"
                         loading="lazy"
-                        width="400"
-                        height="260"
+                        :width="props.card.entry.image_width ?? undefined"
+                        :height="props.card.entry.image_height ?? undefined"
                     />
                 </div>
             </div>

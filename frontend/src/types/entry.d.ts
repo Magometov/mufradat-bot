@@ -10,6 +10,9 @@ export interface IEntry {
     is_word: boolean;
     /** Полный URL или `null`. */
     image: string | null;
+    /** Размеры файла. Пустые без картинки и у карточек, снятых до появления полей. */
+    image_width: number | null;
+    image_height: number | null;
     /** Коды тем карточки. Фильтр по теме считает приложение, поэтому они едут с колодой. */
     themes: string[];
 }

@@ -12,6 +12,8 @@ class CardSerializer(serializers.Serializer):
     transliteration = serializers.CharField()
     is_word = serializers.SerializerMethodField()
     image = serializers.ImageField()
+    image_width = serializers.IntegerField(allow_null=True)
+    image_height = serializers.IntegerField(allow_null=True)
     themes = serializers.ListField(child=serializers.CharField())
 
     def get_id(self, card: WordForm | Phrase) -> str:
