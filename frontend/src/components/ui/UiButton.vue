@@ -1,11 +1,16 @@
 <script setup lang="ts">
+    // #region Imports
+    // Types
     import type { IUiButtonProps } from '../../types/ui';
+    // #endregion
 
-    const props = withDefaults(defineProps<IUiButtonProps & { size?: 'default' | 'large' }>(), {
+    // #region Props
+    const props = withDefaults(defineProps<IUiButtonProps>(), {
         variant: 'primary',
         isDisabled: false,
         size: 'default',
     });
+    // #endregion
 </script>
 
 <template>
@@ -30,7 +35,10 @@
         font-size: 1.6rem;
         font-weight: 500;
         cursor: pointer;
-        transition: opacity 0.15s ease, transform 0.15s ease, box-shadow 0.2s ease;
+        transition:
+            opacity 0.15s ease,
+            transform 0.15s ease,
+            box-shadow 0.2s ease;
 
         &:disabled {
             opacity: 0.4;
@@ -47,11 +55,12 @@
             color: var(--on-primary);
         }
 
+        // Свечение постоянное, а не пульсирующее: этот вариант стоит и на «Далее»,
+        // то есть мигал бы весь прогон, ничего при этом не сообщая.
         &--accent {
             background: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-400) 100%);
             color: var(--on-primary);
             box-shadow: 0 4px 16px rgba(var(--primary-500-rgb), 0.35);
-            animation: pulse-glow 2.5s ease-in-out infinite;
 
             &:active:not(:disabled) {
                 box-shadow: 0 2px 8px rgba(var(--primary-500-rgb), 0.3);
@@ -74,23 +83,18 @@
 
         &--large {
             padding: 1.6rem 2.4rem;
-            font-size: 1.7rem;
+            font-size: 1.8rem;
             font-weight: 600;
         }
     }
 
-    @keyframes pulse-glow {
-        0%, 100% {
-            box-shadow: 0 4px 16px rgba(var(--primary-500-rgb), 0.35);
-        }
-        50% {
-            box-shadow: 0 4px 24px rgba(var(--primary-500-rgb), 0.55);
-        }
-    }
-
     @media (prefers-reduced-motion: reduce) {
-        .UiButton--accent {
-            animation: none;
+        .UiButton {
+            transition: none;
+
+            &:active:not(:disabled) {
+                transform: none;
+            }
         }
     }
 </style>
