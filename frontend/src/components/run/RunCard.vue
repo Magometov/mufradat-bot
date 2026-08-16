@@ -17,12 +17,6 @@
     );
     // #endregion
 
-    // #region Emits
-    const emit = defineEmits<{
-        flip: [];
-    }>();
-    // #endregion
-
     // #region Data
     const HINT = {
         forward: 'нажми, чтобы увидеть перевод',
@@ -47,19 +41,13 @@
 
     const hint = computed<string>(() => (props.card.isReversed ? HINT.reversed : HINT.forward));
     // #endregion
-
-    // #region Methods
-    /**
-     * Переворачивает карточку: нажатие приходит с любого места лица и оборота.
-     */
-    function handleFlip(): void {
-        emit('flip');
-    }
-    // #endregion
 </script>
 
 <template>
-    <div :class="$style.RunCard" @click="handleFlip">
+    <!-- Жесты разбирает сцена прогона, поэтому своего обработчика здесь нет. Роль и
+         tabindex — не для мыши: без них карточка не доступна ни с клавиатуры, ни
+         скринридеру, для которого это была бы просто пара абзацев. -->
+    <div :class="$style.RunCard" role="button" tabindex="0" :aria-label="hint">
         <div :class="[$style.RunCard__inner, props.isFlipped && $style['RunCard__inner--flipped']]">
             <!-- Лицо без модификатора: повёрнут оборот, а лицо лежит как есть. -->
             <div :class="$style.RunCard__face">
@@ -112,7 +100,16 @@
         inset: 0;
         // Переворот трёхмерный: обе стороны лежат друг на друге.
         perspective: 100rem;
+        cursor: pointer;
         user-select: none;
+
+        // Обводка только для пришедшего с клавиатуры: карточку нажимают пальцем, и
+        // рамка после каждого касания была бы шумом.
+        &:focus-visible {
+            outline: 2px solid var(--primary-500);
+            outline-offset: 2px;
+            border-radius: 2rem;
+        }
 
         &__inner {
             position: absolute;

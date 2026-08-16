@@ -61,7 +61,11 @@
             Назад
         </UiButton>
 
-        <p :class="$style.RunControls__counter">{{ props.position }} / {{ props.total }}</p>
+        <!-- Счётчик объявляется вслух: для того, кто листает с клавиатуры, это
+             единственный признак, что карточка сменилась. -->
+        <p :class="$style.RunControls__counter" aria-live="polite">
+            {{ props.position }} / {{ props.total }}
+        </p>
 
         <UiButton variant="accent" @click="handleNext">{{ nextLabel }}</UiButton>
     </footer>

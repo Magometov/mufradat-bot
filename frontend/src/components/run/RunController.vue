@@ -4,7 +4,10 @@
     import type { IRunCard, TSlide } from '../../types/run';
 
     // Vue
-    import { ref, watch } from 'vue';
+    import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+
+    // Composables
+    import { useSwipe } from '../../composables/useSwipe';
 
     // Components
     import RunCard from './RunCard.vue';
@@ -38,6 +41,10 @@
     const isFlipped = ref(false);
     // Направление уезда ставится до эмита: новая карточка придёт уже с нужным классом.
     const slide = ref<TSlide>('slide-forward');
+    const stage = ref<HTMLElement | null>(null);
+
+    // Клавиши, которые переворачивают карточку. Пробел и Enter — то же, что нажатие.
+    const FLIP_KEYS = [' ', 'Enter'] as const;
     // #endregion
 
     // #region Methods
@@ -52,6 +59,8 @@
      * Шаг назад по прогону: карточка уезжает вправо.
      */
     function handlePrev(): void {
+        if (!props.hasPrev) return;
+
         slide.value = 'slide-back';
         emit('prev');
     }
@@ -60,6 +69,8 @@
      * Шаг вперёд по прогону: карточка уезжает влево.
      */
     function handleNext(): void {
+        if (!props.hasNext) return;
+
         slide.value = 'slide-forward';
         emit('next');
     }
@@ -70,9 +81,43 @@
     function handleFinish(): void {
         emit('finish');
     }
+
+    /**
+     * Управление с клавиатуры: стрелки листают, пробел и Enter переворачивают.
+     *
+     * Обработчик один на окно, а не на карточке: тогда листать можно, не наводя на неё
+     * фокус. Пробел и Enter при фокусе на кнопке не перехватываются — там это нажатие
+     * самой кнопки, и подменять его нельзя.
+     */
+    function onKeydown(event: KeyboardEvent): void {
+        if (event.altKey || event.ctrlKey || event.metaKey) return;
+
+        if (event.key === 'ArrowLeft') {
+            event.preventDefault();
+            handlePrev();
+            return;
+        }
+
+        if (event.key === 'ArrowRight') {
+            event.preventDefault();
+            handleNext();
+            return;
+        }
+
+        if (!FLIP_KEYS.includes(event.key as (typeof FLIP_KEYS)[number])) return;
+        if (event.target instanceof HTMLButtonElement) return;
+
+        event.preventDefault();
+        handleFlip();
+    }
     // #endregion
 
     // #region Lifecycle
+    useSwipe(stage, { tap: handleFlip, left: handleNext, right: handlePrev });
+
+    onMounted(() => window.addEventListener('keydown', onKeydown));
+    onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
+
     // Новая карточка всегда приходит лицом вверх, иначе ответ виден до припоминания.
     watch(
         () => props.card.entry.id,
@@ -89,14 +134,9 @@
             <UiButton variant="ghost" @click="handleFinish">Завершить</UiButton>
         </header>
 
-        <div :class="$style.RunController__stage">
+        <div ref="stage" :class="$style.RunController__stage">
             <Transition :name="slide">
-                <RunCard
-                    :key="props.card.entry.id"
-                    :card="props.card"
-                    :is-flipped="isFlipped"
-                    @flip="handleFlip"
-                />
+                <RunCard :key="props.card.entry.id" :card="props.card" :is-flipped="isFlipped" />
             </Transition>
         </div>
 
@@ -130,6 +170,9 @@
             position: relative;
             flex: 1;
             overflow: hidden;
+            // Горизонталь разбираем сами, вертикаль оставляем браузеру и клиенту:
+            // иначе сломается и прокрутка длинной карточки, и жесты Telegram.
+            touch-action: pan-y;
         }
     }
 </style>
