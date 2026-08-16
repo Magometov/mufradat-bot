@@ -1,4 +1,5 @@
-export type TButtonVariant = 'primary' | 'accent' | 'soft' | 'ghost';
+/** `plain` — белая карточка-кнопка, `ghost` — только текст, без подложки. */
+export type TButtonVariant = 'accent' | 'plain' | 'ghost';
 
 /** Размер кнопки: `large` — для главного действия экрана. */
 export type TButtonSize = 'default' | 'large';

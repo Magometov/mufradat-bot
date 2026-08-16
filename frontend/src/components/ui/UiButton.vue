@@ -6,7 +6,7 @@
 
     // #region Props
     const props = withDefaults(defineProps<IUiButtonProps>(), {
-        variant: 'primary',
+        variant: 'accent',
         isDisabled: false,
         size: 'default',
     });
@@ -28,17 +28,21 @@
 </template>
 
 <style module lang="scss">
+    // Границ у кнопок нет: слои в этом виде разделяет тень, а не линия.
     .UiButton {
-        padding: 1.4rem 2rem;
-        border: 1px solid transparent;
-        border-radius: 1.4rem;
-        font-size: 1.6rem;
-        font-weight: 500;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.8rem;
+        padding: 1.6rem 2rem;
+        border: 0;
+        border-radius: 1.6rem;
+        font-size: 1.7rem;
+        font-weight: 600;
         cursor: pointer;
         transition:
             opacity 0.15s ease,
-            transform 0.15s ease,
-            box-shadow 0.2s ease;
+            transform 0.15s ease;
 
         &:disabled {
             opacity: 0.4;
@@ -50,41 +54,39 @@
             opacity: 0.9;
         }
 
-        &--primary {
-            background: var(--primary-500);
-            color: var(--on-primary);
+        &:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
         }
 
-        // Свечение постоянное, а не пульсирующее: этот вариант стоит и на «Далее»,
-        // то есть мигал бы весь прогон, ничего при этом не сообщая.
         &--accent {
-            background: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-400) 100%);
-            color: var(--on-primary);
-            box-shadow: 0 4px 16px rgba(var(--primary-500-rgb), 0.35);
-
-            &:active:not(:disabled) {
-                box-shadow: 0 2px 8px rgba(var(--primary-500-rgb), 0.3);
-            }
+            background: var(--accent);
+            color: var(--on-accent);
+            box-shadow: var(--lift);
         }
 
-        &--soft {
-            border-color: var(--base-200);
-            background: var(--base-50);
-            color: var(--base-900);
+        &--plain {
+            background: var(--surface);
+            color: var(--ink);
+            box-shadow: var(--lift-sm);
+            font-weight: 500;
         }
 
+        // Прозрачная кнопка — обычно один значок, и по нему всё равно попадают пальцем:
+        // ниже 4.4rem промахиваются.
         &--ghost {
+            min-width: 4.4rem;
+            min-height: 4.4rem;
             padding: 0.8rem 1rem;
             background: none;
-            color: var(--base-500);
+            color: var(--muted);
             font-size: 1.4rem;
             font-weight: 400;
         }
 
         &--large {
-            padding: 1.6rem 2.4rem;
+            padding: 1.8rem 2.4rem;
             font-size: 1.8rem;
-            font-weight: 600;
         }
     }
 
