@@ -2,12 +2,28 @@
 
 from django import forms
 from django.contrib import admin
+from django.core.files.base import File
+from django.core.files.uploadedfile import UploadedFile
 
+from apps.vocabulary import images
 from apps.vocabulary.constants import Theme
 from apps.vocabulary.models import Phrase, Word
 
 
-class ThemesForm(forms.ModelForm):
+class ImageForm(forms.ModelForm):
+    """Ручная загрузка ложится в колоду тем же webp, что и картинки от бота."""
+
+    def clean_image(self) -> File | None:
+        image = self.cleaned_data.get("image")
+
+        # Файл не меняли: в поле лежит уже сохранённый, пережимать его заново нечего.
+        if not isinstance(image, UploadedFile):
+            return image
+
+        return images.to_webp(image)
+
+
+class ThemesForm(ImageForm):
     """Темы — чекбоксы: по умолчанию массив правился бы строкой через запятую.
 
     Модель не названа: форма одна на слово и на фразу, подставляет её админка.

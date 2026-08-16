@@ -10,7 +10,7 @@ from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.utils.html import format_html
 
-from apps.vocabulary.admin.base import CardAdmin
+from apps.vocabulary.admin.base import CardAdmin, ImageForm
 from apps.vocabulary.admin.filters import ThemeFilter
 from apps.vocabulary.constants import Number
 from apps.vocabulary.models import Word, WordForm
@@ -20,6 +20,7 @@ class WordFormInline(admin.StackedInline):
     """Написания слова: единственное и множественное число."""
 
     model = WordForm
+    form = ImageForm
     extra = 0
     max_num = len(Number.choices)
     # Превью перед картинкой, а не рядом: поле файла админка рисует внутри fieldset,
