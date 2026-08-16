@@ -1,5 +1,8 @@
 <script setup lang="ts">
     // #region Imports
+    // Vue
+    import { computed } from 'vue';
+
     // Components
     import UiButton from '../ui/UiButton.vue';
     // #endregion
@@ -22,6 +25,11 @@
         next: [];
         finish: [];
     }>();
+    // #endregion
+
+    // #region Computed
+    // На последней карточке кнопка закрывает прогон, поэтому и подпись у неё другая.
+    const nextLabel = computed<string>(() => (props.hasNext ? 'Далее' : 'Готово'));
     // #endregion
 
     // #region Methods
@@ -55,7 +63,7 @@
 
         <p :class="$style.RunControls__counter">{{ props.position }} / {{ props.total }}</p>
 
-        <UiButton variant="accent" @click="handleNext">{{ props.hasNext ? 'Далее' : 'Готово' }}</UiButton>
+        <UiButton variant="accent" @click="handleNext">{{ nextLabel }}</UiButton>
     </footer>
 </template>
 
