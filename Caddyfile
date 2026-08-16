@@ -1,25 +1,10 @@
 # Адрес берётся из переменной DOMAIN. Домен — сертификат выпускается сам; для проверки
 # на своей машине ставится «:80», и тогда Caddy работает без https.
+#
+# Порядок блоков здесь — порядок разбора: `handle` взаимоисключающие, запрос забирает
+# первый совпавший. Поэтому частные правила стоят выше общих.
 {$DOMAIN} {
     encode zstd gzip
-
-    # Кэширование статики: уменьшает нагрузку и ускоряет повторные загрузки.
-    # Версионированные файлы (с хэшем в имени) кэшируются надолго, остальные — кратко.
-    @versioned_static path /s/*.*
-    handle @versioned_static {
-        header Cache-Control "public, max-age=31536000, immutable"
-        header Access-Control-Allow-Origin "*"
-        root * /srv
-        file_server
-    }
-
-    @static path /s/*
-    handle @static {
-        header Cache-Control "public, max-age=3600"
-        header Access-Control-Allow-Origin "*"
-        root * /srv
-        file_server
-    }
 
     # --- Заглушка на время работ ---------------------------------------------------
     #
@@ -45,6 +30,8 @@
         respond "Технические работы" 503
     }
 
+    # Админка и её статика остаются открытыми, картинки — заодно: страница работ
+    # обходится без них, но и закрывать их незачем.
     @closed {
         file {
             root /flags
@@ -60,13 +47,12 @@
 
     # --- Обычная работа ------------------------------------------------------------
 
-    # Картинки — файлами, минуя Django. CORS нужен для crossorigin="anonymous"
-    # на <img>: без него браузер врежет картинку при проверке.
-    handle_path /m/* {
-        header Cache-Control "public, max-age=3600"
-        header Access-Control-Allow-Origin "*"
-        root * /var/www/media
-        file_server
+    # Служебные ручки бота. Стоят выше общего правила для API, иначе оно заберёт их
+    # себе. Бот ходит к Django внутри сети докера, поэтому запрет снаружи ему ничего
+    # не стоит, а токен остаётся вторым слоем, а не единственным.
+    @internal path /api/v1/internal/*
+    handle @internal {
+        respond 404
     }
 
     # API и админка — в Django. Caddy сам добавляет X-Forwarded-Proto, поэтому Django
@@ -76,22 +62,35 @@
         reverse_proxy backend:8000
     }
 
-    # Служебные ручки бота. Бот ходит к Django внутри сети докера, поэтому запрет
-    # снаружи ему ничего не стоит, а токен остаётся вторым слоем, а не единственным.
-    @internal path /api/v1/internal/*
-    handle @internal {
-        respond 404
+    # Картинки — файлами, минуя Django.
+    handle_path /m/* {
+        header Cache-Control "public, max-age=3600"
+        root * /var/www/media
+        file_server
     }
 
-    # Статика приложения — файлами, минуя Django.
+    # Статика Django: её собирает collectstatic в том `static`, и нужна она только
+    # админке. Хэша в именах нет, поэтому кэш короткий.
     handle_path /s/* {
+        header Cache-Control "public, max-age=3600"
+        root * /var/www/static
+        file_server
+    }
+
+    # Сборка приложения. Vite кладёт хэш содержимого в имя файла, поэтому такой адрес
+    # не меняет содержимого никогда — его можно кэшировать навсегда.
+    @assets path /assets/*
+    handle @assets {
+        header Cache-Control "public, max-age=31536000, immutable"
         root * /srv
         file_server
     }
 
-    # Всё остальное — собранное приложение. try_files нужен, чтобы прямой заход по
-    # любому пути отдавал index.html, а не 404.
+    # Всё остальное — собранное приложение. Кэшировать index.html нельзя: в нём лежат
+    # имена файлов сборки, и после выкладки браузер ещё сутки просил бы старые.
+    # try_files нужен, чтобы прямой заход по любому пути отдавал index.html, а не 404.
     handle {
+        header Cache-Control "no-cache"
         root * /srv
         try_files {path} /index.html
         file_server
