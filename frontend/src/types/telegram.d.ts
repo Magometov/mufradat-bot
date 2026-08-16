@@ -1,13 +1,3 @@
-/** Цвета темы клиента; любое поле может отсутствовать. */
-export interface ITelegramThemeParams {
-    bg_color?: string;
-    secondary_bg_color?: string;
-    text_color?: string;
-    hint_color?: string;
-    button_color?: string;
-    button_text_color?: string;
-}
-
 /** Только то, чем пользуется приложение. */
 export interface ITelegramWebApp {
     ready: () => void;
@@ -16,10 +6,6 @@ export interface ITelegramWebApp {
     platform: string;
     /** Подписанные Telegram данные о том, кто открыл приложение. В браузере — пусто. */
     initData: string;
-    colorScheme: 'light' | 'dark';
-    themeParams: ITelegramThemeParams;
-    onEvent: (event: 'themeChanged', handler: () => void) => void;
-    offEvent: (event: 'themeChanged', handler: () => void) => void;
 }
 
 declare global {

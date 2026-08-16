@@ -9,42 +9,26 @@
         <title>مفردات</title>
 
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-        <!-- Цвет обвязки браузера под фон приложения: --base-0 из палитры. -->
-        <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-        <meta name="theme-color" content="#17191c" media="(prefers-color-scheme: dark)" />
+        <!-- Цвет обвязки браузера под фон приложения: --ground из палитры. -->
+        <meta name="theme-color" content="#d7dce4" media="(prefers-color-scheme: light)" />
+        <meta name="theme-color" content="#1d222a" media="(prefers-color-scheme: dark)" />
 
         <script>
-            // Тема ставится до первой отрисовки: иначе тёмный клиент на светлой системе
-            // успевает моргнуть белым. Скрипт Telegram отложенный и к этому моменту ещё
-            // не выполнился, поэтому берём тот же источник, что и он сам, — параметры в
-            // хеше адреса. Ставим только светлую или тёмную: точные цвета клиента
-            // дорисует useTelegram, а держать здесь вторую копию карты цветов не за чем.
+            // Оформление ставится до первой отрисовки, иначе тёмное моргает светлым при
+            // каждом запуске. Ключ продублирован из utils/storage.ts: приложения здесь
+            // ещё нет, импортировать нечего — меняешь там, правь и тут.
             (function () {
+                var appearance = 'light';
+
                 try {
-                    var raw = new URLSearchParams(location.hash.slice(1)).get(
-                        'tgWebAppThemeParams',
-                    );
-                    if (!raw) return;
-
-                    var background = (JSON.parse(raw).bg_color || '').replace(/[\s#]/g, '');
-                    if (background.length === 3) {
-                        background = background.replace(/./g, '$&$&');
+                    if (localStorage.getItem('mufradat.appearance') === 'dark') {
+                        appearance = 'dark';
                     }
-                    if (background.length !== 6) return;
-
-                    var red = parseInt(background.substr(0, 2), 16);
-                    var green = parseInt(background.substr(2, 2), 16);
-                    var blue = parseInt(background.substr(4, 2), 16);
-                    // Порог и веса — как в telegram-web-app.js, чтобы ранняя тема
-                    // совпала с той, что клиент объявит секундой позже.
-                    var brightness = Math.sqrt(
-                        0.299 * red * red + 0.587 * green * green + 0.114 * blue * blue,
-                    );
-
-                    document.documentElement.dataset.theme = brightness < 120 ? 'dark' : 'light';
                 } catch (error) {
-                    // Тема — не повод не открыться: без неё сработает системная.
+                    // Приватный режим: остаётся светлое.
                 }
+
+                document.documentElement.dataset.theme = appearance;
             })();
         </script>
 

@@ -1,8 +1,14 @@
+import type { TAppearance } from '../types/appearance';
 import type { IRunItem, ISavedRun } from '../types/run';
 
 // Номер в ключе — версия формата. Карточки переехали в две таблицы и сменили номера
 // с чисел на строки: старый прогон не упал бы, а молча подставил чужие карточки.
-const KEY = 'mufradat.run.2';
+const RUN_KEY = 'mufradat.run.2';
+
+// Эти два ключа продублированы в index.html: оформление там читают до первой
+// отрисовки, когда приложения ещё нет. Меняешь здесь — правь и там.
+const APPEARANCE_KEY = 'mufradat.appearance';
+const HINT_KEY = 'mufradat.appearance.hint';
 
 /**
  * Похожа ли запись на карточку прогона.
@@ -36,7 +42,7 @@ function isSavedRun(value: unknown): value is ISavedRun {
  */
 export function readRun(): ISavedRun | null {
     try {
-        const raw = localStorage.getItem(KEY);
+        const raw = localStorage.getItem(RUN_KEY);
         if (raw === null) return null;
 
         const parsed: unknown = JSON.parse(raw);
@@ -53,7 +59,7 @@ export function readRun(): ISavedRun | null {
  */
 export function writeRun(run: ISavedRun): void {
     try {
-        localStorage.setItem(KEY, JSON.stringify(run));
+        localStorage.setItem(RUN_KEY, JSON.stringify(run));
     } catch {
         // Без записи прогон живёт до перезагрузки — это лучше, чем падение.
     }
@@ -64,8 +70,56 @@ export function writeRun(run: ISavedRun): void {
  */
 export function clearRun(): void {
     try {
-        localStorage.removeItem(KEY);
+        localStorage.removeItem(RUN_KEY);
     } catch {
         // Нечего чистить.
+    }
+}
+
+/**
+ * Выбранное оформление. `null` — человек ещё не выбирал, значит светлое.
+ */
+export function readAppearance(): TAppearance | null {
+    try {
+        const raw = localStorage.getItem(APPEARANCE_KEY);
+
+        return raw === 'light' || raw === 'dark' ? raw : null;
+    } catch {
+        // Приватный режим: оформление будет светлым до конца сеанса.
+        return null;
+    }
+}
+
+/**
+ * Запоминает выбор оформления.
+ */
+export function writeAppearance(appearance: TAppearance): void {
+    try {
+        localStorage.setItem(APPEARANCE_KEY, appearance);
+    } catch {
+        // Без записи выбор живёт до перезагрузки — это лучше, чем падение.
+    }
+}
+
+/**
+ * Показывали ли уже подсказку про кнопку оформления.
+ */
+export function isHintSeen(): boolean {
+    try {
+        return localStorage.getItem(HINT_KEY) !== null;
+    } catch {
+        // Не знаем — считаем, что показывали: лишний раз навязываться хуже.
+        return true;
+    }
+}
+
+/**
+ * Отмечает подсказку показанной.
+ */
+export function markHintSeen(): void {
+    try {
+        localStorage.setItem(HINT_KEY, '1');
+    } catch {
+        // Тогда она покажется ещё раз в следующий заход. Не беда.
     }
 }
