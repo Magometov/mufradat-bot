@@ -6,12 +6,17 @@ import type { IEntry } from '../types/entry';
 import type { IRunCard, ISavedRun, IUseRun } from '../types/run';
 
 // Utils
+import { preload } from '../utils/preload';
 import { shuffle } from '../utils/shuffle';
 import { clearRun, readRun, writeRun } from '../utils/storage';
 
 // Vue
 import { computed, ref, watch } from 'vue';
 // #endregion
+
+// Насколько вперёд тянутся картинки. Двух хватает: назад ходят редко, а больше — это
+// уже трафик за карточки, до которых прогон может и не дойти.
+const AHEAD = 2;
 
 /**
  * Прогон по колоде: перемешанный список id и место в нём.
@@ -115,6 +120,18 @@ export function useRun(entries: Ref<IEntry[]>): IUseRun {
 
     // Пишем после каждого шага: свёрнутое окно должно открыться на той же карточке.
     watch(run, (value) => (value === null ? clearRun() : writeRun(value)));
+
+    // Картинка лежит на обороте, то есть нужна ровно в момент переворота. Тянем её
+    // заранее, пока смотрят на предыдущую: иначе ответ открывается пустой рамкой.
+    watch(
+        [cards, index],
+        () => {
+            const ahead = cards.value.slice(index.value, index.value + AHEAD + 1);
+
+            preload(ahead.map((item) => item.entry.image));
+        },
+        { immediate: true },
+    );
 
     return { card, position, total, hasPrev, hasNext, restore, start, next, prev, finish };
 }
