@@ -33,3 +33,16 @@
     transform: translateX(-30%);
     opacity: 0;
 }
+
+// Экраны и карточки сменяются мгновенно, но переходы не выключаются совсем: Vue ждёт
+// конца transition, чтобы снять уезжающий элемент, и без длительности он бы завис.
+@media (prefers-reduced-motion: reduce) {
+    .fade-enter-active,
+    .fade-leave-active,
+    .slide-forward-enter-active,
+    .slide-forward-leave-active,
+    .slide-back-enter-active,
+    .slide-back-leave-active {
+        transition-duration: 0.01ms;
+    }
+}

@@ -60,9 +60,7 @@
 
 <template>
     <div :class="$style.RunCard" @click="handleFlip">
-        <div
-            :class="[$style.RunCard__inner, props.isFlipped && $style['RunCard__inner--flipped']]"
-        >
+        <div :class="[$style.RunCard__inner, props.isFlipped && $style['RunCard__inner--flipped']]">
             <!-- Лицо без модификатора: повёрнут оборот, а лицо лежит как есть. -->
             <div :class="$style.RunCard__face">
                 <p
@@ -99,7 +97,6 @@
                         loading="lazy"
                         width="400"
                         height="260"
-                        crossorigin="anonymous"
                     />
                 </div>
             </div>
@@ -193,6 +190,14 @@
             border-radius: 0.8rem;
             object-fit: contain;
             background: var(--base-50);
+        }
+    }
+
+    // Переворот — единственное движение карточки; тому, кто просил его убрать, стороны
+    // меняются сразу.
+    @media (prefers-reduced-motion: reduce) {
+        .RunCard__inner {
+            transition: none;
         }
     }
 </style>
