@@ -1,9 +1,13 @@
 import type { TAppearance } from '../types/appearance';
+import type { IAnswer } from '../types/progress';
 import type { IRunItem, ISavedRun } from '../types/run';
 
 // Номер в ключе — версия формата. Карточки переехали в две таблицы и сменили номера
 // с чисел на строки: старый прогон не упал бы, а молча подставил чужие карточки.
 const RUN_KEY = 'mufradat.run.2';
+
+// Оценки, ещё не уехавшие на сервер. Номер в ключе — версия формата.
+const ANSWERS_KEY = 'mufradat.answers.1';
 
 // Эти два ключа продублированы в index.html: оформление там читают до первой
 // отрисовки, когда приложения ещё нет. Меняешь здесь — правь и там.
@@ -121,5 +125,52 @@ export function markHintSeen(): void {
         localStorage.setItem(HINT_KEY, '1');
     } catch {
         // Тогда она покажется ещё раз в следующий заход. Не беда.
+    }
+}
+
+/**
+ * Похожа ли запись на оценку.
+ */
+function isAnswer(value: unknown): value is IAnswer {
+    if (typeof value !== 'object' || value === null) return false;
+
+    const candidate = value as Record<string, unknown>;
+
+    return (
+        typeof candidate.card_id === 'string' &&
+        (candidate.verdict === 'know' || candidate.verdict === 'forgot')
+    );
+}
+
+/**
+ * Читает оценки, ждущие отправки. Нечитаемое считается пустой очередью.
+ */
+export function readAnswers(): IAnswer[] {
+    try {
+        const raw = localStorage.getItem(ANSWERS_KEY);
+        if (raw === null) return [];
+
+        const parsed: unknown = JSON.parse(raw);
+
+        return Array.isArray(parsed) && parsed.every(isAnswer) ? parsed : [];
+    } catch {
+        // Приватный режим и битый JSON лечатся одинаково — очереди просто нет.
+        return [];
+    }
+}
+
+/**
+ * Запоминает очередь оценок: закрытое окно не должно уносить их с собой.
+ */
+export function writeAnswers(answers: IAnswer[]): void {
+    try {
+        if (answers.length === 0) {
+            localStorage.removeItem(ANSWERS_KEY);
+            return;
+        }
+
+        localStorage.setItem(ANSWERS_KEY, JSON.stringify(answers));
+    } catch {
+        // Без записи оценки живут до перезагрузки — это лучше, чем падение.
     }
 }

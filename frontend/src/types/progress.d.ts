@@ -1,3 +1,5 @@
+import type { Ref } from 'vue';
+
 /** Что человек помнит про одну карточку. Приходит из `GET /api/v1/state/`. */
 export interface IProgress {
     level: number;
@@ -43,3 +45,25 @@ export interface ISessionCard {
 
 /** Что человек сказал про карточку. */
 export type TVerdict = 'know' | 'forgot';
+
+/** Оценка, ждущая отправки. */
+export interface IAnswer {
+    card_id: string;
+    verdict: TVerdict;
+}
+
+/** Что вернул `useProgress`. */
+export interface IUseProgress {
+    /** Видит ли человек новую логику. */
+    enabled: Ref<boolean>;
+    rules: Ref<IRules | null>;
+    progress: Ref<Map<string, IProgress>>;
+    /** Время сервера по часам устройства: сроки считаются по нему. */
+    now: () => number;
+    fetchState: () => Promise<void>;
+    /** Кладёт оценку в очередь и возвращает предсказанный срок для тоста. */
+    record: (id: string, verdict: TVerdict) => IProgress | null;
+    /** Снимает последнюю оценку, пока она не уехала. `false` — уже поздно. */
+    cancelLast: () => boolean;
+    flush: () => Promise<void>;
+}
