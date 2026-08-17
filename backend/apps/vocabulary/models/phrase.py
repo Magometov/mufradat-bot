@@ -1,11 +1,12 @@
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 
+from apps.common.models import BaseModel
 from apps.vocabulary.constants import Theme
 from apps.vocabulary.models.base import Card
 
 
-class Phrase(Card):
+class Phrase(Card, BaseModel):
     """Фраза. Форм нет: числа у фразы не бывает."""
 
     themes = ArrayField(
@@ -14,12 +15,10 @@ class Phrase(Card):
         default=list,
         blank=True,
     )
-    created_at = models.DateTimeField("Добавлено", auto_now_add=True, db_index=True)
 
-    class Meta:
+    class Meta(BaseModel.Meta):
         verbose_name = "Фраза"
         verbose_name_plural = "Фразы"
-        ordering = ("-created_at", "-id")
         constraints = [
             models.UniqueConstraint(
                 fields=["arabic", "translation_ru"],

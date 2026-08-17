@@ -5,8 +5,11 @@ from django.db import models
 # Ник длиннее Telegram не даёт; строку браузера обрезаем сами, чтобы запись не пухла.
 USERNAME_LENGTH = 32
 USER_AGENT_LENGTH = 400
-# SHA-256 в шестнадцатеричном виде — ровно 64 знака.
+# SHA-256 в шестнадцатеричном виде.
 KEY_HASH_LENGTH = 64
+
+# Поле, которое можно не заполнять.
+BLANK_AND_NULL = {"blank": True, "null": True}
 
 
 class Source(models.TextChoices):

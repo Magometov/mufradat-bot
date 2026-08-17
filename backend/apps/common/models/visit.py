@@ -1,24 +1,29 @@
 from django.db import models
 from django.utils.timezone import localtime
 
-from apps.common.constants import USERNAME_LENGTH, Source
+from apps.common.constants import BLANK_AND_NULL, Source
+from apps.common.models.base import BaseModel
 
 
-class Visit(models.Model):
+class Visit(BaseModel):
     """Один вход в приложение — строка на каждый заход, а не на человека."""
 
     source = models.CharField("Источник", max_length=16, choices=Source.choices)
-    telegram_id = models.BigIntegerField("Telegram id", null=True, blank=True)
-    username = models.CharField("Ник", max_length=USERNAME_LENGTH, blank=True, default="")
+    # Пусто у неопознанных: журнал пишет заход, а не сеанс.
+    learner = models.ForeignKey(
+        "common.Learner",
+        verbose_name="Человек",
+        related_name="visits",
+        on_delete=models.CASCADE,
+        **BLANK_AND_NULL,
+    )
     user_agent = models.TextField("Браузер", blank=True, default="")
-    created_at = models.DateTimeField("Когда", auto_now_add=True, db_index=True)
 
-    class Meta:
+    class Meta(BaseModel.Meta):
         verbose_name = "Вход"
         verbose_name_plural = "Входы"
-        ordering = ("-created_at", "-id")
 
     def __str__(self) -> str:
-        who = f"@{self.username}" if self.username else self.get_source_display()
+        who = str(self.learner) if self.learner_id else self.get_source_display()
 
         return f"{who} — {localtime(self.created_at):%d.%m.%Y %H:%M}"

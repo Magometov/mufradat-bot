@@ -6,26 +6,32 @@ from rest_framework.views import APIView
 from apps.api.internal.permissions import signed
 from apps.api.serializers import CardSerializer, ThemeSerializer, VisitSerializer
 from apps.common.constants import Source
-from apps.common.services import visits
+from apps.common.models import Learner
+from apps.common.services import learners, visits
 from apps.common.utils import telegram
 from apps.vocabulary import services
 from apps.vocabulary.constants import Theme
 
 
-def visitor(request: Request, fields: dict) -> tuple[Source, int | None, str]:
+def visitor(request: Request, fields: dict) -> tuple[Source, Learner | None]:
     """Кто пришёл: по подписи Telegram, по секрету бота или никак — тогда это сайт."""
     user = telegram.user_from(fields["init_data"])
 
     if user is not None:
         telegram_id, username = user
 
-        return Source.TELEGRAM, telegram_id, username
+        return Source.TELEGRAM, learners.identify(telegram_id=telegram_id, username=username)
 
     # Полям тела верим только от бота: ручка открыта наружу, подписи у них нет.
     if signed(request) and fields.get("telegram_id"):
-        return Source.TELEGRAM, fields["telegram_id"], fields["username"]
+        learner = learners.identify(
+            telegram_id=fields["telegram_id"],
+            username=fields["username"],
+        )
 
-    return Source.SITE, None, ""
+        return Source.TELEGRAM, learner
+
+    return Source.SITE, None
 
 
 class CardListView(APIView):
@@ -52,12 +58,11 @@ class VisitCreateView(APIView):
     def post(self, request: Request) -> Response:
         data = VisitSerializer(data=request.data)
         data.is_valid(raise_exception=True)
-        source, telegram_id, username = visitor(request, data.validated_data)
+        source, learner = visitor(request, data.validated_data)
 
         visits.log(
             source=source,
-            telegram_id=telegram_id,
-            username=username,
+            learner=learner,
             user_agent=request.headers.get("User-Agent", ""),
         )
 

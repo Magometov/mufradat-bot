@@ -1,5 +1,7 @@
 from django.db import models
 
+from apps.common.constants import BLANK_AND_NULL
+
 
 class Card(models.Model):
     """Общее у формы слова и фразы: что написано на карточке и картинка к этому."""
@@ -10,16 +12,15 @@ class Card(models.Model):
     image = models.ImageField(
         "Картинка",
         upload_to="cards/",
-        blank=True,
-        null=True,
         width_field="image_width",
         height_field="image_height",
+        **BLANK_AND_NULL,
     )
     # Размеры едут в приложение, чтобы оно резервировало под картинку место нужной
     # формы: иначе она встаёт на место не той пропорции и при загрузке всё прыгает.
     # Заполняет их Django при сохранении файла, руками их не правят.
-    image_width = models.PositiveIntegerField(null=True, blank=True, editable=False)
-    image_height = models.PositiveIntegerField(null=True, blank=True, editable=False)
+    image_width = models.PositiveIntegerField(editable=False, **BLANK_AND_NULL)
+    image_height = models.PositiveIntegerField(editable=False, **BLANK_AND_NULL)
 
     class Meta:
         abstract = True

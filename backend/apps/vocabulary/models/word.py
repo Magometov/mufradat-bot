@@ -1,11 +1,12 @@
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 
+from apps.common.models import BaseModel
 from apps.vocabulary.constants import Number, Theme
 from apps.vocabulary.models.base import Card
 
 
-class Word(models.Model):
+class Word(BaseModel):
     """Слово — понятие; написания лежат в `WordForm`, раздел один на все формы."""
 
     themes = ArrayField(
@@ -14,12 +15,10 @@ class Word(models.Model):
         default=list,
         blank=True,
     )
-    created_at = models.DateTimeField("Добавлено", auto_now_add=True, db_index=True)
 
-    class Meta:
+    class Meta(BaseModel.Meta):
         verbose_name = "Слово"
         verbose_name_plural = "Слова"
-        ordering = ("-created_at", "-id")
 
     def __str__(self) -> str:
         form = self.singular or self.forms.first()
