@@ -42,13 +42,6 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "config.urls"
 
-REST_FRAMEWORK = {
-    "DEFAULT_THROTTLE_RATES": {
-        "visits": "60/hour",
-        "answers": "120/hour",
-    },
-}
-
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -106,6 +99,19 @@ LOGGING = {
     "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "simple"}},
     "loggers": {"apps": {"handlers": ["console"], "level": "INFO"}},
 }
+
+# --- Пределы открытых ручек -----------------------------------------------------
+# Без них журнал входов и прогресс можно засорять сколько угодно.
+
+# Частота запросов; считается по адресу, потому что опознание у ручек разное.
+REST_FRAMEWORK = {
+    "DEFAULT_THROTTLE_RATES": {
+        "visits": getenv("VISITS_RATE", "60/hour"),
+        "answers": getenv("ANSWERS_RATE", "120/hour"),
+    },
+}
+# Столько оценок принимается за раз: пачка собирается в браузере и уезжает разом.
+ANSWERS_LIMIT = int(getenv("ANSWERS_LIMIT") or 100)
 
 # --- Telegram -------------------------------------------------------------------
 

@@ -1,12 +1,14 @@
 """Правила колоды: что в неё ложится, что из неё берётся и как разбирают урок."""
 
+from collections.abc import Iterable
+
 from django.core.files.base import File
 from django.db import transaction
 from django.db.models import QuerySet
 
 from apps.vocabulary.constants import Theme
 from apps.vocabulary.models import Phrase, Word, WordForm
-from apps.vocabulary.utils import to_webp
+from apps.vocabulary.utils import parse, to_id, to_webp
 
 # Единицы, которыми колоду разбирают: слово со всеми формами и отдельная фраза.
 UNITS = {"word": Word, "phrase": Phrase}
@@ -34,6 +36,27 @@ def deck() -> list[WordForm | Phrase]:
     phrases = Phrase.objects.order_by("-created_at", "-id")
 
     return [*forms, *phrases]
+
+
+def cards_by_id(card_ids: Iterable[str]) -> dict[str, WordForm | Phrase]:
+    """Карточки по номерам приложения. Неизвестные номера в ответ не попадают."""
+    forms, phrases = [], []
+
+    for card_id in card_ids:
+        parsed = parse(card_id)
+
+        if parsed is None:
+            continue
+
+        is_word, pk = parsed
+        (forms if is_word else phrases).append(pk)
+
+    found = {to_id(card.pk, is_word=True): card for card in WordForm.objects.filter(pk__in=forms)}
+    found.update(
+        {to_id(card.pk, is_word=False): card for card in Phrase.objects.filter(pk__in=phrases)}
+    )
+
+    return found
 
 
 def add_form(
