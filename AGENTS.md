@@ -89,6 +89,7 @@ source, learner = learners.visitor(init_data=...)
 
 ## Коммиты
 
+- **Коммитить перечисленными путями** (`git commit -o путь ...`), а не `git add -A`: иначе в историю уезжают скриншоты, слепки страниц и прочий мусор проверки.
 - Сообщение по-русски: заголовок в одну строку, тело — «почему», а не «что» (что видно в диффе).
 - В конце: `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`.
 - Спеки — `docs/superpowers/specs/`, планы — `docs/superpowers/plans/`.
