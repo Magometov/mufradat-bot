@@ -70,14 +70,14 @@ def test_nothing_to_send_is_no_content(client, monkeypatch):
 
 @signed
 @pytest.mark.django_db
-def test_image_comes_as_a_path(client, monkeypatch, form):
-    """Адрес картинки собрался бы от внутреннего хоста, и Telegram его не скачает."""
+def test_group_gets_the_postcard(client, monkeypatch, form):
+    """В группу уезжает собранная карточка, и путём, а не адресом: хост знает бот."""
     form.image.save("probe.png", picture(), save=True)
     monkeypatch.setattr(view, "take_group_card", lambda **kwargs: form)
 
     image = client.post(URL, headers={HEADER: TOKEN}).json()["image"]
 
-    assert image.startswith("/m/cards/")
+    assert image == f"/api/v1/card/w{form.pk}.jpg"
 
 
 @signed

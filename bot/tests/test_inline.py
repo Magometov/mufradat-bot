@@ -12,9 +12,7 @@ CARD = Found(
     arabic="قَلَم",
     translation_ru="ручка",
     transliteration="qalam",
-    image="https://mufradat.example/m/cards/w12.webp",
-    width=1024,
-    height=1024,
+    image="https://mufradat.example/api/v1/card/w12.jpg",
 )
 
 
@@ -26,13 +24,6 @@ def test_card_with_a_picture_goes_as_a_photo():
     assert item.photo_url == CARD.image
     assert item.thumbnail_url == CARD.image
     assert item.caption == "قَلَم\n\nручка\nqalam"
-
-
-def test_the_picture_carries_its_size():
-    """Размеры едут с картинкой: по ним Telegram раскладывает список выбора."""
-    item = as_result(CARD)
-
-    assert (item.photo_width, item.photo_height) == (1024, 1024)
 
 
 def test_card_without_a_picture_goes_as_text():

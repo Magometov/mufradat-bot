@@ -1,26 +1,33 @@
 """Правила колоды: что в неё ложится, что из неё берётся и как разбирают урок."""
 
 from collections.abc import Iterable
+from hashlib import sha1
 
-from django.core.files.base import File
+from django.core.files.base import ContentFile, File
+from django.core.files.storage import default_storage
 from django.db import transaction
 from django.db.models import QuerySet
 
 from apps.vocabulary.constants import Theme
 from apps.vocabulary.models import Phrase, Word, WordForm
-from apps.vocabulary.utils import parse, to_id, to_webp
+from apps.vocabulary.utils import card_id, parse, render, to_id, to_jpeg, to_webp
 
 # Единицы, которыми колоду разбирают: слово со всеми формами и отдельная фраза.
 UNITS = {"word": Word, "phrase": Phrase}
 
 Unit = Word | Phrase
 
+Card = WordForm | Phrase
+
+# Готовое для Telegram лежит рядом с колодой: собирается один раз и потом только читается.
+READY = "telegram"
+
 
 class Occupied(Exception):
     """Место занято: такая карточка уже есть или у слова уже есть это число."""
 
 
-def _attach(card: WordForm | Phrase, name: str, image: File | None) -> None:
+def _attach(card: Card, name: str, image: File | None) -> None:
     """Кладёт картинку под номером карточки: `w12.webp` понятнее, чем `card_a1b2.webp`."""
     if image is None:
         return
@@ -40,12 +47,12 @@ def phrases() -> QuerySet[Phrase]:
     return Phrase.objects.order_by("-created_at", "-id")
 
 
-def deck() -> list[WordForm | Phrase]:
+def deck() -> list[Card]:
     """Вся колода плоским списком: формы слов и фразы, свежие сверху."""
     return [*forms(), *phrases()]
 
 
-def find(query: str, *, limit: int) -> list[WordForm | Phrase]:
+def find(query: str, *, limit: int) -> list[Card]:
     """Карточки по русскому слову. Пустой запрос — верх колоды.
 
     Ищем по переводу и подстрокой: колода своя, слов сотни, и «маш» должно находить
@@ -60,25 +67,69 @@ def find(query: str, *, limit: int) -> list[WordForm | Phrase]:
     return [*found_forms[:limit], *found_phrases[:limit]][:limit]
 
 
-def cards_by_id(card_ids: Iterable[str]) -> dict[str, WordForm | Phrase]:
+def cards_by_id(card_ids: Iterable[str]) -> dict[str, Card]:
     """Карточки по номерам приложения. Неизвестные номера в ответ не попадают."""
-    forms, phrases = [], []
+    word_ids, phrase_ids = [], []
 
-    for card_id in card_ids:
-        parsed = parse(card_id)
+    for wanted in card_ids:
+        parsed = parse(wanted)
 
         if parsed is None:
             continue
 
         is_word, pk = parsed
-        (forms if is_word else phrases).append(pk)
+        (word_ids if is_word else phrase_ids).append(pk)
 
-    found = {to_id(card.pk, is_word=True): card for card in WordForm.objects.filter(pk__in=forms)}
+    found = {
+        to_id(card.pk, is_word=True): card for card in WordForm.objects.filter(pk__in=word_ids)
+    }
     found.update(
-        {to_id(card.pk, is_word=False): card for card in Phrase.objects.filter(pk__in=phrases)}
+        {to_id(card.pk, is_word=False): card for card in Phrase.objects.filter(pk__in=phrase_ids)}
     )
 
     return found
+
+
+def _ready(card: Card, kind: str) -> str:
+    """Имя готового файла. В нём слепок текста и картинки: правка карточки даёт новое имя."""
+    parts = (card.arabic, card.translation_ru, card.transliteration, card.image.name or "")
+    stamp = sha1("|".join(parts).encode()).hexdigest()[:8]
+
+    return f"{READY}/{kind}-{card_id(card)}-{stamp}.jpg"
+
+
+def postcard(card: Card) -> File | None:
+    """Собранная карточка для чата. `None` — картинки нет, и собирать нечего."""
+    if not card.image:
+        return None
+
+    name = _ready(card, "card")
+
+    if not default_storage.exists(name):
+        with card.image.open("rb") as art:
+            drawn = render(
+                arabic=card.arabic,
+                translation=card.translation_ru,
+                transliteration=card.transliteration,
+                illustration=art,
+            )
+        default_storage.save(name, ContentFile(drawn))
+
+    return default_storage.open(name)
+
+
+def photo(card: Card) -> File | None:
+    """Иллюстрация карточки джипегом: в напоминаниях спойлер прячет именно её."""
+    if not card.image:
+        return None
+
+    name = _ready(card, "photo")
+
+    if not default_storage.exists(name):
+        with card.image.open("rb") as source:
+            default_storage.save(name, to_jpeg(source))
+
+    return default_storage.open(name)
 
 
 def add_form(

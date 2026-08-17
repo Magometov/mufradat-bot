@@ -71,9 +71,6 @@ class Found:
     translation_ru: str
     transliteration: str
     image: str | None
-    # Размеры нужны Telegram, чтобы разложить список выбора, не скачивая картинки.
-    width: int | None
-    height: int | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -278,8 +275,6 @@ async def search(query: str) -> list[Found]:
             translation_ru=card["translation_ru"],
             transliteration=card["transliteration"],
             image=_image_url(card["image"]),
-            width=card["image_width"],
-            height=card["image_height"],
         )
         for card in body
     ]

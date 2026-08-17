@@ -56,19 +56,17 @@ def test_card_comes_with_its_number(client, form):
             "translation_ru": "книга",
             "transliteration": "",
             "image": None,
-            "image_width": None,
-            "image_height": None,
         }
     ]
 
 
 @signed
 @pytest.mark.django_db
-def test_image_comes_as_a_path(client, form):
-    """Адрес картинки собрался бы от внутреннего хоста, и Telegram его не скачает."""
+def test_inline_gets_the_postcard(client, form):
+    """В инлайн уезжает собранная карточка, и путём, а не адресом: хост знает бот."""
     form.image.save("probe.png", picture(), save=True)
 
-    assert ask(client, query="книга").json()[0]["image"].startswith("/m/cards/")
+    assert ask(client, query="книга").json()[0]["image"] == f"/api/v1/card/w{form.pk}.jpg"
 
 
 @signed

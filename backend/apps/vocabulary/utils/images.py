@@ -21,6 +21,16 @@ def _has_alpha(picture: Image.Image) -> bool:
     return picture.mode in ("RGBA", "LA") or "transparency" in picture.info
 
 
+def to_jpeg(image: File) -> ContentFile:
+    """Переводит картинку в джипег: Telegram в инлайне другого формата не принимает."""
+    picture = Image.open(image).convert("RGB")
+
+    buffer = BytesIO()
+    picture.save(buffer, format="JPEG", quality=QUALITY, optimize=True)
+
+    return ContentFile(buffer.getvalue(), name=f"{Path(image.name or 'card').stem}.jpg")
+
+
 def to_webp(image: File) -> ContentFile:
     """Пережимает картинку в webp. Имя — прежнее, расширение новое."""
     source = Image.open(image)

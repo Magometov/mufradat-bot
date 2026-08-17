@@ -1,7 +1,8 @@
 from rest_framework import serializers
 
+from apps.api.utils import postcard_path
 from apps.vocabulary.models import Phrase, WordForm
-from apps.vocabulary.utils import to_id
+from apps.vocabulary.utils import card_id
 
 
 class SearchSerializer(serializers.Serializer):
@@ -17,13 +18,11 @@ class FoundCardSerializer(serializers.Serializer):
     arabic = serializers.CharField()
     translation_ru = serializers.CharField()
     transliteration = serializers.CharField()
-    # Путь, а не полный адрес: он собрался бы от внутреннего хоста, а такую ссылку
-    # Telegram не скачает. Публичный адрес подставляет бот — он его знает.
-    image = serializers.ImageField()
-    # Размеры едут, чтобы Telegram разложил список выбора, не скачивая картинки.
-    image_width = serializers.IntegerField(allow_null=True)
-    image_height = serializers.IntegerField(allow_null=True)
+    # Собранная карточка, а не иллюстрация: в инлайне уезжает именно она.
+    image = serializers.SerializerMethodField()
 
     def get_id(self, card: WordForm | Phrase) -> str:
-        """Номер тот же, что у приложения: форма и фраза лежат в разных таблицах."""
-        return to_id(card.pk, is_word=isinstance(card, WordForm))
+        return card_id(card)
+
+    def get_image(self, card: WordForm | Phrase) -> str | None:
+        return postcard_path(card)

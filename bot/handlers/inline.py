@@ -51,8 +51,6 @@ def as_result(card: api.Found) -> InlineQueryResult:
         id=card.id,
         photo_url=card.image,
         thumbnail_url=card.image,
-        photo_width=card.width,
-        photo_height=card.height,
         title=card.translation_ru,
         description=card.arabic,
         caption=text,

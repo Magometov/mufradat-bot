@@ -6,6 +6,12 @@ from apps.common.models import Learner
 from apps.vocabulary.models import Phrase, Word, WordForm
 
 
+@pytest.fixture(autouse=True)
+def media(tmp_path, settings) -> None:
+    """Картинки тестов не оседают в рабочем каталоге."""
+    settings.MEDIA_ROOT = tmp_path
+
+
 @pytest.fixture
 def learner(db) -> Learner:
     return Learner.objects.create(telegram_id=1001, username="ali")
