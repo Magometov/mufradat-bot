@@ -64,6 +64,7 @@ export function useSession(entries: Ref<IEntry[]>, needed: Ref<number>): IUseSes
                 isReversed: Math.random() < 0.5,
                 level: state?.level ?? null,
                 step: state?.step ?? 0,
+                misses: 0,
             };
         });
 

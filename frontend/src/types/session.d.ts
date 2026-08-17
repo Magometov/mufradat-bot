@@ -12,6 +12,7 @@ export interface ISessionItem {
     /** `null` — карточку видят впервые. */
     level: number | null;
     step: number;
+    misses: number;
 }
 
 export interface IUseSession {

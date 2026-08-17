@@ -3,18 +3,19 @@
 import type { ISessionCard, TVerdict } from '../types/progress';
 // #endregion
 
-// Через столько других карточек возвращается забытая. Меньше — и слово не успевает
-// вылететь из головы, а значит припоминания не происходит.
-export const RETURN_AFTER = 3;
+// Через сколько других карточек возвращается забытая: с каждым промахом дальше. Первый
+// возврат близко, чтобы слово не успело выветриться; дальше — иначе в длинном сеансе одно
+// и то же слово лезет в лицо каждые три карточки.
+export const RETURN_STEPS = [5, 10, 20];
 
 const LEARNING = 0;
 
 /**
  * Очередь сеанса после оценки первой карточки.
  *
- * Закрытая карточка из очереди уходит, забытая возвращается через несколько других.
- * Уровень и счёт здесь считаются только чтобы решить, закрылась ли карточка; настоящие
- * уровень и срок пишет сервер.
+ * Закрытая карточка из очереди уходит, забытая возвращается тем дальше, чем чаще не
+ * давалась. Уровень и счёт здесь считаются только чтобы решить, закрылась ли карточка;
+ * настоящие уровень и срок пишет сервер.
  */
 export function answer<TCard extends ISessionCard>(
     queue: TCard[],
@@ -25,7 +26,11 @@ export function answer<TCard extends ISessionCard>(
 
     if (card === undefined) return [];
 
-    if (verdict === 'forgot') return back(rest, { ...card, level: LEARNING, step: 0 });
+    if (verdict === 'forgot') {
+        const misses = card.misses + 1;
+
+        return back(rest, { ...card, level: LEARNING, step: 0, misses });
+    }
 
     // Узнал с первого взгляда — карточка знакомая и уходит сразу, как и на сервере.
     if (card.level === null) return rest;
@@ -39,10 +44,13 @@ export function answer<TCard extends ISessionCard>(
 }
 
 /**
- * Ставит карточку в очередь через `RETURN_AFTER` других или в конец, если их меньше.
+ * Ставит карточку дальше по очереди или в конец, если та короче нужного шага.
+ *
+ * Шаг берётся по числу уже случившихся промахов: первый возврат — первый шаг.
  */
 function back<TCard extends ISessionCard>(queue: TCard[], card: TCard): TCard[] {
-    const at = Math.min(RETURN_AFTER, queue.length);
+    const index = Math.min(Math.max(card.misses - 1, 0), RETURN_STEPS.length - 1);
+    const at = Math.min(RETURN_STEPS[index], queue.length);
 
     return [...queue.slice(0, at), card, ...queue.slice(at)];
 }
