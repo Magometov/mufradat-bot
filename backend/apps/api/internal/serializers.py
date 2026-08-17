@@ -34,3 +34,13 @@ class MoveSerializer(serializers.Serializer):
     id = serializers.IntegerField(min_value=1)
     # Выбор ограничен целями разбора, поэтому сам раздел урока отсеется здесь же.
     themes = serializers.ListField(child=serializers.ChoiceField(choices=services.move_targets()))
+
+
+class ReminderSerializer(serializers.Serializer):
+    """Карточка для чата: кому и что отправить."""
+
+    telegram_id = serializers.IntegerField(source="learner.telegram_id")
+    arabic = serializers.CharField(source="card.arabic")
+    translation_ru = serializers.CharField(source="card.translation_ru")
+    transliteration = serializers.CharField(source="card.transliteration")
+    image = serializers.ImageField(source="card.image")

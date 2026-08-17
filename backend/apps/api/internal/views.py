@@ -8,7 +8,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.api.internal.permissions import IsBot
-from apps.api.internal.serializers import FormSerializer, MoveSerializer, PhraseSerializer
+from apps.api.internal.serializers import (
+    FormSerializer,
+    MoveSerializer,
+    PhraseSerializer,
+    ReminderSerializer,
+)
+from apps.learning.services import take_reminders
 from apps.vocabulary import services
 from apps.vocabulary.models import Word
 
@@ -96,3 +102,20 @@ class LessonMoveView(APIView):
         logger.info("бот разложил %s %s → %s", fields["kind"], unit.pk, themes or "без темы")
 
         return Response({"themes": themes})
+
+
+class ReminderTakeView(APIView):
+    """Отдаёт боту по одной карточке на человека и помечает их отправленными.
+
+    Окно тишины и шаг между сообщениями считает бэкенд: бот только отправляет.
+    """
+
+    permission_classes = (IsBot,)
+
+    def post(self, request: Request) -> Response:
+        cards = take_reminders()
+
+        if cards:
+            logger.info("к отправке в чат: %s", len(cards))
+
+        return Response(ReminderSerializer(cards, many=True, context={"request": request}).data)

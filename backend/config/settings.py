@@ -140,4 +140,6 @@ FIRST_SIGHT_LEVEL = int(getenv("FIRST_SIGHT_LEVEL") or 3)
 SESSION_LIMIT = int(getenv("SESSION_LIMIT") or 20)
 NEW_LIMIT = int(getenv("NEW_LIMIT") or 10)
 # Открыть новую логику всем, а не только тем, кому поставили галочку в админке.
+# TODO: когда логика открыта всем и это устоялось — снести саму переменную вместе с
+# галочкой `Learner.scheduling`, признаком `enabled` в ответе API и ветками во фронтенде.
 SCHEDULING_FOR_ALL = getenv("SCHEDULING_FOR_ALL", "").lower() == "true"

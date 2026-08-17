@@ -1,4 +1,6 @@
-"""Уровни и оценки, у которых есть особый смысл."""
+"""Уровни, оценки и напоминания."""
+
+from datetime import timedelta
 
 from django.db import models
 
@@ -8,6 +10,11 @@ LEARNING = 0
 FIRST_SCHEDULED = 1
 # Столько верных ответов подряд закрывает изучение.
 NEEDED = 2
+
+# Напоминания в чат: шаг между сообщениями и окно, вне которого бот молчит.
+REMINDER_STEP = timedelta(hours=1)
+AWAKE_FROM = 9
+AWAKE_TO = 21
 
 
 class Verdict(models.TextChoices):
