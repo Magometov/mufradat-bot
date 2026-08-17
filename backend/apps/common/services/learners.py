@@ -1,15 +1,8 @@
 """Люди: кто пришёл и как его найти."""
 
-import hashlib
-
-from django.conf import settings
-
 from apps.common.constants import USERNAME_LENGTH, Source
 from apps.common.models import Learner
 from apps.common.utils import user_from
-
-# Ключ человека для разработки: подписи Telegram в браузере нет, а прогресс надо видеть.
-LOCAL_KEY_HASH = hashlib.sha256(b"local").hexdigest()
 
 
 def identify(*, telegram_id: int, username: str = "") -> Learner:
@@ -43,18 +36,4 @@ def visitor(
     if is_bot and telegram_id:
         return Source.TELEGRAM, identify(telegram_id=telegram_id, username=username)
 
-    # Только на своей машине: нужны оба признака, и LOCAL_LEARNER в проде не ставят.
-    if settings.DEBUG and settings.LOCAL_LEARNER:
-        return Source.SITE, local()
-
     return Source.SITE, None
-
-
-def local() -> Learner:
-    """Человек для разработки, один на машину."""
-    learner, _ = Learner.objects.get_or_create(
-        key_hash=LOCAL_KEY_HASH,
-        defaults={"username": "local"},
-    )
-
-    return learner
