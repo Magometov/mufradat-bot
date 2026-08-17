@@ -5,9 +5,9 @@ from django.contrib import admin
 from django.core.files.base import File
 from django.core.files.uploadedfile import UploadedFile
 
-from apps.vocabulary import images
 from apps.vocabulary.constants import Theme
 from apps.vocabulary.models import Phrase, Word
+from apps.vocabulary.utils import to_webp
 
 
 class ImageForm(forms.ModelForm):
@@ -20,7 +20,7 @@ class ImageForm(forms.ModelForm):
         if not isinstance(image, UploadedFile):
             return image
 
-        return images.to_webp(image)
+        return to_webp(image)
 
 
 class ThemesForm(ImageForm):

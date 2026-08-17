@@ -5,7 +5,7 @@ from django.db.models import QuerySet
 from django.http import HttpRequest
 
 from apps.common.models import Visit
-from apps.common.utils.devices import device_name
+from apps.common.utils import device_name
 
 
 @admin.register(Visit)

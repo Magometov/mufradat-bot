@@ -3,13 +3,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.api.serializers import CardSerializer
-from apps.vocabulary import services
+from apps.vocabulary.services import deck
 
 
 class CardListView(APIView):
     """Колода одним ответом: формы слов и фразы плоским списком."""
 
     def get(self, request: Request) -> Response:
-        cards = services.deck()
+        cards = deck()
 
         return Response(CardSerializer(cards, many=True, context={"request": request}).data)

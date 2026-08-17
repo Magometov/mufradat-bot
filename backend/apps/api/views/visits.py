@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 
 from apps.api.internal.permissions import signed
 from apps.api.serializers import VisitSerializer
-from apps.common.services import learners, visits
+from apps.common.services import log, visitor
 
 
 class VisitCreateView(APIView):
@@ -20,14 +20,14 @@ class VisitCreateView(APIView):
         data.is_valid(raise_exception=True)
         fields = data.validated_data
 
-        source, learner = learners.visitor(
+        source, learner = visitor(
             init_data=fields["init_data"],
             telegram_id=fields.get("telegram_id"),
             username=fields["username"],
             is_bot=signed(request),
         )
 
-        visits.log(
+        log(
             source=source,
             learner=learner,
             user_agent=request.headers.get("User-Agent", ""),

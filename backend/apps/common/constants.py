@@ -12,6 +12,8 @@ KEY_HASH_LENGTH = 64
 
 # Столько живёт подпись Telegram: без срока перехваченная строка работает вечно.
 SIGNATURE_MAX_AGE = timedelta(days=1)
+# Заголовок с подписью.
+INIT_DATA_HEADER = "X-Init-Data"
 
 # Поле, которое можно не заполнять.
 BLANK_AND_NULL = {"blank": True, "null": True}

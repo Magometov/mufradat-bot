@@ -5,14 +5,14 @@ from django.db import IntegrityError, transaction
 
 from apps.common.constants import Source
 from apps.common.models import Learner
-from apps.common.services import learners
+from apps.common.services import identify, visitor
 
 
 @pytest.mark.django_db
 def test_telegram_learner_is_created_once():
     """Второй заход того же человека новую запись не заводит."""
-    first = learners.identify(telegram_id=111, username="ali")
-    second = learners.identify(telegram_id=111, username="ali")
+    first = identify(telegram_id=111, username="ali")
+    second = identify(telegram_id=111, username="ali")
 
     assert first.pk == second.pk
     assert Learner.objects.count() == 1
@@ -21,8 +21,8 @@ def test_telegram_learner_is_created_once():
 @pytest.mark.django_db
 def test_username_follows_telegram():
     """Сменившийся ник переписывается: он один на человека, а не снимок на заход."""
-    learners.identify(telegram_id=222, username="old")
-    learner = learners.identify(telegram_id=222, username="new")
+    identify(telegram_id=222, username="old")
+    learner = identify(telegram_id=222, username="new")
 
     assert learner.username == "new"
 
@@ -30,8 +30,8 @@ def test_username_follows_telegram():
 @pytest.mark.django_db
 def test_empty_username_does_not_erase_saved_one():
     """Заход без ника не стирает известный: Telegram отдаёт ник не всегда."""
-    learners.identify(telegram_id=333, username="ali")
-    learner = learners.identify(telegram_id=333)
+    identify(telegram_id=333, username="ali")
+    learner = identify(telegram_id=333)
 
     assert learner.username == "ali"
 
@@ -46,21 +46,21 @@ def test_learner_without_identity_is_rejected():
 @pytest.mark.django_db
 def test_str_prefers_username():
     """Подпись в админке: ник, а иначе id, а у гостя — номер."""
-    assert str(learners.identify(telegram_id=444, username="ali")) == "@ali"
-    assert str(learners.identify(telegram_id=555)) == "555"
+    assert str(identify(telegram_id=444, username="ali")) == "@ali"
+    assert str(identify(telegram_id=555)) == "555"
     assert str(Learner.objects.create(key_hash="a" * 64)).startswith("гость №")
 
 
 @pytest.mark.django_db
 def test_visitor_without_signature_is_nobody():
     """Заход без подписи — сайт и никто: заводить человека не на что."""
-    assert learners.visitor() == (Source.SITE, None)
+    assert visitor() == (Source.SITE, None)
 
 
 @pytest.mark.django_db
 def test_visitor_does_not_trust_the_body():
     """Названный в теле id без секрета бота ничего не значит: ручка открыта наружу."""
-    source, learner = learners.visitor(telegram_id=666, username="fake")
+    source, learner = visitor(telegram_id=666, username="fake")
 
     assert (source, learner) == (Source.SITE, None)
     assert Learner.objects.count() == 0
@@ -69,7 +69,7 @@ def test_visitor_does_not_trust_the_body():
 @pytest.mark.django_db
 def test_visitor_trusts_the_bot():
     """Боту верим: у него подписи нет, зато есть общий секрет."""
-    source, learner = learners.visitor(telegram_id=777, username="ali", is_bot=True)
+    source, learner = visitor(telegram_id=777, username="ali", is_bot=True)
 
     assert source == Source.TELEGRAM
     assert learner.telegram_id == 777

@@ -2,7 +2,7 @@
 
 from apps.common.constants import USERNAME_LENGTH, Source
 from apps.common.models import Learner
-from apps.common.utils import telegram
+from apps.common.utils import user_from
 
 
 def identify(*, telegram_id: int, username: str = "") -> Learner:
@@ -27,7 +27,7 @@ def visitor(
     is_bot: bool = False,
 ) -> tuple[Source, Learner | None]:
     """Откуда заход и кто его сделал. Без опознания — сайт и никто."""
-    signed_user = telegram.user_from(init_data)
+    signed_user = user_from(init_data)
 
     if signed_user is not None:
         return Source.TELEGRAM, identify(telegram_id=signed_user[0], username=signed_user[1])

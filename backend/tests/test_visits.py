@@ -5,7 +5,7 @@ from django.test import override_settings
 
 from apps.common.constants import Source
 from apps.common.models import Visit
-from apps.common.services import learners, visits
+from apps.common.services import identify, log
 
 OWNER = 900
 STRANGER = 901
@@ -14,9 +14,9 @@ STRANGER = 901
 @pytest.mark.django_db
 def test_visit_points_at_learner():
     """Заход из Telegram ссылается на человека, а не хранит его id у себя."""
-    learner = learners.identify(telegram_id=STRANGER, username="ali")
+    learner = identify(telegram_id=STRANGER, username="ali")
 
-    visits.log(source=Source.TELEGRAM, learner=learner, user_agent="Mozilla/5.0")
+    log(source=Source.TELEGRAM, learner=learner, user_agent="Mozilla/5.0")
 
     visit = Visit.objects.get()
     assert visit.learner_id == learner.pk
@@ -26,7 +26,7 @@ def test_visit_points_at_learner():
 @pytest.mark.django_db
 def test_site_visit_has_no_learner():
     """Заход с сайта — без ссылки: в этот момент мы не знаем, кто пришёл."""
-    visits.log(source=Source.SITE, user_agent="Mozilla/5.0")
+    log(source=Source.SITE, user_agent="Mozilla/5.0")
 
     assert Visit.objects.get().learner_id is None
 
@@ -35,9 +35,9 @@ def test_site_visit_has_no_learner():
 @pytest.mark.django_db
 def test_owner_visit_is_not_logged_but_learner_stays():
     """Владельца журнал не пишет, а запись о человеке остаётся: к ней привязан прогресс."""
-    owner = learners.identify(telegram_id=OWNER, username="me")
+    owner = identify(telegram_id=OWNER, username="me")
 
-    visits.log(source=Source.TELEGRAM, learner=owner)
+    log(source=Source.TELEGRAM, learner=owner)
 
     assert Visit.objects.count() == 0
     assert owner.pk is not None
@@ -46,7 +46,7 @@ def test_owner_visit_is_not_logged_but_learner_stays():
 @pytest.mark.django_db
 def test_user_agent_is_trimmed():
     """Строка браузера обрезается, чтобы запись не пухла."""
-    visits.log(source=Source.SITE, user_agent="x" * 900)
+    log(source=Source.SITE, user_agent="x" * 900)
 
     assert len(Visit.objects.get().user_agent) == 400
 
@@ -54,8 +54,8 @@ def test_user_agent_is_trimmed():
 @pytest.mark.django_db
 def test_deleting_learner_takes_visits_with_it():
     """Удалили человека — его заходы уходят следом: журнал без человека нечитаем."""
-    learner = learners.identify(telegram_id=STRANGER)
-    visits.log(source=Source.TELEGRAM, learner=learner)
+    learner = identify(telegram_id=STRANGER)
+    log(source=Source.TELEGRAM, learner=learner)
 
     learner.delete()
 

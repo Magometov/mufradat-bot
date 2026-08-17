@@ -4,9 +4,9 @@ from django.core.files.base import File
 from django.db import transaction
 from django.db.models import QuerySet
 
-from apps.vocabulary import images
 from apps.vocabulary.constants import Theme
 from apps.vocabulary.models import Phrase, Word, WordForm
+from apps.vocabulary.utils import to_webp
 
 # Единицы, которыми колоду разбирают: слово со всеми формами и отдельная фраза.
 UNITS = {"word": Word, "phrase": Phrase}
@@ -23,7 +23,7 @@ def _attach(card: WordForm | Phrase, name: str, image: File | None) -> None:
     if image is None:
         return
 
-    card.image.save(f"{name}{card.pk}.webp", images.to_webp(image), save=True)
+    card.image.save(f"{name}{card.pk}.webp", to_webp(image), save=True)
 
 
 def deck() -> list[WordForm | Phrase]:
