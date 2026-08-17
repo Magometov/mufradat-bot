@@ -51,7 +51,7 @@ select = ["E", "F", "I", "UP", "B"]
 # Тесты бэкенда. База нужна живая: `docker compose up -d db`, адрес берётся из .env.
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"
-pythonpath = ["backend"]
-testpaths = ["backend/tests"]
+pythonpath = ["backend", "."]
+testpaths = ["backend/tests", "bot/tests"]
 python_files = ["test_*.py"]
 addopts = "-q"

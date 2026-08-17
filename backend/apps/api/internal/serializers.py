@@ -44,3 +44,5 @@ class ReminderSerializer(serializers.Serializer):
     translation_ru = serializers.CharField(source="card.translation_ru")
     transliteration = serializers.CharField(source="card.transliteration")
     image = serializers.ImageField(source="card.image")
+    # Первое сообщение человеку идёт со вступлением.
+    is_first = serializers.BooleanField()

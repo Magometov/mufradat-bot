@@ -34,6 +34,7 @@ def test_learning_card_goes_to_chat(student, form):
 
     assert [card.card for card in taken] == [form]
     assert taken[0].reminded_at == NOON
+    assert taken[0].is_first is True
 
 
 @settings
@@ -66,6 +67,9 @@ def test_unsent_first_then_the_oldest(student, form, phrase):
 
     first = take_reminders(now=NOON)[0]
     second = take_reminders(now=NOON + timedelta(hours=2))[0]
+
+    # Вступление идёт только с первым сообщением.
+    assert (first.is_first, second.is_first) == (True, False)
     third = take_reminders(now=NOON + timedelta(hours=4))[0]
 
     assert first.pk != second.pk

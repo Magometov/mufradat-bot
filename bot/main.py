@@ -9,7 +9,7 @@ from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramUnauthorizedError
 from aiogram.types import BotCommand, BotCommandScopeChat
 
-from bot import config
+from bot import config, reminders
 from bot.handlers import add, maintenance, start, themes
 from bot.keyboards import menu_button
 
@@ -43,7 +43,15 @@ async def run(token: str) -> None:
         await bot.set_chat_menu_button(menu_button=menu_button())
         await set_commands(bot)
         logger.info("бот @%s запущен", me.username)
-        await dispatcher.start_polling(bot)
+
+        # Напоминания живут заданием рядом с опросом: свой контейнер им не нужен, а
+        # токен и сессия у них те же.
+        sender = asyncio.create_task(reminders.run(bot))
+
+        try:
+            await dispatcher.start_polling(bot)
+        finally:
+            sender.cancel()
     except TelegramUnauthorizedError:
         raise SystemExit("BOT_TOKEN не принят Telegram — проверь токен в .env") from None
     finally:

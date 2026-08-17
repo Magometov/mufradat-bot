@@ -12,6 +12,7 @@ FORMS = "/api/v1/internal/forms/"
 PHRASES = "/api/v1/internal/phrases/"
 LESSON = "/api/v1/internal/lesson/"
 MOVE = "/api/v1/internal/lesson/move/"
+REMINDERS = "/api/v1/internal/reminders/take/"
 VISITS = "/api/v1/visits/"
 
 
@@ -30,6 +31,18 @@ class Unit:
     kind: str
     id: int
     title: str
+
+
+@dataclass(frozen=True, slots=True)
+class Reminder:
+    """Карточка для чата: кому и что отправить."""
+
+    telegram_id: int
+    arabic: str
+    translation_ru: str
+    transliteration: str
+    image: str | None
+    is_first: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,7 +76,7 @@ def _reason(response: httpx.Response) -> str:
     return str(body)
 
 
-async def _send(method: str, path: str, **kwargs: object) -> dict:
+async def _send(method: str, path: str, **kwargs: object) -> dict | list:
     """Зовёт служебную ручку и разбирает ответ."""
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT) as client:
@@ -161,3 +174,20 @@ async def move(*, kind: str, unit: int, themes: list[str]) -> None:
     Ходит JSON, а не формой: пустой список полем формы не передать вовсе.
     """
     await _send("POST", MOVE, json={"kind": kind, "id": unit, "themes": themes})
+
+
+async def reminders() -> list[Reminder]:
+    """Спрашивает, кому что напомнить. Окно тишины и шаг решает бэкенд, не бот."""
+    body = await _send("POST", REMINDERS)
+
+    return [
+        Reminder(
+            telegram_id=int(card["telegram_id"]),
+            arabic=card["arabic"],
+            translation_ru=card["translation_ru"],
+            transliteration=card["transliteration"],
+            image=card["image"],
+            is_first=bool(card["is_first"]),
+        )
+        for card in body
+    ]

@@ -26,7 +26,7 @@ test: test-back test-front ## Прогнать все тесты
 
 .PHONY: test-back
 test-back: ## Тесты бэкенда. База должна быть поднята: docker compose up -d db
-	uv run --group backend --group dev pytest
+	uv run --group backend --group bot --group dev pytest
 
 .PHONY: test-front
 test-front: ## Тесты фронтенда: чистые функции сеанса
