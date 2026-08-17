@@ -3,6 +3,7 @@
 import pytest
 from django.db import IntegrityError, transaction
 
+from apps.common.constants import Source
 from apps.common.models import Learner
 from apps.common.services import learners
 
@@ -48,3 +49,27 @@ def test_str_prefers_username():
     assert str(learners.identify(telegram_id=444, username="ali")) == "@ali"
     assert str(learners.identify(telegram_id=555)) == "555"
     assert str(Learner.objects.create(key_hash="a" * 64)).startswith("гость №")
+
+
+@pytest.mark.django_db
+def test_visitor_without_signature_is_nobody():
+    """Заход без подписи — сайт и никто: заводить человека не на что."""
+    assert learners.visitor() == (Source.SITE, None)
+
+
+@pytest.mark.django_db
+def test_visitor_does_not_trust_the_body():
+    """Названный в теле id без секрета бота ничего не значит: ручка открыта наружу."""
+    source, learner = learners.visitor(telegram_id=666, username="fake")
+
+    assert (source, learner) == (Source.SITE, None)
+    assert Learner.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_visitor_trusts_the_bot():
+    """Боту верим: у него подписи нет, зато есть общий секрет."""
+    source, learner = learners.visitor(telegram_id=777, username="ali", is_bot=True)
+
+    assert source == Source.TELEGRAM
+    assert learner.telegram_id == 777

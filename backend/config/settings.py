@@ -11,7 +11,7 @@ load_dotenv(BASE_DIR.parent / ".env")
 SECRET_KEY = getenv("DJANGO_SECRET_KEY")
 DEBUG = getenv("DJANGO_DEBUG", "").lower() == "true"
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = [host.strip() for host in getenv("ALLOWED_HOSTS", "*").split(",")]
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
@@ -41,6 +41,13 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "config.urls"
+
+REST_FRAMEWORK = {
+    "DEFAULT_THROTTLE_RATES": {
+        "visits": "60/hour",
+        "answers": "120/hour",
+    },
+}
 
 TEMPLATES = [
     {

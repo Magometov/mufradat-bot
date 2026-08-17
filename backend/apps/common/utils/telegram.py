@@ -3,9 +3,13 @@
 import hashlib
 import hmac
 import json
+from datetime import UTC, datetime, timedelta
 from urllib.parse import parse_qsl
 
 from django.conf import settings
+from django.utils import timezone
+
+from apps.common.constants import SIGNATURE_MAX_AGE
 
 
 def user_from(init_data: str) -> tuple[int, str] | None:
@@ -22,7 +26,20 @@ def user_from(init_data: str) -> tuple[int, str] | None:
     if not signature or not _matches(fields, signature, token):
         return None
 
+    if not _fresh(fields.get("auth_date", "")):
+        return None
+
     return _user(fields.get("user", ""))
+
+
+def _fresh(raw: str) -> bool:
+    """Подпись не старше суток. Без даты и с нечитаемой датой — не годится."""
+    try:
+        signed_at = datetime.fromtimestamp(int(raw), tz=UTC)
+    except (TypeError, ValueError):
+        return False
+
+    return timedelta() <= timezone.now() - signed_at <= SIGNATURE_MAX_AGE
 
 
 def _matches(fields: dict[str, str], signature: str, token: str) -> bool:
