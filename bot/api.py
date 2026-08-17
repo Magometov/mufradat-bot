@@ -13,6 +13,9 @@ PHRASES = "/api/v1/internal/phrases/"
 LESSON = "/api/v1/internal/lesson/"
 MOVE = "/api/v1/internal/lesson/move/"
 REMINDERS = "/api/v1/internal/reminders/take/"
+SWITCH = "/api/v1/internal/reminders/switch/"
+PROGRESS = "/api/v1/internal/progress/"
+RESET = "/api/v1/internal/progress/reset/"
 VISITS = "/api/v1/visits/"
 
 
@@ -43,6 +46,15 @@ class Reminder:
     transliteration: str
     image: str | None
     is_first: bool
+
+
+@dataclass(frozen=True, slots=True)
+class Progress:
+    """Что у человека с прогрессом: этим бот отвечает на команды."""
+
+    reminders_on: bool
+    scheduling: bool
+    cards: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -191,3 +203,33 @@ async def reminders() -> list[Reminder]:
         )
         for card in body
     ]
+
+
+def _progress(body: dict) -> Progress:
+    """Разбирает сводку по человеку."""
+    return Progress(
+        reminders_on=bool(body["reminders_on"]),
+        scheduling=bool(body["scheduling"]),
+        cards=int(body["cards"]),
+    )
+
+
+async def progress(*, telegram_id: int, username: str) -> Progress:
+    """Спрашивает, что у человека с прогрессом."""
+    body = await _send("POST", PROGRESS, json={"telegram_id": telegram_id, "username": username})
+
+    return _progress(body)
+
+
+async def switch_reminders(*, telegram_id: int, username: str) -> Progress:
+    """Переворачивает признак напоминаний и отдаёт, каким он стал."""
+    body = await _send("POST", SWITCH, json={"telegram_id": telegram_id, "username": username})
+
+    return _progress(body)
+
+
+async def reset_progress(*, telegram_id: int, username: str) -> Progress:
+    """Обнуляет прогресс: колода остаётся, уходят уровни и сроки."""
+    body = await _send("POST", RESET, json={"telegram_id": telegram_id, "username": username})
+
+    return _progress(body)

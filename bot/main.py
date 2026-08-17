@@ -10,19 +10,29 @@ from aiogram.exceptions import TelegramUnauthorizedError
 from aiogram.types import BotCommand, BotCommandScopeChat
 
 from bot import config, reminders
-from bot.handlers import add, maintenance, start, themes
+from bot.handlers import add, maintenance, progress, start, themes
 from bot.keyboards import menu_button
 
 logger = logging.getLogger(__name__)
 
 
+# Команды про прогресс видны всем: у кого его нет, тому бот честно об этом скажет.
+COMMANDS = [
+    BotCommand(command="help", description="Как это работает"),
+    BotCommand(command="reminders", description="Слова в чат: присылать или нет"),
+    BotCommand(command="reset", description="Обнулить прогресс"),
+]
+
+
 async def set_commands(bot: Bot) -> None:
-    """Команда добавления стоит в меню только у владельца, остальным её нет."""
+    """Общее меню всем, а добавление карточек — только владельцу."""
+    await bot.set_my_commands(COMMANDS)
+
     if not config.ADMIN_TELEGRAM_ID:
         return
 
     await bot.set_my_commands(
-        [BotCommand(command="add", description="Добавить слова или фразы")],
+        [*COMMANDS, BotCommand(command="add", description="Добавить слова или фразы")],
         scope=BotCommandScopeChat(chat_id=config.ADMIN_TELEGRAM_ID),
     )
 
@@ -34,6 +44,7 @@ async def run(token: str) -> None:
     dispatcher.include_router(maintenance.router)
     dispatcher.include_router(add.router)
     dispatcher.include_router(themes.router)
+    dispatcher.include_router(progress.router)
     dispatcher.include_router(start.router)
 
     # Сессию закрываем и когда запуск не удался: иначе aiogram ругается на брошенное

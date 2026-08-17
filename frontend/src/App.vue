@@ -271,9 +271,12 @@
         void flush();
     });
 
-    // Подсказки про расписание нужны только тому, у кого расписание есть.
+    // Подсказки про расписание нужны только тому, у кого расписание есть. Ссылка из
+    // бота открывает их и повторно: человек пришёл именно за ними.
     watch(enabled, (isOn) => {
-        if (isOn && !isTipsSeen()) isTipsOpen.value = true;
+        if (!isOn) return;
+
+        if (!isTipsSeen() || window.location.hash.includes('tips')) isTipsOpen.value = true;
     });
 
     onMounted(() => {

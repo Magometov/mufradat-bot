@@ -5,6 +5,9 @@ from apps.api.internal.views import (
     LessonMoveView,
     LessonView,
     PhraseCreateView,
+    ProgressResetView,
+    ProgressView,
+    RemindersSwitchView,
     ReminderTakeView,
 )
 
@@ -14,4 +17,7 @@ urlpatterns = [
     path("lesson/", LessonView.as_view(), name="bot-lesson"),
     path("lesson/move/", LessonMoveView.as_view(), name="bot-lesson-move"),
     path("reminders/take/", ReminderTakeView.as_view(), name="bot-reminders"),
+    path("reminders/switch/", RemindersSwitchView.as_view(), name="bot-reminders-switch"),
+    path("progress/", ProgressView.as_view(), name="bot-progress"),
+    path("progress/reset/", ProgressResetView.as_view(), name="bot-progress-reset"),
 ]

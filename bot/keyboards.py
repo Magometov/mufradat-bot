@@ -31,6 +31,11 @@ SORT_NONE = "sort:none"
 # Тем немного, но в столбик они выглядят списком, а не выбором.
 THEMES_IN_ROW = 2
 
+# Прогресс: переключатель напоминаний и подтверждение сброса.
+REMINDERS_SWITCH = "reminders:switch"
+RESET_GO = "reset:go"
+RESET_KEEP = "reset:keep"
+
 
 def menu_button() -> MenuButtonWebApp | MenuButtonDefault:
     """Синяя кнопка у поля ввода — вход в приложение, один на всех.
@@ -121,5 +126,48 @@ def review() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="Изменить", callback_data=ADD_EDIT),
             ],
             [InlineKeyboardButton(text="Не добавлять", callback_data=ADD_DROP)],
+        ]
+    )
+
+
+def reminders(is_on: bool) -> InlineKeyboardMarkup:
+    """Переключатель напоминаний. Кнопка тут к месту: это настройка, а не карточка."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Выключить" if is_on else "Включить",
+                    callback_data=REMINDERS_SWITCH,
+                )
+            ]
+        ]
+    )
+
+
+def reset() -> InlineKeyboardMarkup:
+    """Подтверждение сброса: действие редкое и необратимое."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="Сбросить", callback_data=RESET_GO),
+                InlineKeyboardButton(text="Отмена", callback_data=RESET_KEEP),
+            ]
+        ]
+    )
+
+
+def tips() -> InlineKeyboardMarkup | None:
+    """Кнопка в подсказки приложения. Без адреса приложения её нет."""
+    if not config.WEBAPP_URL:
+        return None
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Открыть подсказки",
+                    web_app=WebAppInfo(url=f"{config.WEBAPP_URL}#tips"),
+                )
+            ]
         ]
     )
