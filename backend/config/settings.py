@@ -11,7 +11,7 @@ load_dotenv(BASE_DIR.parent / ".env")
 SECRET_KEY = getenv("DJANGO_SECRET_KEY")
 DEBUG = getenv("DJANGO_DEBUG", "").lower() == "true"
 
-ALLOWED_HOSTS = [host.strip() for host in getenv("ALLOWED_HOSTS", "*").split(",")]
+ALLOWED_HOSTS = [host.strip() for host in (getenv("ALLOWED_HOSTS") or "*").split(",")]
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
@@ -106,8 +106,8 @@ LOGGING = {
 # Частота запросов; считается по адресу, потому что опознание у ручек разное.
 REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
-        "visits": getenv("VISITS_RATE", "60/hour"),
-        "answers": getenv("ANSWERS_RATE", "120/hour"),
+        "visits": getenv("VISITS_RATE") or "60/hour",
+        "answers": getenv("ANSWERS_RATE") or "120/hour",
     },
 }
 # Столько оценок принимается за раз: пачка собирается в браузере и уезжает разом.
@@ -130,7 +130,7 @@ ADMIN_TELEGRAM_ID = int(getenv("ADMIN_TELEGRAM_ID") or 0)
 # получает их вместе с состоянием прогресса и собирает по ним сеанс.
 
 # Лестница сроков в днях: уровень 1 — через день, последний — через 35.
-LADDER = [int(days) for days in getenv("LADDER", "1,3,7,16,35").split(",")]
+LADDER = [int(days) for days in (getenv("LADDER") or "1,3,7,16,35").split(",")]
 # Разброс к каждому сроку в процентах, чтобы раздел не возвращался лавиной.
 JITTER_PERCENT = int(getenv("JITTER_PERCENT") or 10)
 # Куда уезжает новая карточка, узнанная сразу: «знал заранее» — не «вспомнил с третьего раза».

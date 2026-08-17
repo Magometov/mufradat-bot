@@ -1,12 +1,39 @@
+x-db-env: &db-env
+  POSTGRES_USER: ${POSTGRES_USER:-postgres}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+  POSTGRES_DB: ${POSTGRES_NAME:-mufradat}
+
+x-backend-env: &backend-env
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-local-secret-key-change-me}
+  DJANGO_DEBUG: ${DJANGO_DEBUG:-true}
+  POSTGRES_USER: ${POSTGRES_USER:-postgres}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+  POSTGRES_NAME: ${POSTGRES_NAME:-mufradat}
+  POSTGRES_HOST: db
+  POSTGRES_PORT: 5432
+  BOT_API_TOKEN: ${BOT_API_TOKEN:-local-token}
+  BOT_TOKEN: ${BOT_TOKEN:-}
+  ADMIN_TELEGRAM_ID: ${ADMIN_TELEGRAM_ID:-0}
+  # Повторение по расписанию и пределы ручек. Пустое значение — «как в коде».
+  SCHEDULING_FOR_ALL: ${SCHEDULING_FOR_ALL:-}
+  LADDER: ${LADDER:-}
+  JITTER_PERCENT: ${JITTER_PERCENT:-}
+  FIRST_SIGHT_LEVEL: ${FIRST_SIGHT_LEVEL:-}
+  SESSION_LIMIT: ${SESSION_LIMIT:-}
+  NEW_LIMIT: ${NEW_LIMIT:-}
+  VISITS_RATE: ${VISITS_RATE:-}
+  ANSWERS_RATE: ${ANSWERS_RATE:-}
+  ANSWERS_LIMIT: ${ANSWERS_LIMIT:-}
+
+x-caddy-env: &caddy-env
+  DOMAIN: ${DOMAIN:-:80}
+
 services:
   db:
     image: postgres:16-alpine
     container_name: db
     restart: always
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_NAME:-mufradat}
+    environment: *db-env
     ports:
       - "${POSTGRES_PORT:-5433}:5432"
     volumes:
@@ -23,17 +50,7 @@ services:
       dockerfile: backend/Dockerfile
     container_name: mufradat-backend
     restart: always
-    environment:
-      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-local-secret-key-change-me}
-      DJANGO_DEBUG: ${DJANGO_DEBUG:-true}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_NAME: ${POSTGRES_NAME:-mufradat}
-      POSTGRES_HOST: db
-      POSTGRES_PORT: 5432
-      BOT_API_TOKEN: ${BOT_API_TOKEN:-local-token}
-      BOT_TOKEN: ${BOT_TOKEN:-}
-      ADMIN_TELEGRAM_ID: ${ADMIN_TELEGRAM_ID:-0}
+    environment: *backend-env
     volumes:
       - media:/app/media
       - static:/app/static
@@ -47,8 +64,7 @@ services:
     build: ./frontend
     container_name: mufradat-caddy
     restart: always
-    environment:
-      DOMAIN: ${DOMAIN:-:80}
+    environment: *caddy-env
     ports:
       - "80:80"
       - "443:443"

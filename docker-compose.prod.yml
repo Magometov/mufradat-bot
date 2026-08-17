@@ -1,11 +1,50 @@
+x-db-env: &db-env
+  POSTGRES_USER: ${POSTGRES_USER}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  POSTGRES_DB: ${POSTGRES_NAME}
+
+x-backend-env: &backend-env
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+  DJANGO_DEBUG: "false"
+  POSTGRES_USER: ${POSTGRES_USER}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  POSTGRES_NAME: ${POSTGRES_NAME}
+  POSTGRES_HOST: db
+  POSTGRES_PORT: 5432
+  BOT_API_TOKEN: ${BOT_API_TOKEN}
+  # Журнал входов: токеном сверяется подпись Telegram, по id не пишутся свои заходы.
+  BOT_TOKEN: ${BOT_TOKEN}
+  ADMIN_TELEGRAM_ID: ${ADMIN_TELEGRAM_ID}
+  ALLOWED_HOSTS: ${ALLOWED_HOSTS:-}
+  # Повторение по расписанию. Пустые значения читаются как «те, что в коде», поэтому
+  # менять их можно по одной, не выписывая остальные.
+  SCHEDULING_FOR_ALL: ${SCHEDULING_FOR_ALL:-}
+  LADDER: ${LADDER:-}
+  JITTER_PERCENT: ${JITTER_PERCENT:-}
+  FIRST_SIGHT_LEVEL: ${FIRST_SIGHT_LEVEL:-}
+  SESSION_LIMIT: ${SESSION_LIMIT:-}
+  NEW_LIMIT: ${NEW_LIMIT:-}
+  # Пределы открытых ручек.
+  VISITS_RATE: ${VISITS_RATE:-}
+  ANSWERS_RATE: ${ANSWERS_RATE:-}
+  ANSWERS_LIMIT: ${ANSWERS_LIMIT:-}
+
+x-bot-env: &bot-env
+  BOT_TOKEN: ${BOT_TOKEN}
+  ADMIN_TELEGRAM_ID: ${ADMIN_TELEGRAM_ID}
+  WEBAPP_URL: ${WEBAPP_URL}
+  BOT_API_TOKEN: ${BOT_API_TOKEN}
+  BACKEND_URL: ${BACKEND_URL:-http://backend:8000}
+  FAL_KEY: ${FAL_KEY}
+
+x-caddy-env: &caddy-env
+  DOMAIN: ${DOMAIN}
+
 services:
   db:
     image: postgres:16-alpine
     restart: always
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_NAME}
+    environment: *db-env
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -20,18 +59,7 @@ services:
       dockerfile: backend/Dockerfile
     image: mufradat-backend
     restart: always
-    environment:
-      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
-      DJANGO_DEBUG: "false"
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_NAME: ${POSTGRES_NAME}
-      POSTGRES_HOST: db
-      POSTGRES_PORT: 5432
-      BOT_API_TOKEN: ${BOT_API_TOKEN}
-      # Журнал входов: токеном сверяется подпись Telegram, по id не пишутся свои заходы.
-      BOT_TOKEN: ${BOT_TOKEN}
-      ADMIN_TELEGRAM_ID: ${ADMIN_TELEGRAM_ID}
+    environment: *backend-env
     volumes:
       - media:/app/media
       - static:/app/static
@@ -45,13 +73,7 @@ services:
       dockerfile: bot/Dockerfile
     image: mufradat-bot
     restart: always
-    environment:
-      BOT_TOKEN: ${BOT_TOKEN}
-      ADMIN_TELEGRAM_ID: ${ADMIN_TELEGRAM_ID}
-      WEBAPP_URL: ${WEBAPP_URL}
-      BOT_API_TOKEN: ${BOT_API_TOKEN}
-      BACKEND_URL: ${BACKEND_URL:-http://backend:8000}
-      FAL_KEY: ${FAL_KEY}
+    environment: *bot-env
     volumes:
       - ./flags:/flags:ro
     # Часть адресов api.telegram.org недоступна с российского хостинга: DNS отдаёт
@@ -65,8 +87,7 @@ services:
   caddy:
     build: ./frontend
     restart: always
-    environment:
-      DOMAIN: ${DOMAIN}
+    environment: *caddy-env
     ports:
       - "80:80"
       - "443:443"
