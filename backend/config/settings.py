@@ -11,15 +11,6 @@ load_dotenv(BASE_DIR.parent / ".env")
 SECRET_KEY = getenv("DJANGO_SECRET_KEY")
 DEBUG = getenv("DJANGO_DEBUG", "").lower() == "true"
 
-# Общий секрет с ботом: им подписаны служебные ручки, которыми бот пишет карточки.
-BOT_API_TOKEN = getenv("BOT_API_TOKEN")
-
-# Токен бота — им Telegram подписывает данные о том, кто открыл приложение: без сверки
-# подписи id и ник в журнале входов значили бы не больше, чем присланная кем угодно строка.
-BOT_TOKEN = getenv("BOT_TOKEN")
-# Заходы владельца в журнал не пишутся.
-ADMIN_TELEGRAM_ID = int(getenv("ADMIN_TELEGRAM_ID") or 0)
-
 ALLOWED_HOSTS = ["*"]
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -35,6 +26,7 @@ INSTALLED_APPS = [
     "rest_framework",
     # apps
     "apps.common",
+    "apps.learning",
     "apps.vocabulary",
 ]
 
@@ -100,7 +92,6 @@ STATIC_ROOT = Path(BASE_DIR) / "static"
 MEDIA_URL = "/m/"
 MEDIA_ROOT = Path(BASE_DIR) / "media"
 
-# Без этого записи уровня INFO из наших модулей не видны в консоли.
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -108,3 +99,32 @@ LOGGING = {
     "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "simple"}},
     "loggers": {"apps": {"handlers": ["console"], "level": "INFO"}},
 }
+
+# --- Telegram -------------------------------------------------------------------
+
+# Общий секрет с ботом: им подписаны служебные ручки, через которые бот пишет карточки
+# в колоду. Пустой секрет не пускает никого — иначе ручки открыты всем.
+BOT_API_TOKEN = getenv("BOT_API_TOKEN")
+# Токен бота: им Telegram подписывает данные о том, кто открыл приложение. Без сверки
+# подписи id и ник значили бы не больше, чем присланная кем угодно строка.
+BOT_TOKEN = getenv("BOT_TOKEN")
+# Владелец: его заходы не пишутся в журнал, чтобы не мешали считать чужие, и ему одному
+# бот показывает команду добавления карточек.
+ADMIN_TELEGRAM_ID = int(getenv("ADMIN_TELEGRAM_ID") or 0)
+
+# --- Повторение по расписанию ---------------------------------------------------
+# Числа подкручиваются по опыту, поэтому живут в окружении, а не в коде. Приложение
+# получает их вместе с состоянием прогресса и собирает по ним сеанс.
+
+# Лестница сроков в днях: уровень 1 — через день, последний — через 35.
+LADDER = [int(days) for days in getenv("LADDER", "1,3,7,16,35").split(",")]
+# Разброс к каждому сроку в процентах, чтобы раздел не возвращался лавиной.
+JITTER_PERCENT = int(getenv("JITTER_PERCENT") or 10)
+# Куда уезжает новая карточка, узнанная сразу: «знал заранее» — не «вспомнил с третьего раза».
+FIRST_SIGHT_LEVEL = int(getenv("FIRST_SIGHT_LEVEL") or 3)
+# Потолок сеанса у кнопки «Повторить» и сколько новых карточек в него попадает.
+# В сеансе, набранном заходом в раздел, потолка нет.
+SESSION_LIMIT = int(getenv("SESSION_LIMIT") or 20)
+NEW_LIMIT = int(getenv("NEW_LIMIT") or 10)
+# Открыть новую логику всем, а не только тем, кому поставили галочку в админке.
+SCHEDULING_FOR_ALL = getenv("SCHEDULING_FOR_ALL", "").lower() == "true"
