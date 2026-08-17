@@ -3,6 +3,18 @@ import type { Ref } from 'vue';
 /** Чем оказался жест. */
 export type TGesture = 'tap' | 'left' | 'right';
 
+/** Что известно о законченном жесте. */
+export interface IGesture {
+    dx: number;
+    dy: number;
+    /** Сколько он длился, в миллисекундах. */
+    ms: number;
+    /** Ширина, по которой считается порог утягивания. */
+    width: number;
+    /** Вёлся ли жест поперёк экрана: ось выбирается в начале и не меняется. */
+    isSideways: boolean;
+}
+
 /** Что делать по жестам. Нажатие здесь же: его отличают от свайпа по одному ходу. */
 export interface ISwipeActions {
     tap: () => void;

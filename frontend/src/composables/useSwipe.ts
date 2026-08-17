@@ -5,7 +5,7 @@ import type { Ref } from 'vue';
 import type { ISwipeActions, IUseSwipe } from '../types/swipe';
 
 // Utils
-import { MARK_AT, decide } from '../utils/gesture';
+import { LOCK, MARK_AT, decide } from '../utils/gesture';
 
 // Vue
 import { onBeforeUnmount, onMounted, ref } from 'vue';
@@ -30,6 +30,8 @@ export function useSwipe(target: Ref<HTMLElement | null>, actions: ISwipeActions
     let startY = 0;
     let startedAt = 0;
     let tracking = false;
+    // Ось жеста: выбирается на первых пикселях и до конца уже не меняется.
+    let axis: 'none' | 'sideways' | 'along' = 'none';
     let shift = 0;
     let frame = 0;
     let mover: HTMLElement | null = null;
@@ -76,6 +78,7 @@ export function useSwipe(target: Ref<HTMLElement | null>, actions: ISwipeActions
         startY = event.clientY;
         startedAt = event.timeStamp;
         tracking = true;
+        axis = 'none';
         shift = 0;
         mover = findMover();
 
@@ -84,14 +87,23 @@ export function useSwipe(target: Ref<HTMLElement | null>, actions: ISwipeActions
     }
 
     /**
-     * Тянет карточку за пальцем, пока жест горизонтальный.
+     * Тянет карточку за пальцем, пока жест идёт поперёк экрана.
      */
     function handleMove(event: PointerEvent): void {
         if (!tracking) return;
 
         const byX = event.clientX - startX;
+        const byY = event.clientY - startY;
 
-        shift = Math.abs(byX) > Math.abs(event.clientY - startY) ? byX : 0;
+        // Ось решается один раз: пока палец не отошёл на `LOCK`, ждём, а решив — держимся
+        // выбранного. Иначе на дуге большого пальца карточка дёргается туда-обратно.
+        if (axis === 'none' && Math.max(Math.abs(byX), Math.abs(byY)) >= LOCK) {
+            axis = Math.abs(byX) > Math.abs(byY) ? 'sideways' : 'along';
+        }
+
+        if (axis === 'along') return;
+
+        shift = byX;
 
         const side = Math.abs(shift) < MARK_AT ? 0 : Math.sign(shift);
         if (side !== direction.value) direction.value = side;
@@ -110,12 +122,13 @@ export function useSwipe(target: Ref<HTMLElement | null>, actions: ISwipeActions
         cancelAnimationFrame(frame);
         frame = 0;
 
-        const gesture = decide(
-            event.clientX - startX,
-            event.clientY - startY,
-            event.timeStamp - startedAt,
-            target.value?.clientWidth ?? 0,
-        );
+        const gesture = decide({
+            dx: event.clientX - startX,
+            dy: event.clientY - startY,
+            ms: event.timeStamp - startedAt,
+            width: target.value?.clientWidth ?? 0,
+            isSideways: axis === 'sideways',
+        });
 
         release();
 
@@ -129,6 +142,7 @@ export function useSwipe(target: Ref<HTMLElement | null>, actions: ISwipeActions
      */
     function handleCancel(): void {
         tracking = false;
+        axis = 'none';
         direction.value = 0;
         cancelAnimationFrame(frame);
         frame = 0;
