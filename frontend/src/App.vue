@@ -27,6 +27,7 @@
     // Components
     import RunController from './components/run/RunController.vue';
     import RunDone from './components/run/RunDone.vue';
+    import StartIdle from './components/start/StartIdle.vue';
     import StartMode from './components/start/StartMode.vue';
     import StartSections from './components/start/StartSections.vue';
     import UiButton from './components/ui/UiButton.vue';
@@ -48,6 +49,8 @@
     const isViewing = ref(false);
     // Итог закрытого сеанса. Пусто — экрана конца нет.
     const summary = ref('');
+    // Раздел, в котором на сегодня пусто: показываем, когда ждать, и выход в просмотр.
+    const idle = ref<string | null>(null);
 
     const { initData, init } = useTelegram();
     const { enabled, rules, progress, now, fetchState, record, cancelLast, flush } =
@@ -92,6 +95,20 @@
 
         return at === null ? '' : soonText(at, now());
     });
+
+    // То же для пустого раздела: там ждут ближайшую именно его карточку.
+    const idleCards = computed<IEntry[]>(() => (idle.value === null ? [] : cardsFor(idle.value)));
+
+    const idleNext = computed<string>(() => {
+        const at = nextDueAt(idleCards.value, progress.value);
+
+        return at === null ? '' : soonText(at, now());
+    });
+
+    const idleTitle = computed<string>(
+        () =>
+            sections.value.find((section) => section.slug === idle.value)?.name ?? modeTitle.value,
+    );
     // #endregion
 
     // #region Methods
@@ -136,8 +153,16 @@
         }
 
         // Потолков в разделе нет: пришёл сам — получай всё, что на сегодня.
+        const portion = buildPortion(selected, progress.value, now(), null);
+
+        // Пустой сеанс не открываем: вместо него экран с ближайшим сроком.
+        if (portion.length === 0) {
+            idle.value = theme;
+            return;
+        }
+
         summary.value = '';
-        session.start(buildPortion(selected, progress.value, now(), null), progress.value);
+        session.start(portion, progress.value);
     }
 
     /**
@@ -214,6 +239,15 @@
         isViewing.value = false;
         reset();
     }
+
+    /**
+     * Смотрит раздел, в котором на сегодня пусто: расписание при этом не участвует.
+     */
+    function handleIdleView(): void {
+        isViewing.value = true;
+        start(idleCards.value);
+        idle.value = null;
+    }
     // #endregion
 
     // #region Lifecycle
@@ -271,6 +305,16 @@
                 @home="handleHome"
             />
 
+            <StartIdle
+                v-else-if="idle !== null"
+                key="idle"
+                :title="idleTitle"
+                :next="idleNext"
+                :total="idleCards.length"
+                @view="handleIdleView"
+                @back="idle = null"
+            />
+
             <StartSections
                 v-else-if="mode"
                 key="sections"
@@ -283,16 +327,20 @@
                 @back="reset"
             />
 
+            <!-- Ключ разный для повторения и просмотра: переход играет на смене ключа, а
+                 не свойств, иначе первый экран подменялся бы рывком. -->
             <StartMode
                 v-else
-                key="mode"
+                :key="isViewing ? 'mode-view' : 'mode-review'"
                 :total="entries.length"
                 :is-review="isScheduled"
                 :due="dueTotal"
                 :next="nextWord"
+                :can-back="isViewing"
                 @select="choose"
                 @repeat="handleRepeat"
                 @view="handleView"
+                @back="isViewing = false"
             />
         </Transition>
     </main>

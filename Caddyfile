@@ -47,6 +47,17 @@
 
     # --- Обычная работа ------------------------------------------------------------
 
+    # Заголовки безопасности на все ответы. `unsafe-inline` для скриптов приходится
+    # оставить: оформление ставится встроенным скриптом до первой отрисовки, а его хэш
+    # молча ломался бы при каждой правке. Главное всё равно закрыто — чужие домены для
+    # скриптов и запросов, отправка форм и встраивание в чужие страницы.
+    header {
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors https://web.telegram.org https://*.telegram.org"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "same-origin"
+        -Server
+    }
+
     # Служебные ручки бота. Стоят выше общего правила для API, иначе оно заберёт их
     # себе. Бот ходит к Django внутри сети докера, поэтому запрет снаружи ему ничего
     # не стоит, а токен остаётся вторым слоем, а не единственным.

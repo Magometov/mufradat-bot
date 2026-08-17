@@ -5,6 +5,9 @@
 
     import type { ITheme } from '../../types/theme';
 
+    // Utils
+    import { cardWord, sectionWord } from '../../utils/plural';
+
     // Vue
     import { computed } from 'vue';
 
@@ -177,9 +180,11 @@
             </div>
 
             <p v-if="props.isReview" :class="$style.StartSections__total">
-                на сегодня <b>{{ props.dueAll }}</b>
-                {{ props.dueAll === 1 ? 'карточка' : 'карточек' }}
-                <template v-if="busy > 0">в {{ busy }} из {{ props.sections.length }}</template>
+                на сегодня <b>{{ props.dueAll }}</b> {{ cardWord(props.dueAll) }}
+                <template v-if="busy > 0">
+                    в {{ busy }} из {{ props.sections.length }}
+                    {{ sectionWord(props.sections.length) }}
+                </template>
             </p>
         </div>
     </section>

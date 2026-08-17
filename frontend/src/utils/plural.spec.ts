@@ -1,6 +1,6 @@
 // #region Imports
 // Utils
-import { dayWord } from './plural';
+import { cardWord, dayWord, sectionWord, wordWord } from './plural';
 
 // Vitest
 import { describe, expect, it } from 'vitest';
@@ -25,5 +25,25 @@ describe('склонение дней', () => {
     it('вторая десятка — всегда «дней»', () => {
         expect(dayWord(11)).toBe('дней');
         expect(dayWord(16)).toBe('дней');
+    });
+});
+
+describe('склонение прочих слов', () => {
+    it('карточки', () => {
+        expect(cardWord(1)).toBe('карточка');
+        expect(cardWord(294)).toBe('карточки');
+        expect(cardWord(337)).toBe('карточек');
+        expect(cardWord(11)).toBe('карточек');
+    });
+
+    it('слова', () => {
+        expect(wordWord(1)).toBe('слово');
+        expect(wordWord(2)).toBe('слова');
+        expect(wordWord(8)).toBe('слов');
+    });
+
+    it('разделы — всегда после «из», поэтому родительный', () => {
+        expect(sectionWord(1)).toBe('раздела');
+        expect(sectionWord(8)).toBe('разделов');
     });
 });

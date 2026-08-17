@@ -1,27 +1,41 @@
 /**
- * Слово «день» в нужном числе: 1 день, 3 дня, 7 дней.
+ * Форма слова по числу. Формы передаются тройкой: для одного, для двух-четырёх и для остальных.
  */
-export function dayWord(count: number): string {
+export function plural(count: number, forms: [string, string, string]): string {
     const tail = Math.abs(count) % 100;
     const last = tail % 10;
 
-    if (tail > 10 && tail < 20) return 'дней';
-    if (last === 1) return 'день';
-    if (last > 1 && last < 5) return 'дня';
+    if (tail > 10 && tail < 20) return forms[2];
+    if (last === 1) return forms[0];
+    if (last > 1 && last < 5) return forms[1];
 
-    return 'дней';
+    return forms[2];
 }
 
 /**
- * Слово «слово» в нужном числе: 1 слово, 3 слова, 7 слов.
+ * «День» в нужном числе.
+ */
+export function dayWord(count: number): string {
+    return plural(count, ['день', 'дня', 'дней']);
+}
+
+/**
+ * «Слово» в нужном числе.
  */
 export function wordWord(count: number): string {
-    const tail = Math.abs(count) % 100;
-    const last = tail % 10;
+    return plural(count, ['слово', 'слова', 'слов']);
+}
 
-    if (tail > 10 && tail < 20) return 'слов';
-    if (last === 1) return 'слово';
-    if (last > 1 && last < 5) return 'слова';
+/**
+ * «Карточка» в нужном числе.
+ */
+export function cardWord(count: number): string {
+    return plural(count, ['карточка', 'карточки', 'карточек']);
+}
 
-    return 'слов';
+/**
+ * «Раздел» в родительном падеже: слово всегда идёт после «из».
+ */
+export function sectionWord(count: number): string {
+    return plural(count, ['раздела', 'разделов', 'разделов']);
 }

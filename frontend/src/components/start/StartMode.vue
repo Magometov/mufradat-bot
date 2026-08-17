@@ -21,8 +21,10 @@
             due?: number;
             /** Когда придёт ближайшая, если на сегодня ничего нет. */
             next?: string;
+            /** Есть ли куда возвращаться: в просмотре колоды — на главную. */
+            canBack?: boolean;
         }>(),
-        { isReview: false, due: 0, next: '' },
+        { isReview: false, due: 0, next: '', canBack: false },
     );
     // #endregion
 
@@ -31,6 +33,7 @@
         select: [mode: TRunMode];
         repeat: [];
         view: [];
+        back: [];
     }>();
     // #endregion
 
@@ -46,9 +49,13 @@
 
 <template>
     <section :class="$style.StartMode">
-        <!-- Оформление меняют здесь и больше нигде: это настройка, а не действие
-             прогона, в разделах и карточках ей делать нечего. -->
-        <StartAppearance />
+        <header :class="$style.StartMode__head">
+            <UiButton v-if="props.canBack" variant="ghost" @click="emit('back')">←</UiButton>
+
+            <!-- Оформление меняют здесь и больше нигде: это настройка, а не действие
+                 прогона, в разделах и карточках ей делать нечего. -->
+            <StartAppearance :class="$style.StartMode__appearance" />
+        </header>
 
         <div :class="$style.StartMode__body">
             <!-- Стопка вместо заголовка: название лежит на верхней карточке, и с первого
@@ -114,6 +121,17 @@
         display: flex;
         flex: 1;
         flex-direction: column;
+
+        // Возврат слева, оформление справа — как в шапке разделов.
+        &__head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        &__appearance {
+            margin-left: auto;
+        }
 
         // Кнопка оформления стоит сверху, а стопка с выбором — по центру остатка.
         &__body {
