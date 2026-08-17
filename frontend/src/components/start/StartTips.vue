@@ -7,7 +7,7 @@
     import { dayWord } from '../../utils/plural';
 
     // Vue
-    import { computed, ref } from 'vue';
+    import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
     // #endregion
 
     // #region Props
@@ -63,6 +63,26 @@
 
         step.value += 1;
     }
+
+    /**
+     * Управление с клавиатуры: Escape закрывает, пробел и стрелка листают.
+     */
+    function onKeydown(event: KeyboardEvent): void {
+        if (event.key === 'Escape') {
+            emit('close');
+            return;
+        }
+
+        if (event.key !== 'ArrowRight' && event.key !== ' ') return;
+
+        event.preventDefault();
+        handleNext();
+    }
+    // #endregion
+
+    // #region Lifecycle
+    onMounted(() => window.addEventListener('keydown', onKeydown));
+    onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
     // #endregion
 </script>
 

@@ -46,6 +46,8 @@ async def handle_reminders(message: Message) -> None:
     state = await _state(user)
 
     if state is None:
+        await message.answer(texts.BACKEND_SILENT)
+
         return
 
     keyboard = keyboards.reminders(state.reminders_on) if state.cards else None
@@ -87,6 +89,8 @@ async def handle_reset(message: Message) -> None:
     state = await _state(user)
 
     if state is None:
+        await message.answer(texts.BACKEND_SILENT)
+
         return
 
     if state.cards == 0:

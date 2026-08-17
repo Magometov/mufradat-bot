@@ -43,8 +43,8 @@ def visitor(
     if is_bot and telegram_id:
         return Source.TELEGRAM, identify(telegram_id=telegram_id, username=username)
 
-    # Только на своей машине: в проде DEBUG выключен, и этой ветки там нет.
-    if settings.DEBUG and settings.SCHEDULING_FOR_ALL:
+    # Только на своей машине: нужны оба признака, и LOCAL_LEARNER в проде не ставят.
+    if settings.DEBUG and settings.LOCAL_LEARNER:
         return Source.SITE, local()
 
     return Source.SITE, None

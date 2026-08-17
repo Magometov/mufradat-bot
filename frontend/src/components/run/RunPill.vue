@@ -70,7 +70,8 @@
 <style module lang="scss">
     .RunPill {
         position: absolute;
-        bottom: 0;
+        // Над подвалом, а не поверх кнопок: иначе она накрывает то, чем оценивают.
+        bottom: calc(100% + 0.8rem);
         left: 50%;
         display: flex;
         align-items: center;

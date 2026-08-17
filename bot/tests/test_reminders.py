@@ -39,3 +39,11 @@ def test_intro_and_hint_only_in_the_first_message():
 
     assert "раз в час" not in _caption(CARD)
     assert "/reminders" not in _caption(CARD)
+
+
+def test_markup_characters_are_escaped():
+    """«&» и «<» в словах не должны ломать разметку сообщения."""
+    text = _caption(replace(CARD, translation_ru="сложно & просто", arabic="<нет>"))
+
+    assert "&amp;" in text
+    assert "&lt;нет&gt;" in text

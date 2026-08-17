@@ -202,6 +202,13 @@
         const state = record(first.entry.id, verdict);
         session.answer(verdict);
 
+        // Сеанс кончился сам — показываем итог. По опустевшей очереди этого делать нельзя:
+        // крестик опустошает её точно так же, а из него человек хочет уйти, а не читать.
+        if (session.left.value === 0) {
+            summary.value = summarize(session.ids.value, progress.value, now());
+            void flush();
+        }
+
         if (state === null || verdict === 'forgot' || rules.value === null) {
             pill.value = '';
             return;
@@ -263,14 +270,6 @@
     // #endregion
 
     // #region Lifecycle
-    // Очередь опустела — сеанс закончился сам, и его итог занимает место карточки.
-    watch(session.left, (left, was) => {
-        if (left !== 0 || was === 0 || !isScheduled.value) return;
-
-        summary.value = summarize(session.ids.value, progress.value, now());
-        void flush();
-    });
-
     // Подсказки про расписание нужны только тому, у кого расписание есть. Ссылка из
     // бота открывает их и повторно: человек пришёл именно за ними.
     watch(enabled, (isOn) => {
