@@ -2,25 +2,30 @@
 // Types
 import type { Ref } from 'vue';
 
-import type { ISwipeActions } from '../types/swipe';
+import type { ISwipeActions, IUseSwipe } from '../types/swipe';
+
+// Utils
+import { decide } from '../utils/gesture';
 
 // Vue
-import { onBeforeUnmount, onMounted } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 // #endregion
-
-// Ход короче этого считается нажатием: палец никогда не стоит на месте ровно.
-const DISTANCE = 48;
 
 /**
  * Разбирает жесты по элементу: нажатие и горизонтальные свайпы.
  *
+ * Карточка едет за пальцем, поэтому `shift` меняется на каждом движении: без этого
+ * свайп кажется тяжёлым — палец идёт, а на экране до конца жеста ничего не происходит.
+ *
  * Нажатие живёт здесь, а не отдельным обработчиком `click`: клик приходит и после
- * свайпа, и карточка успевала бы перевернуться в тот же миг, когда уезжает. Одна
- * точка решения на весь жест снимает вопрос порядка событий.
+ * свайпа, и карточка успевала бы перевернуться в тот же миг, когда уезжает.
  */
-export function useSwipe(target: Ref<HTMLElement | null>, actions: ISwipeActions): void {
+export function useSwipe(target: Ref<HTMLElement | null>, actions: ISwipeActions): IUseSwipe {
+    const shift = ref(0);
+
     let startX = 0;
     let startY = 0;
+    let startedAt = 0;
     let tracking = false;
 
     /**
@@ -33,34 +38,41 @@ export function useSwipe(target: Ref<HTMLElement | null>, actions: ISwipeActions
 
         startX = event.clientX;
         startY = event.clientY;
+        startedAt = event.timeStamp;
         tracking = true;
     }
 
     /**
-     * Решает, чем был жест: нажатием, свайпом или ничем.
+     * Тянет карточку за пальцем, пока жест горизонтальный.
+     */
+    function handleMove(event: PointerEvent): void {
+        if (!tracking) return;
+
+        const byX = event.clientX - startX;
+
+        shift.value = Math.abs(byX) > Math.abs(event.clientY - startY) ? byX : 0;
+    }
+
+    /**
+     * Решает, чем был жест, и отпускает карточку.
      */
     function handleUp(event: PointerEvent): void {
         if (!tracking) return;
+
         tracking = false;
+        shift.value = 0;
 
-        const byX = event.clientX - startX;
-        const byY = event.clientY - startY;
+        const width = target.value?.clientWidth ?? 0;
+        const gesture = decide(
+            event.clientX - startX,
+            event.clientY - startY,
+            event.timeStamp - startedAt,
+            width,
+        );
 
-        if (Math.abs(byX) < DISTANCE) {
-            actions.tap();
-            return;
-        }
+        if (gesture === null) return;
 
-        // Горизонталь должна перевешивать: наклонное движение — это прокрутка длинной
-        // карточки или жест самого клиента Telegram, и перехватывать его нельзя.
-        if (Math.abs(byX) <= Math.abs(byY)) return;
-
-        if (byX < 0) {
-            actions.left();
-            return;
-        }
-
-        actions.right();
+        actions[gesture]();
     }
 
     /**
@@ -68,17 +80,22 @@ export function useSwipe(target: Ref<HTMLElement | null>, actions: ISwipeActions
      */
     function handleCancel(): void {
         tracking = false;
+        shift.value = 0;
     }
 
     onMounted(() => {
         target.value?.addEventListener('pointerdown', handleDown);
+        target.value?.addEventListener('pointermove', handleMove);
         target.value?.addEventListener('pointerup', handleUp);
         target.value?.addEventListener('pointercancel', handleCancel);
     });
 
     onBeforeUnmount(() => {
         target.value?.removeEventListener('pointerdown', handleDown);
+        target.value?.removeEventListener('pointermove', handleMove);
         target.value?.removeEventListener('pointerup', handleUp);
         target.value?.removeEventListener('pointercancel', handleCancel);
     });
+
+    return { shift };
 }

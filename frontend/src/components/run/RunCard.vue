@@ -12,8 +12,10 @@
         defineProps<{
             card: IRunCard;
             isFlipped: boolean;
+            /** На сколько карточку утянули пальцем. */
+            shift?: number;
         }>(),
-        {},
+        { shift: 0 },
     );
     // #endregion
 
@@ -25,6 +27,13 @@
     // #endregion
 
     // #region Computed
+    // Наклон делает жест живым: карточка не скользит плашмя, а поворачивается за пальцем.
+    const dragStyle = computed(() => ({
+        transform: `translateX(${props.shift}px) rotate(${props.shift / 26}deg)`,
+        // Пока палец ведёт, переход выключен: иначе карточка тянется с задержкой.
+        transition: props.shift === 0 ? undefined : 'none',
+    }));
+
     // Лицо и оборот меняются местами, а не переписываются: правило одно на оба
     // направления — на лице вопрос, на обороте ответ.
     const front = computed<ICardSide>(() =>
@@ -58,45 +67,56 @@
             aria-hidden="true"
         ></div>
 
-        <div :class="[$style.RunCard__inner, props.isFlipped && $style['RunCard__inner--flipped']]">
-            <!-- Лицо без модификатора: повёрнут оборот, а лицо лежит как есть. -->
-            <div :class="$style.RunCard__face">
-                <p
-                    :class="front.isArabic ? $style.RunCard__arabic : $style.RunCard__translation"
-                    :dir="front.isArabic ? 'rtl' : undefined"
-                    :lang="front.isArabic ? 'ar' : undefined"
-                >
-                    {{ front.text }}
-                </p>
-            </div>
+        <div :class="$style.RunCard__mover" :style="dragStyle">
+            <div
+                :class="[
+                    $style.RunCard__inner,
+                    props.isFlipped && $style['RunCard__inner--flipped'],
+                ]"
+            >
+                <!-- Лицо без модификатора: повёрнут оборот, а лицо лежит как есть. -->
+                <div :class="$style.RunCard__face">
+                    <p
+                        :class="
+                            front.isArabic ? $style.RunCard__arabic : $style.RunCard__translation
+                        "
+                        :dir="front.isArabic ? 'rtl' : undefined"
+                        :lang="front.isArabic ? 'ar' : undefined"
+                    >
+                        {{ front.text }}
+                    </p>
+                </div>
 
-            <div :class="[$style.RunCard__face, $style['RunCard__face--back']]">
-                <p
-                    :class="back.isArabic ? $style.RunCard__arabic : $style.RunCard__translation"
-                    :dir="back.isArabic ? 'rtl' : undefined"
-                    :lang="back.isArabic ? 'ar' : undefined"
-                >
-                    {{ back.text }}
-                </p>
+                <div :class="[$style.RunCard__face, $style['RunCard__face--back']]">
+                    <p
+                        :class="
+                            back.isArabic ? $style.RunCard__arabic : $style.RunCard__translation
+                        "
+                        :dir="back.isArabic ? 'rtl' : undefined"
+                        :lang="back.isArabic ? 'ar' : undefined"
+                    >
+                        {{ back.text }}
+                    </p>
 
-                <span :class="$style.RunCard__rule"></span>
+                    <span :class="$style.RunCard__rule"></span>
 
-                <!-- Картинка только на обороте: на лице она подменила бы припоминание
+                    <!-- Картинка только на обороте: на лице она подменила бы припоминание
                      узнаванием картинки. -->
-                <img
-                    v-if="props.card.entry.image"
-                    :class="$style.RunCard__image"
-                    :src="props.card.entry.image"
-                    :alt="props.card.entry.translation_ru"
-                    decoding="async"
-                    loading="lazy"
-                    :width="props.card.entry.image_width ?? undefined"
-                    :height="props.card.entry.image_height ?? undefined"
-                />
+                    <img
+                        v-if="props.card.entry.image"
+                        :class="$style.RunCard__image"
+                        :src="props.card.entry.image"
+                        :alt="props.card.entry.translation_ru"
+                        decoding="async"
+                        loading="lazy"
+                        :width="props.card.entry.image_width ?? undefined"
+                        :height="props.card.entry.image_height ?? undefined"
+                    />
 
-                <p v-if="props.card.entry.transliteration" :class="$style.RunCard__translit">
-                    {{ props.card.entry.transliteration }}
-                </p>
+                    <p v-if="props.card.entry.transliteration" :class="$style.RunCard__translit">
+                        {{ props.card.entry.transliteration }}
+                    </p>
+                </div>
             </div>
         </div>
     </div>
@@ -144,12 +164,20 @@
             left: 1.4rem;
         }
 
-        &__inner {
+        // Двигается при свайпе только этот слой: карточки под ним стоят на месте, и
+        // видно, что колода не кончилась.
+        &__mover {
             position: absolute;
             top: 0;
             right: 0;
             bottom: 1.6rem;
             left: 0;
+            transition: transform 0.26s ease;
+        }
+
+        &__inner {
+            position: absolute;
+            inset: 0;
             transform-style: preserve-3d;
             transition: transform 0.45s ease;
 
@@ -222,7 +250,8 @@
     // Переворот — единственное движение карточки; тому, кто просил его убрать, стороны
     // меняются сразу.
     @media (prefers-reduced-motion: reduce) {
-        .RunCard__inner {
+        .RunCard__inner,
+        .RunCard__mover {
             transition: none;
         }
     }

@@ -121,7 +121,7 @@
     // #endregion
 
     // #region Lifecycle
-    useSwipe(stage, { tap: handleFlip, left: handleNext, right: handlePrev });
+    const { shift } = useSwipe(stage, { tap: handleFlip, left: handleNext, right: handlePrev });
 
     onMounted(() => window.addEventListener('keydown', onKeydown));
     onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
@@ -150,7 +150,12 @@
 
         <div ref="stage" :class="$style.RunController__stage">
             <Transition :name="slide">
-                <RunCard :key="props.card.entry.id" :card="props.card" :is-flipped="isFlipped" />
+                <RunCard
+                    :key="props.card.entry.id"
+                    :card="props.card"
+                    :is-flipped="isFlipped"
+                    :shift="shift"
+                />
             </Transition>
         </div>
 
