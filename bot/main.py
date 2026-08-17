@@ -10,7 +10,7 @@ from aiogram.exceptions import TelegramUnauthorizedError
 from aiogram.types import BotCommand, BotCommandScopeChat
 
 from bot import config, reminders
-from bot.handlers import add, maintenance, progress, start, themes
+from bot.handlers import add, inline, maintenance, progress, start, themes
 from bot.keyboards import menu_button
 
 logger = logging.getLogger(__name__)
@@ -42,6 +42,9 @@ async def run(token: str) -> None:
     dispatcher = Dispatcher()
     # Заглушка первой: aiogram останавливается на первом подошедшем обработчике.
     dispatcher.include_router(maintenance.router)
+    # Заглушка ловит только сообщения, поэтому инлайн живёт и во время работ: он
+    # ничего не пишет в базу, а пустой ответ Telegram покажет сам.
+    dispatcher.include_router(inline.router)
     dispatcher.include_router(add.router)
     dispatcher.include_router(themes.router)
     dispatcher.include_router(progress.router)

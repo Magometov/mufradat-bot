@@ -1,7 +1,6 @@
 """Слово в группу: бэкенд решает, пора ли и какое, бот отправляет."""
 
 import asyncio
-import html
 import logging
 
 from aiogram import Bot
@@ -9,23 +8,18 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramForbiddenError
 
-from bot import api, config, texts
+from bot import api, cards, config, texts
 
 logger = logging.getLogger(__name__)
 
 
 def _caption(card: api.GroupCard) -> str:
-    """Карточка целиком: арабское, перевод, транслитерация.
-
-    Слова экранируются: сообщения уходят разметкой, и «&» или «<» в переводе иначе
-    ломают её.
-    """
-    translit = f"\n{html.escape(card.transliteration)}" if card.transliteration else ""
-
-    return texts.GROUP_CARD.format(
-        arabic=html.escape(card.arabic),
-        translation=html.escape(card.translation_ru),
-        transliteration=translit,
+    """Карточка целиком: арабское, перевод, транслитерация."""
+    return cards.caption(
+        texts.GROUP_CARD,
+        arabic=card.arabic,
+        translation=card.translation_ru,
+        transliteration=card.transliteration,
     )
 
 

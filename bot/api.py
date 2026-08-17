@@ -15,6 +15,7 @@ LESSON = "/api/v1/internal/lesson/"
 MOVE = "/api/v1/internal/lesson/move/"
 REMINDERS = "/api/v1/internal/reminders/take/"
 GROUP = "/api/v1/internal/group/take/"
+SEARCH = "/api/v1/internal/search/"
 SWITCH = "/api/v1/internal/reminders/switch/"
 PROGRESS = "/api/v1/internal/progress/"
 RESET = "/api/v1/internal/progress/reset/"
@@ -59,6 +60,20 @@ class GroupCard:
     translation_ru: str
     transliteration: str
     image: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class Found:
+    """Найденная карточка: из неё бот собирает ответ инлайна."""
+
+    id: str
+    arabic: str
+    translation_ru: str
+    transliteration: str
+    image: str | None
+    # Размеры нужны Telegram, чтобы разложить список выбора, не скачивая картинки.
+    width: int | None
+    height: int | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -247,6 +262,27 @@ async def group_card(*, forced: bool = False) -> GroupCard | None:
         transliteration=body["transliteration"],
         image=_image_url(body["image"]),
     )
+
+
+async def search(query: str) -> list[Found]:
+    """Ищет карточки по русскому слову. Пустой запрос отдаёт верх колоды.
+
+    Сколько вернуть, не спрашиваем: потолок у поиска свой и совпадает с потолком инлайна.
+    """
+    body = await _send("GET", SEARCH, params={"query": query})
+
+    return [
+        Found(
+            id=card["id"],
+            arabic=card["arabic"],
+            translation_ru=card["translation_ru"],
+            transliteration=card["transliteration"],
+            image=_image_url(card["image"]),
+            width=card["image_width"],
+            height=card["image_height"],
+        )
+        for card in body
+    ]
 
 
 def _progress(body: dict) -> Progress:

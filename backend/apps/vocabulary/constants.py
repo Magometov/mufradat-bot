@@ -1,6 +1,9 @@
-"""Перечисления колоды."""
+"""Перечисления и пределы колоды."""
 
 from django.db import models
+
+# Столько карточек отдаёт поиск: у инлайна в Telegram потолок тот же.
+SEARCH_LIMIT = 50
 
 
 class Number(models.IntegerChoices):

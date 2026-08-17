@@ -137,5 +137,11 @@ async def handle_reset_keep(call: CallbackQuery) -> None:
 
 @router.message(Command("help"))
 async def handle_help(message: Message) -> None:
-    """Выжимка про расписание и кнопка в подсказки приложения."""
-    await message.answer(texts.HELP, reply_markup=keyboards.tips())
+    """Выжимка про расписание и кнопка в подсказки приложения.
+
+    Имя бота спрашивается у Telegram, а не хранится: aiogram помнит ответ, а строка в
+    настройках однажды разойдётся с настоящим именем.
+    """
+    me = await message.bot.me()
+
+    await message.answer(texts.HELP.format(bot=me.username), reply_markup=keyboards.tips())

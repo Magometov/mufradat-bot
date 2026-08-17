@@ -28,14 +28,36 @@ def _attach(card: WordForm | Phrase, name: str, image: File | None) -> None:
     card.image.save(f"{name}{card.pk}.webp", to_webp(image), save=True)
 
 
-def deck() -> list[WordForm | Phrase]:
-    """Вся колода плоским списком: формы слов и фразы, свежие сверху."""
-    forms = WordForm.objects.select_related("word").order_by(
+def forms() -> QuerySet[WordForm]:
+    """Формы слов, свежие сверху; числа одного слова идут подряд."""
+    return WordForm.objects.select_related("word").order_by(
         "-word__created_at", "-word_id", "number"
     )
-    phrases = Phrase.objects.order_by("-created_at", "-id")
 
-    return [*forms, *phrases]
+
+def phrases() -> QuerySet[Phrase]:
+    """Фразы, свежие сверху."""
+    return Phrase.objects.order_by("-created_at", "-id")
+
+
+def deck() -> list[WordForm | Phrase]:
+    """Вся колода плоским списком: формы слов и фразы, свежие сверху."""
+    return [*forms(), *phrases()]
+
+
+def find(query: str, *, limit: int) -> list[WordForm | Phrase]:
+    """Карточки по русскому слову. Пустой запрос — верх колоды.
+
+    Ищем по переводу и подстрокой: колода своя, слов сотни, и «маш» должно находить
+    машину. Потолок общий на слова и фразы, поэтому список не разрастается вдвое.
+    """
+    found_forms, found_phrases = forms(), phrases()
+
+    if query:
+        found_forms = found_forms.filter(translation_ru__icontains=query)
+        found_phrases = found_phrases.filter(translation_ru__icontains=query)
+
+    return [*found_forms[:limit], *found_phrases[:limit]][:limit]
 
 
 def cards_by_id(card_ids: Iterable[str]) -> dict[str, WordForm | Phrase]:

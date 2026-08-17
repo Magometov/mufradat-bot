@@ -1,13 +1,12 @@
 """Напоминания в чат: бот спрашивает бэкенд и отправляет то, что тот отдал."""
 
 import asyncio
-import html
 import logging
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramForbiddenError
 
-from bot import api, group, texts
+from bot import api, cards, group, texts
 
 logger = logging.getLogger(__name__)
 
@@ -20,16 +19,12 @@ AFTER_ERROR = 60
 
 
 def _caption(card: api.Reminder) -> str:
-    """Сообщение с карточкой: арабское открыто, ответ под спойлером.
-
-    Слова экранируются: сообщения уходят разметкой, и «&» или «<» в переводе иначе
-    ломают её — Telegram отказывается разбирать такое сообщение целиком.
-    """
-    translit = f"\n{html.escape(card.transliteration)}" if card.transliteration else ""
-    body = texts.REMINDER_CARD.format(
-        arabic=html.escape(card.arabic),
-        translation=html.escape(card.translation_ru),
-        transliteration=translit,
+    """Сообщение с карточкой: арабское открыто, ответ под спойлером."""
+    body = cards.caption(
+        texts.REMINDER_CARD,
+        arabic=card.arabic,
+        translation=card.translation_ru,
+        transliteration=card.transliteration,
     )
 
     if not card.is_first:

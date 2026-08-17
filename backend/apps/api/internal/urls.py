@@ -10,6 +10,7 @@ from apps.api.internal.views import (
     ProgressView,
     RemindersSwitchView,
     ReminderTakeView,
+    SearchView,
 )
 
 urlpatterns = [
@@ -18,6 +19,7 @@ urlpatterns = [
     path("lesson/", LessonView.as_view(), name="bot-lesson"),
     path("lesson/move/", LessonMoveView.as_view(), name="bot-lesson-move"),
     path("group/take/", GroupCardView.as_view(), name="bot-group"),
+    path("search/", SearchView.as_view(), name="bot-search"),
     path("reminders/take/", ReminderTakeView.as_view(), name="bot-reminders"),
     path("reminders/switch/", RemindersSwitchView.as_view(), name="bot-reminders-switch"),
     path("progress/", ProgressView.as_view(), name="bot-progress"),
