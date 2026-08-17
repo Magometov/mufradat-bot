@@ -27,4 +27,5 @@ class StateSerializer(serializers.Serializer):
     session_limit = serializers.IntegerField()
     new_limit = serializers.IntegerField()
     first_sight_level = serializers.IntegerField()
+    needed = serializers.IntegerField()
     cards = CardStateSerializer(many=True)

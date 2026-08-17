@@ -75,6 +75,7 @@ def test_rules_travel_as_data(client):
     assert body["session_limit"] == 7
     assert body["new_limit"] == 3
     assert body["first_sight_level"] == 2
+    assert body["needed"] == 2
     assert body["now"]
 
 

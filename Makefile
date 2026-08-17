@@ -22,8 +22,15 @@ help: ## Показать этот список
 # --- Разработка: тесты ----------------------------------------------------------
 
 .PHONY: test
-test: ## Прогнать тесты бэкенда. База должна быть поднята: docker compose up -d db
+test: test-back test-front ## Прогнать все тесты
+
+.PHONY: test-back
+test-back: ## Тесты бэкенда. База должна быть поднята: docker compose up -d db
 	uv run --group backend --group dev pytest
+
+.PHONY: test-front
+test-front: ## Тесты фронтенда: чистые функции сеанса
+	cd frontend && npm run test
 
 # --- Сервер: сборка и запуск ---------------------------------------------------
 
