@@ -91,6 +91,10 @@ superuser: ## Создать суперпользователя админки
 shell: ## Django shell в контейнере
 	$(COMPOSE) exec backend python manage.py shell
 
+.PHONY: word
+word: ## Отправить слово в группу сейчас, не дожидаясь часа
+	$(COMPOSE) exec bot python -m bot.group
+
 .PHONY: deploy
 deploy: ## Забрать код, пересобрать, применить миграции
 	git pull

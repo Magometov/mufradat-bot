@@ -24,6 +24,7 @@ x-backend-env: &backend-env
   FIRST_SIGHT_LEVEL: ${FIRST_SIGHT_LEVEL:-}
   SESSION_LIMIT: ${SESSION_LIMIT:-}
   NEW_LIMIT: ${NEW_LIMIT:-}
+  GROUP_CHAT_ID: ${GROUP_CHAT_ID:-}
   # Пределы открытых ручек.
   VISITS_RATE: ${VISITS_RATE:-}
   ANSWERS_RATE: ${ANSWERS_RATE:-}

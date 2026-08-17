@@ -1,6 +1,7 @@
 """Обращения к бэкенду: колоду наполняет он, бот только просит."""
 
 from dataclasses import dataclass
+from urllib.parse import urljoin
 
 import httpx
 
@@ -13,6 +14,7 @@ PHRASES = "/api/v1/internal/phrases/"
 LESSON = "/api/v1/internal/lesson/"
 MOVE = "/api/v1/internal/lesson/move/"
 REMINDERS = "/api/v1/internal/reminders/take/"
+GROUP = "/api/v1/internal/group/take/"
 SWITCH = "/api/v1/internal/reminders/switch/"
 PROGRESS = "/api/v1/internal/progress/"
 RESET = "/api/v1/internal/progress/reset/"
@@ -49,6 +51,17 @@ class Reminder:
 
 
 @dataclass(frozen=True, slots=True)
+class GroupCard:
+    """Слово из колоды для группы: карточка целиком, без спойлера."""
+
+    chat_id: int
+    arabic: str
+    translation_ru: str
+    transliteration: str
+    image: str | None
+
+
+@dataclass(frozen=True, slots=True)
 class Progress:
     """Что у человека с прогрессом: этим бот отвечает на команды."""
 
@@ -73,6 +86,18 @@ def _headers() -> dict[str, str]:
         raise BackendError("в BOT_API_TOKEN не латиница — заголовок с таким не отправить")
 
     return {"X-Bot-Token": token}
+
+
+def _image_url(path: str | None) -> str | None:
+    """Публичный адрес картинки. Бэкенд отдаёт путь: свой адрес — внутренний, и с него
+    Telegram картинку не скачает.
+
+    Без `WEBAPP_URL` собрать его не из чего, и карточка уедет без картинки.
+    """
+    if not path or not config.WEBAPP_URL:
+        return None
+
+    return urljoin(config.WEBAPP_URL, path)
 
 
 def _reason(response: httpx.Response) -> str:
@@ -198,11 +223,30 @@ async def reminders() -> list[Reminder]:
             arabic=card["arabic"],
             translation_ru=card["translation_ru"],
             transliteration=card["transliteration"],
-            image=card["image"],
+            image=_image_url(card["image"]),
             is_first=bool(card["is_first"]),
         )
         for card in body
     ]
+
+
+async def group_card(*, forced: bool = False) -> GroupCard | None:
+    """Спрашивает слово для группы. Пусто — слот ещё не наступил или в нём уже слали.
+
+    `forced` — просьба владельца прислать сейчас: слот бэкенд тогда не смотрит.
+    """
+    body = await _send("POST", GROUP, json={"forced": forced})
+
+    if not body:
+        return None
+
+    return GroupCard(
+        chat_id=int(body["chat_id"]),
+        arabic=body["arabic"],
+        translation_ru=body["translation_ru"],
+        transliteration=body["transliteration"],
+        image=_image_url(body["image"]),
+    )
 
 
 def _progress(body: dict) -> Progress:

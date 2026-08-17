@@ -26,7 +26,7 @@ class ReminderTakeView(APIView):
         if cards:
             logger.info("к отправке в чат: %s", len(cards))
 
-        return Response(ReminderSerializer(cards, many=True, context={"request": request}).data)
+        return Response(ReminderSerializer(cards, many=True).data)
 
 
 class RemindersSwitchView(APIView):

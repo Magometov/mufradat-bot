@@ -16,6 +16,9 @@ REMINDER_STEP = timedelta(hours=1)
 AWAKE_FROM = 9
 AWAKE_TO = 21
 
+# Часы по Москве, когда слово уезжает в группу. Длина списка и есть «сколько раз в день».
+GROUP_HOURS = (10, 18)
+
 
 class Verdict(models.TextChoices):
     """Что человек сказал про карточку."""

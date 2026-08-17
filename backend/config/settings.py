@@ -143,3 +143,7 @@ NEW_LIMIT = int(getenv("NEW_LIMIT") or 10)
 # TODO: когда логика открыта всем и это устоялось — снести саму переменную вместе с
 # галочкой `Learner.scheduling`, признаком `enabled` в ответе API и ветками во фронтенде.
 SCHEDULING_FOR_ALL = getenv("SCHEDULING_FOR_ALL", "").lower() == "true"
+
+# --- Слово в группу -------------------------------------------------------------
+# Куда шлём. У супергруппы id отрицательный; пустой — рассылки нет вовсе.
+GROUP_CHAT_ID = int(getenv("GROUP_CHAT_ID") or 0)

@@ -7,7 +7,7 @@ import logging
 from aiogram import Bot
 from aiogram.exceptions import TelegramForbiddenError
 
-from bot import api, texts
+from bot import api, group, texts
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ async def _deliver(bot: Bot, card: api.Reminder) -> None:
 
 
 async def _round(bot: Bot) -> None:
-    """Один обход: спросить и разослать."""
+    """Один обход: напоминания по личным чатам и, если наступил слот, слово в группу."""
     cards = await api.reminders()
 
     for card in cards:
@@ -61,6 +61,8 @@ async def _round(bot: Bot) -> None:
             logger.info("напоминание не доставлено, чат закрыт: %s", card.telegram_id)
         except Exception:
             logger.exception("напоминание не отправилось: %s", card.telegram_id)
+
+    await group.send(bot)
 
 
 async def run(bot: Bot) -> None:
