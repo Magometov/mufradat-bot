@@ -34,6 +34,7 @@
         repeat: [];
         view: [];
         back: [];
+        tips: [];
     }>();
     // #endregion
 
@@ -51,6 +52,16 @@
     <section :class="$style.StartMode">
         <header :class="$style.StartMode__head">
             <UiButton v-if="props.canBack" variant="ghost" @click="emit('back')">←</UiButton>
+
+            <UiButton
+                v-else-if="props.isReview"
+                :class="$style.StartMode__help"
+                variant="plain"
+                aria-label="Как это работает"
+                @click="emit('tips')"
+            >
+                ?
+            </UiButton>
 
             <!-- Оформление меняют здесь и больше нигде: это настройка, а не действие
                  прогона, в разделах и карточках ей делать нечего. -->
@@ -131,6 +142,16 @@
 
         &__appearance {
             margin-left: auto;
+        }
+
+        // Круглая, как кнопка оформления: справка и настройка выглядят одинаково.
+        &__help {
+            width: 4.4rem;
+            height: 4.4rem;
+            padding: 0;
+            border-radius: 50%;
+            color: var(--muted);
+            font-size: 1.8rem;
         }
 
         // Кнопка оформления стоит сверху, а стопка с выбором — по центру остатка.

@@ -9,6 +9,9 @@ const RUN_KEY = 'mufradat.run.2';
 // Оценки, ещё не уехавшие на сервер. Номер в ключе — версия формата.
 const ANSWERS_KEY = 'mufradat.answers.1';
 
+// Показывали ли подсказки про расписание.
+const TIPS_KEY = 'mufradat.tips.1';
+
 // Эти два ключа продублированы в index.html: оформление там читают до первой
 // отрисовки, когда приложения ещё нет. Меняешь здесь — правь и там.
 const APPEARANCE_KEY = 'mufradat.appearance';
@@ -172,5 +175,27 @@ export function writeAnswers(answers: IAnswer[]): void {
         localStorage.setItem(ANSWERS_KEY, JSON.stringify(answers));
     } catch {
         // Без записи оценки живут до перезагрузки — это лучше, чем падение.
+    }
+}
+
+/**
+ * Видели ли подсказки. Не знаем — считаем, что видели: навязываться лишний раз хуже.
+ */
+export function isTipsSeen(): boolean {
+    try {
+        return localStorage.getItem(TIPS_KEY) !== null;
+    } catch {
+        return true;
+    }
+}
+
+/**
+ * Отмечает подсказки показанными.
+ */
+export function markTipsSeen(): void {
+    try {
+        localStorage.setItem(TIPS_KEY, '1');
+    } catch {
+        // Тогда они покажутся ещё раз в следующий заход. Не беда.
     }
 }

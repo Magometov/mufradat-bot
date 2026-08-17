@@ -15,6 +15,7 @@
     import { dayWord } from './utils/plural';
     import { buildPortion } from './utils/portion';
     import { days } from './utils/predict';
+    import { isTipsSeen, markTipsSeen } from './utils/storage';
     import { logVisit } from './utils/visit';
 
     // Composables
@@ -30,6 +31,7 @@
     import StartIdle from './components/start/StartIdle.vue';
     import StartMode from './components/start/StartMode.vue';
     import StartSections from './components/start/StartSections.vue';
+    import StartTips from './components/start/StartTips.vue';
     import UiButton from './components/ui/UiButton.vue';
     // #endregion
 
@@ -51,6 +53,8 @@
     const summary = ref('');
     // Раздел, в котором на сегодня пусто: показываем, когда ждать, и выход в просмотр.
     const idle = ref<string | null>(null);
+    // Подсказки: сами всходят один раз, дальше — по кнопке «?».
+    const isTipsOpen = ref(false);
 
     const { initData, init } = useTelegram();
     const { enabled, rules, progress, now, fetchState, record, cancelLast, flush } =
@@ -241,6 +245,14 @@
     }
 
     /**
+     * Закрывает подсказки и помнит, что их видели.
+     */
+    function handleTipsClose(): void {
+        isTipsOpen.value = false;
+        markTipsSeen();
+    }
+
+    /**
      * Смотрит раздел, в котором на сегодня пусто: расписание при этом не участвует.
      */
     function handleIdleView(): void {
@@ -257,6 +269,11 @@
 
         summary.value = summarize(session.ids.value, progress.value, now());
         void flush();
+    });
+
+    // Подсказки про расписание нужны только тому, у кого расписание есть.
+    watch(enabled, (isOn) => {
+        if (isOn && !isTipsSeen()) isTipsOpen.value = true;
     });
 
     onMounted(() => {
@@ -341,8 +358,11 @@
                 @repeat="handleRepeat"
                 @view="handleView"
                 @back="isViewing = false"
+                @tips="isTipsOpen = true"
             />
         </Transition>
+
+        <StartTips v-if="isTipsOpen" :rules="rules" @close="handleTipsClose" />
     </main>
 </template>
 
