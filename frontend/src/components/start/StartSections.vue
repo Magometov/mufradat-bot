@@ -30,8 +30,14 @@
         defineProps<{
             title: string;
             sections: ITheme[];
+            /** Сколько карточек на сегодня в каждом разделе, по коду раздела. */
+            due?: Map<string, number>;
+            /** Сколько на сегодня во всём режиме. */
+            dueAll?: number;
+            /** Видна ли новая логика: без неё экран остаётся сегодняшним. */
+            isReview?: boolean;
         }>(),
-        {},
+        { due: () => new Map(), dueAll: 0, isReview: false },
     );
     // #endregion
 
@@ -70,6 +76,12 @@
     const otherSections = computed<ITheme[]>(() =>
         props.sections.filter((section) => section.slug !== PINNED),
     );
+
+    // Сколько разделов ждут повторения: строка-итог отвечает на «куда идти», когда
+    // цифры есть только у двух широких кнопок.
+    const busy = computed<number>(
+        () => props.sections.filter((section) => (props.due.get(section.slug) ?? 0) > 0).length,
+    );
     // #endregion
 
     // #region Methods
@@ -92,6 +104,13 @@
      */
     function handleBack(): void {
         emit('back');
+    }
+
+    /**
+     * Пусто ли в разделе на сегодня: такие приглушены, но нажимаются.
+     */
+    function isIdle(slug: string): boolean {
+        return props.isReview && (props.due.get(slug) ?? 0) === 0;
     }
 
     /**
@@ -121,6 +140,9 @@
             >
                 <component :is="getIconForSection(pinnedSection.slug)" :size="20" />
                 {{ pinnedSection.name }}
+                <span v-if="props.isReview" :class="$style.StartSections__count">
+                    · {{ props.due.get(pinnedSection.slug) ?? 0 }}
+                </span>
             </UiButton>
 
             <UiButton
@@ -129,13 +151,19 @@
                 @click="handleSelectAll"
             >
                 Все разделы
+                <span v-if="props.isReview" :class="$style.StartSections__count">
+                    · {{ props.dueAll }}
+                </span>
             </UiButton>
 
             <div v-if="otherSections.length > 0" :class="$style.StartSections__list">
                 <UiButton
                     v-for="section in otherSections"
                     :key="section.slug"
-                    :class="$style.StartSections__button"
+                    :class="[
+                        $style.StartSections__button,
+                        isIdle(section.slug) && $style['StartSections__button--idle'],
+                    ]"
                     variant="plain"
                     @click="handleSelect(section.slug)"
                 >
@@ -147,6 +175,12 @@
                     {{ section.name }}
                 </UiButton>
             </div>
+
+            <p v-if="props.isReview" :class="$style.StartSections__total">
+                на сегодня <b>{{ props.dueAll }}</b>
+                {{ props.dueAll === 1 ? 'карточка' : 'карточек' }}
+                <template v-if="busy > 0">в {{ busy }} из {{ props.sections.length }}</template>
+            </p>
         </div>
     </section>
 </template>
@@ -188,6 +222,28 @@
 
         &__icon {
             color: var(--muted);
+        }
+
+        // Цифра только у двух широких кнопок: в сетке она не влезает в строку подписи.
+        &__count {
+            font-weight: 700;
+        }
+
+        // Раздел без сегодняшних карточек приглушён, но нажимается: там объяснят, когда
+        // придёт ближайшее слово.
+        &__button--idle {
+            opacity: 0.5;
+        }
+
+        &__total {
+            color: var(--muted);
+            font-size: 1.4rem;
+            text-align: center;
+
+            b {
+                color: var(--ink);
+                font-weight: 600;
+            }
         }
 
         &__list {

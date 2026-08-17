@@ -6,10 +6,11 @@
     import type { ITheme } from './types/theme';
 
     // Vue
-    import { computed, onMounted, ref } from 'vue';
+    import { computed, onMounted, ref, watch } from 'vue';
 
     // Utils
     import { API_URL } from './utils/api';
+    import { countDue, nextDueAt, soonText, summarize } from './utils/due';
     import { MODE_TITLES } from './utils/modes';
     import { dayWord } from './utils/plural';
     import { buildPortion } from './utils/portion';
@@ -25,6 +26,7 @@
 
     // Components
     import RunController from './components/run/RunController.vue';
+    import RunDone from './components/run/RunDone.vue';
     import StartMode from './components/start/StartMode.vue';
     import StartSections from './components/start/StartSections.vue';
     import UiButton from './components/ui/UiButton.vue';
@@ -42,6 +44,10 @@
     const error = ref('');
     // Что засчитала последняя оценка: текст пилюли с отменой.
     const pill = ref('');
+    // Просмотр колоды — сегодняшнее приложение: там нет ни оценок, ни цифр.
+    const isViewing = ref(false);
+    // Итог закрытого сеанса. Пусто — экрана конца нет.
+    const summary = ref('');
 
     const { initData, init } = useTelegram();
     const { enabled, rules, progress, now, fetchState, record, cancelLast, flush } =
@@ -58,11 +64,34 @@
     const modeTitle = computed<string>(() => (mode.value === null ? '' : MODE_TITLES[mode.value]));
 
     // Повторение идёт по расписанию, просмотр — по колоде: у каждого свой прогон.
-    const isReview = computed<boolean>(() => enabled.value && session.card.value !== null);
+    const isScheduled = computed<boolean>(() => enabled.value && !isViewing.value);
+    const isReview = computed<boolean>(() => isScheduled.value && session.card.value !== null);
     const shownCard = computed(() => (isReview.value ? session.card.value : card.value));
     const done = computed<number>(() =>
         isReview.value ? session.done.value : position.value / total.value,
     );
+
+    // Сколько на сегодня: по всей колоде, по выбранному режиму и по каждому разделу.
+    const dueTotal = computed<number>(() => countDue(entries.value, progress.value, now()));
+
+    const dueMode = computed<number>(() => countDue(cardsFor(null), progress.value, now()));
+
+    const dueByTheme = computed<Map<string, number>>(
+        () =>
+            new Map(
+                sections.value.map((section) => [
+                    section.slug,
+                    countDue(cardsFor(section.slug), progress.value, now()),
+                ]),
+            ),
+    );
+
+    // Когда придёт ближайшая карточка, если на сегодня ничего нет.
+    const nextWord = computed<string>(() => {
+        const at = nextDueAt(entries.value, progress.value);
+
+        return at === null ? '' : soonText(at, now());
+    });
     // #endregion
 
     // #region Methods
@@ -101,13 +130,37 @@
     function handleStart(theme: string | null): void {
         const selected = cardsFor(theme);
 
-        if (!enabled.value) {
+        if (!isScheduled.value) {
             start(selected);
             return;
         }
 
         // Потолков в разделе нет: пришёл сам — получай всё, что на сегодня.
+        summary.value = '';
         session.start(buildPortion(selected, progress.value, now(), null), progress.value);
+    }
+
+    /**
+     * Ежедневная доза по всей колоде: с потолком, в отличие от захода в раздел.
+     */
+    function handleRepeat(): void {
+        if (rules.value === null) return;
+
+        const limits = {
+            sessionLimit: rules.value.sessionLimit,
+            newLimit: rules.value.newLimit,
+        };
+
+        summary.value = '';
+        session.start(buildPortion(entries.value, progress.value, now(), limits), progress.value);
+    }
+
+    /**
+     * Уводит в просмотр колоды: там приложение работает как до расписания.
+     */
+    function handleView(): void {
+        isViewing.value = true;
+        reset();
     }
 
     /**
@@ -152,9 +205,26 @@
 
         finish();
     }
+
+    /**
+     * Уходит с экрана конца сеанса.
+     */
+    function handleHome(): void {
+        summary.value = '';
+        isViewing.value = false;
+        reset();
+    }
     // #endregion
 
     // #region Lifecycle
+    // Очередь опустела — сеанс закончился сам, и его итог занимает место карточки.
+    watch(session.left, (left, was) => {
+        if (left !== 0 || was === 0 || !isScheduled.value) return;
+
+        summary.value = summarize(session.ids.value, progress.value, now());
+        void flush();
+    });
+
     onMounted(() => {
         init();
         logVisit(VISITS_URL, initData);
@@ -192,16 +262,38 @@
                 @finish="handleFinish"
             />
 
+            <RunDone
+                v-else-if="summary"
+                key="done"
+                :summary="summary"
+                :left="dueTotal"
+                @more="handleRepeat"
+                @home="handleHome"
+            />
+
             <StartSections
                 v-else-if="mode"
                 key="sections"
                 :title="modeTitle"
                 :sections="sections"
+                :due="dueByTheme"
+                :due-all="dueMode"
+                :is-review="isScheduled"
                 @select="handleStart"
                 @back="reset"
             />
 
-            <StartMode v-else key="mode" :total="entries.length" @select="choose" />
+            <StartMode
+                v-else
+                key="mode"
+                :total="entries.length"
+                :is-review="isScheduled"
+                :due="dueTotal"
+                :next="nextWord"
+                @select="choose"
+                @repeat="handleRepeat"
+                @view="handleView"
+            />
         </Transition>
     </main>
 </template>

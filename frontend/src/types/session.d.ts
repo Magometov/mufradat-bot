@@ -18,6 +18,8 @@ export interface IUseSession {
     card: ComputedRef<IRunCard | null>;
     /** Сколько карточек ещё не закрыто. */
     left: ComputedRef<number>;
+    /** Номера карточек, с которыми сеанс начался: по ним считается итог. */
+    ids: ComputedRef<string[]>;
     /** Доля пройденного для полосы прогресса. */
     done: ComputedRef<number>;
     /** Набирает сеанс из готовой порции. */

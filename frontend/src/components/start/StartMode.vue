@@ -15,14 +15,22 @@
     const props = withDefaults(
         defineProps<{
             total: number;
+            /** Видна ли новая логика: без неё экран остаётся сегодняшним. */
+            isReview?: boolean;
+            /** Сколько карточек назначено на сегодня по всей колоде. */
+            due?: number;
+            /** Когда придёт ближайшая, если на сегодня ничего нет. */
+            next?: string;
         }>(),
-        {},
+        { isReview: false, due: 0, next: '' },
     );
     // #endregion
 
     // #region Emits
     const emit = defineEmits<{
         select: [mode: TRunMode];
+        repeat: [];
+        view: [];
     }>();
     // #endregion
 
@@ -60,13 +68,42 @@
             </p>
 
             <div v-else :class="$style.StartMode__choice">
-                <UiButton variant="accent" @click="handleSelect('words')">
+                <template v-if="props.isReview">
+                    <UiButton v-if="props.due > 0" variant="accent" @click="emit('repeat')">
+                        Повторить
+                    </UiButton>
+
+                    <p v-else :class="$style.StartMode__empty">
+                        На сегодня всё повторено.<br />
+                        Ближайшее слово — <b>{{ props.next }}</b
+                        >.
+                    </p>
+
+                    <!-- Разделитель словами: без него кнопки режима читаются как
+                         соперники «Повторить», хотя ведут к выбору раздела. -->
+                    <p :class="$style.StartMode__label">или выбрать раздел</p>
+                </template>
+
+                <UiButton
+                    :variant="props.isReview ? 'plain' : 'accent'"
+                    @click="handleSelect('words')"
+                >
                     {{ MODE_TITLES.words }}
                 </UiButton>
 
                 <UiButton variant="plain" @click="handleSelect('all')">
                     {{ MODE_TITLES.all }}
                 </UiButton>
+
+                <button
+                    v-if="props.isReview"
+                    :class="$style.StartMode__view"
+                    type="button"
+                    @click="emit('view')"
+                >
+                    Посмотреть колоду
+                    <small>листать без оценок</small>
+                </button>
             </div>
         </div>
     </section>
@@ -150,6 +187,45 @@
         &__empty {
             color: var(--muted);
             text-align: center;
+
+            b {
+                color: var(--ink);
+                font-weight: 600;
+            }
+        }
+
+        &__label {
+            color: var(--muted);
+            font-size: 1.4rem;
+            text-align: center;
+        }
+
+        // Обводка вместо заливки: кнопка должна читаться кнопкой, но стоять третьей по
+        // весу — у остальных есть фон и тень, у неё только контур.
+        &__view {
+            padding: 1.2rem 2rem;
+            border: 1px solid var(--track);
+            border-radius: 1.6rem;
+            background: none;
+            color: var(--muted);
+            font-family: inherit;
+            font-size: 1.5rem;
+            font-weight: 500;
+            cursor: pointer;
+
+            small {
+                display: block;
+                margin-top: 0.2rem;
+                color: var(--muted);
+                font-size: 1.2rem;
+                font-weight: 400;
+                opacity: 0.8;
+            }
+
+            &:focus-visible {
+                outline: 2px solid var(--accent);
+                outline-offset: 2px;
+            }
         }
 
         &__choice {

@@ -29,6 +29,7 @@ const AHEAD = 2;
 export function useSession(entries: Ref<IEntry[]>, needed: Ref<number>): IUseSession {
     const queue = ref<ISessionItem[]>([]);
     const total = ref(0);
+    const started = ref<string[]>([]);
     // Очередь до последней оценки: отмена в тосте возвращает её целиком.
     let before: ISessionItem[] | null = null;
 
@@ -44,6 +45,8 @@ export function useSession(entries: Ref<IEntry[]>, needed: Ref<number>): IUseSes
     });
 
     const left = computed<number>(() => queue.value.length);
+
+    const ids = computed<string[]>(() => started.value);
 
     const done = computed<number>(() =>
         total.value === 0 ? 0 : (total.value - queue.value.length) / total.value,
@@ -66,6 +69,7 @@ export function useSession(entries: Ref<IEntry[]>, needed: Ref<number>): IUseSes
 
         queue.value = shuffle(items);
         total.value = items.length;
+        started.value = items.map((item) => item.id);
         before = null;
     }
 
@@ -108,5 +112,5 @@ export function useSession(entries: Ref<IEntry[]>, needed: Ref<number>): IUseSes
         { immediate: true },
     );
 
-    return { card, left, done, start, answer, undo, finish };
+    return { card, left, ids, done, start, answer, undo, finish };
 }
