@@ -25,6 +25,8 @@ bot = [
 ]
 dev = [
     "ruff>=0.16,<0.17",
+    "pytest>=9,<10",
+    "pytest-django>=4.13,<5",
 ]
 
 # Проект не библиотека: колесо собирать не нужно, uv ставит только зависимости.
@@ -45,3 +47,11 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.ruff.lint.per-file-ignores]
 # Django migrations are generated code.
 "*/migrations/*" = ["E501"]
+
+# Тесты бэкенда. База нужна живая: `docker compose up -d db`, адрес берётся из .env.
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+pythonpath = ["backend"]
+testpaths = ["backend/tests"]
+python_files = ["test_*.py"]
+addopts = "-q"
