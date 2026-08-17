@@ -1,6 +1,7 @@
 <script setup lang="ts">
     // #region Imports
     // Types
+    import type { TVerdict } from '../../types/progress';
     import type { ICardSide, IRunCard } from '../../types/run';
 
     // Vue
@@ -12,14 +13,19 @@
         defineProps<{
             card: IRunCard;
             isFlipped: boolean;
-            /** На сколько карточку утянули пальцем. */
-            shift?: number;
+            /** Что засчитается, если отпустить сейчас. Пусто — метки нет. */
+            mark?: TVerdict | '';
         }>(),
-        { shift: 0 },
+        { mark: '' },
     );
     // #endregion
 
     // #region Data
+    const MARK_TEXT: Record<TVerdict, string> = {
+        know: 'Помню',
+        forgot: 'Не помню',
+    };
+
     const HINT = {
         forward: 'нажми, чтобы увидеть перевод',
         reversed: 'нажми, чтобы увидеть арабское',
@@ -27,13 +33,6 @@
     // #endregion
 
     // #region Computed
-    // Наклон делает жест живым: карточка не скользит плашмя, а поворачивается за пальцем.
-    const dragStyle = computed(() => ({
-        transform: `translateX(${props.shift}px) rotate(${props.shift / 26}deg)`,
-        // Пока палец ведёт, переход выключен: иначе карточка тянется с задержкой.
-        transition: props.shift === 0 ? undefined : 'none',
-    }));
-
     // Лицо и оборот меняются местами, а не переписываются: правило одно на оба
     // направления — на лице вопрос, на обороте ответ.
     const front = computed<ICardSide>(() =>
@@ -57,17 +56,7 @@
          tabindex — не для мыши: без них карточка не доступна ни с клавиатуры, ни
          скринридеру, для которого это была бы просто пара абзацев. -->
     <div :class="$style.RunCard" role="button" tabindex="0" :aria-label="hint">
-        <!-- Карточки под верхней выглядывают по краям: видно, что колода не кончилась. -->
-        <div
-            :class="[$style.RunCard__behind, $style['RunCard__behind--far']]"
-            aria-hidden="true"
-        ></div>
-        <div
-            :class="[$style.RunCard__behind, $style['RunCard__behind--near']]"
-            aria-hidden="true"
-        ></div>
-
-        <div :class="$style.RunCard__mover" :style="dragStyle">
+        <div :class="$style.RunCard__mover" data-mover>
             <div
                 :class="[
                     $style.RunCard__inner,
@@ -101,14 +90,16 @@
                     <span :class="$style.RunCard__rule"></span>
 
                     <!-- Картинка только на обороте: на лице она подменила бы припоминание
-                     узнаванием картинки. -->
+                         узнаванием картинки. Загрузка не отложенная: оборот скрыт, и
+                         браузер тянул бы файл в момент переворота — отсюда провал на
+                         первом. Заранее их просит предзагрузка прогона. -->
                     <img
                         v-if="props.card.entry.image"
                         :class="$style.RunCard__image"
                         :src="props.card.entry.image"
                         :alt="props.card.entry.translation_ru"
                         decoding="async"
-                        loading="lazy"
+                        loading="eager"
                         :width="props.card.entry.image_width ?? undefined"
                         :height="props.card.entry.image_height ?? undefined"
                     />
@@ -118,6 +109,16 @@
                     </p>
                 </div>
             </div>
+
+            <!-- Метка идёт после сторон: у перевёрнутого слоя своя трёхмерная сцена, и
+                 внутри неё порядок наложения решает не z-index, а он сам. -->
+            <span
+                v-if="props.mark"
+                :class="[$style.RunCard__mark, $style[`RunCard__mark--${props.mark}`]]"
+                aria-hidden="true"
+            >
+                {{ MARK_TEXT[props.mark] }}
+            </span>
         </div>
     </div>
 </template>
@@ -141,27 +142,26 @@
             border-radius: 2.4rem;
         }
 
-        // Тон, а не прозрачность: полупрозрачная белая карточка на светлом фоне в него
-        // же и утекает, а разница тонов держится при любой теме.
-        &__behind {
+        // Метка лежит на утягиваемом слое, поэтому едет вместе с карточкой.
+        &__mark {
             position: absolute;
-            border-radius: 2.4rem;
-            background: var(--behind);
-            box-shadow: 0 0.6rem 1.6rem -0.8rem var(--under);
-        }
-
-        &__behind--far {
             top: 1.6rem;
-            right: 2.6rem;
-            bottom: 0;
-            left: 2.6rem;
+            left: 1.6rem;
+            z-index: 1;
+            padding: 0.4rem 1.2rem;
+            border-radius: 1rem;
+            font-size: 1.4rem;
+            font-weight: 700;
         }
 
-        &__behind--near {
-            top: 0.8rem;
-            right: 1.4rem;
-            bottom: 0.8rem;
-            left: 1.4rem;
+        &__mark--know {
+            background: var(--good-soft);
+            color: var(--good);
+        }
+
+        &__mark--forgot {
+            background: var(--bad-soft);
+            color: var(--bad);
         }
 
         // Двигается при свайпе только этот слой: карточки под ним стоят на месте, и
@@ -172,7 +172,10 @@
             right: 0;
             bottom: 1.6rem;
             left: 0;
-            transition: transform 0.26s ease;
+            transition: transform 0.22s ease-out;
+            // `will-change` здесь нельзя: он создаёт и уничтожает слой отрисовки на каждый
+            // жест, и в этот момент скругление успевает мигнуть прямоугольником. Слой и так
+            // поднимается от `translate3d`, пока палец ведёт.
         }
 
         &__inner {
@@ -198,9 +201,11 @@
             overflow-y: auto;
             border-radius: 2.4rem;
             background: var(--surface);
-            box-shadow: var(--lift);
             backface-visibility: hidden;
             text-align: center;
+            // Обе стороны с трансформацией с самого начала: иначе слои отрисовки под них
+            // создаются в момент первого переворота, и он идёт с провалом.
+            transform: translateZ(0);
 
             &--back {
                 transform: rotateY(180deg);

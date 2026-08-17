@@ -55,11 +55,18 @@ def test_checkbox_turns_the_logic_on(client):
     assert ask(client, signed=True).json()["enabled"] is True
 
 
-@override_settings(SCHEDULING_FOR_ALL=True)
+@override_settings(SCHEDULING_FOR_ALL=True, BOT_TOKEN=TOKEN)
 @pytest.mark.django_db
 def test_open_to_all_ignores_the_checkbox(client):
-    """Открыли всем — видно и без подписи, и без галочки."""
-    assert ask(client).json()["enabled"] is True
+    """Открыли всем — галочка больше не нужна, но опознание нужно."""
+    assert ask(client, signed=True).json()["enabled"] is True
+
+
+@override_settings(SCHEDULING_FOR_ALL=True)
+@pytest.mark.django_db
+def test_stranger_gets_nothing_even_when_open_to_all(client):
+    """Неопознанному логика не включается: его оценки некуда писать."""
+    assert ask(client).json()["enabled"] is False
 
 
 @override_settings(

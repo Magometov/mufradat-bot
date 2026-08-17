@@ -14,7 +14,7 @@ const NEEDED = 2;
 /**
  * Карточка очереди: номер, уровень и счёт верных подряд.
  */
-function card(id: string, level = 0, step = 0): ISessionCard {
+function card(id: string, level: number | null = 0, step = 0): ISessionCard {
     return { id, level, step };
 }
 
@@ -72,6 +72,18 @@ describe('очередь сеанса', () => {
 
     it('последняя закрытая карточка кончает сеанс', () => {
         expect(answer([card('w1', 2)], 'know', NEEDED)).toEqual([]);
+    });
+
+    it('узнанная с первого взгляда уходит сразу', () => {
+        const next = answer([card('w1', null), card('w2')], 'know', NEEDED);
+
+        expect(ids(next)).toEqual(['w2']);
+    });
+
+    it('незнакомая новая падает в изучение и возвращается', () => {
+        const next = answer([card('w1', null), card('w2')], 'forgot', NEEDED);
+
+        expect(next.at(-1)).toEqual(card('w1', 0, 0));
     });
 
     it('пустую очередь оценивать нечем', () => {

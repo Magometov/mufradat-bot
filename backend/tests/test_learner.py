@@ -2,6 +2,7 @@
 
 import pytest
 from django.db import IntegrityError, transaction
+from django.test import override_settings
 
 from apps.common.constants import Source
 from apps.common.models import Learner
@@ -73,3 +74,22 @@ def test_visitor_trusts_the_bot():
 
     assert source == Source.TELEGRAM
     assert learner.telegram_id == 777
+
+
+@override_settings(DEBUG=True, SCHEDULING_FOR_ALL=True)
+@pytest.mark.django_db
+def test_local_learner_appears_only_in_development():
+    """На своей машине неопознанный получает локального человека."""
+    source, learner = visitor()
+
+    assert source == Source.SITE
+    assert learner is not None
+    assert learner.telegram_id is None
+
+
+@override_settings(DEBUG=False, SCHEDULING_FOR_ALL=True)
+@pytest.mark.django_db
+def test_local_learner_never_appears_in_production():
+    """Без DEBUG эта ветка мертва, даже когда логика открыта всем."""
+    assert visitor() == (Source.SITE, None)
+    assert Learner.objects.count() == 0

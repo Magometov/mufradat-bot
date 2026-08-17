@@ -1,7 +1,8 @@
 <script setup lang="ts">
     // #region Imports
     // Types
-    import type { IRunCard, TSlide } from '../../types/run';
+    import type { TVerdict } from '../../types/progress';
+    import type { IRunCard, TRunKind, TSlide } from '../../types/run';
 
     // Vue
     import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
@@ -12,6 +13,7 @@
     // Components
     import RunCard from './RunCard.vue';
     import RunControls from './RunControls.vue';
+    import RunPill from './RunPill.vue';
     import UiButton from '../ui/UiButton.vue';
 
     // Icons
@@ -22,17 +24,26 @@
     const props = withDefaults(
         defineProps<{
             card: IRunCard;
-            position: number;
-            total: number;
-            hasPrev: boolean;
-            hasNext: boolean;
+            /** Повторение оценивает, просмотр листает. */
+            kind: TRunKind;
+            /** Доля пройденного: в повторении её считает сеанс, в просмотре — место в колоде. */
+            done: number;
+            /** Что засчитала последняя оценка. Пусто — пилюли нет. */
+            pill?: string;
+            position?: number;
+            total?: number;
+            hasPrev?: boolean;
+            hasNext?: boolean;
         }>(),
-        {},
+        { pill: '', position: 0, total: 0, hasPrev: false, hasNext: false },
     );
     // #endregion
 
     // #region Emits
     const emit = defineEmits<{
+        know: [];
+        forgot: [];
+        cancel: [];
         prev: [];
         next: [];
         finish: [];
@@ -52,7 +63,18 @@
 
     // #region Computed
     // Полоса отвечает на «сколько осталось», счётчик внизу — на «где я именно».
-    const progress = computed<string>(() => `${(props.position / props.total) * 100}%`);
+    // Без округления до целых: в длинном сеансе один ответ — это доли процента, и
+    // округлённая полоса стояла бы на месте.
+    const progress = computed<string>(() => `${(props.done * 100).toFixed(2)}%`);
+
+    const isReview = computed<boolean>(() => props.kind === 'review');
+
+    // Метка появляется по мере ухода: видно, что засчитается, ещё до того как отпустил.
+    const mark = computed<TVerdict | ''>(() => {
+        if (!isReview.value || direction.value === 0) return '';
+
+        return direction.value > 0 ? 'know' : 'forgot';
+    });
     // #endregion
 
     // #region Methods
@@ -64,10 +86,29 @@
     }
 
     /**
+     * Оценка карточки.
+     */
+    function handleRate(verdict: TVerdict): void {
+        if (!isReview.value) return;
+
+        slide.value = 'slide-forward';
+
+        if (verdict === 'know') emit('know');
+        else emit('forgot');
+    }
+
+    /**
+     * Просит отменить последнюю оценку.
+     */
+    function handleCancel(): void {
+        emit('cancel');
+    }
+
+    /**
      * Шаг назад по прогону: карточка уезжает вправо.
      */
     function handlePrev(): void {
-        if (!props.hasPrev) return;
+        if (isReview.value || !props.hasPrev) return;
 
         slide.value = 'slide-back';
         emit('prev');
@@ -77,7 +118,7 @@
      * Шаг вперёд по прогону: карточка уезжает влево.
      */
     function handleNext(): void {
-        if (!props.hasNext) return;
+        if (isReview.value || !props.hasNext) return;
 
         slide.value = 'slide-forward';
         emit('next');
@@ -102,13 +143,19 @@
 
         if (event.key === 'ArrowLeft') {
             event.preventDefault();
-            handlePrev();
+
+            if (isReview.value) handleRate('forgot');
+            else handlePrev();
+
             return;
         }
 
         if (event.key === 'ArrowRight') {
             event.preventDefault();
-            handleNext();
+
+            if (isReview.value) handleRate('know');
+            else handleNext();
+
             return;
         }
 
@@ -121,7 +168,12 @@
     // #endregion
 
     // #region Lifecycle
-    const { shift } = useSwipe(stage, { tap: handleFlip, left: handleNext, right: handlePrev });
+    // До переворота любой жест по карточке её переворачивает: мёртвых жестов не остаётся.
+    const { direction } = useSwipe(stage, {
+        tap: handleFlip,
+        left: () => (isReview.value ? handleRate('forgot') : handleNext()),
+        right: () => (isReview.value ? handleRate('know') : handlePrev()),
+    });
 
     onMounted(() => window.addEventListener('keydown', onKeydown));
     onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
@@ -149,25 +201,43 @@
         </header>
 
         <div ref="stage" :class="$style.RunController__stage">
+            <!-- Карточки под верхней выглядывают снизу: видно, что колода не кончилась.
+                 Живут в сцене, а не в карточке, иначе уезжали бы вместе с ней. -->
+            <div
+                :class="[$style.RunController__behind, $style['RunController__behind--far']]"
+                aria-hidden="true"
+            ></div>
+            <div
+                :class="[$style.RunController__behind, $style['RunController__behind--near']]"
+                aria-hidden="true"
+            ></div>
+
             <Transition :name="slide">
                 <RunCard
                     :key="props.card.entry.id"
                     :card="props.card"
                     :is-flipped="isFlipped"
-                    :shift="shift"
+                    :mark="mark"
                 />
             </Transition>
         </div>
 
-        <RunControls
-            :position="props.position"
-            :total="props.total"
-            :has-prev="props.hasPrev"
-            :has-next="props.hasNext"
-            @prev="handlePrev"
-            @next="handleNext"
-            @finish="handleFinish"
-        />
+        <div :class="$style.RunController__foot">
+            <RunPill :text="props.pill" @cancel="handleCancel" />
+
+            <RunControls
+                :kind="props.kind"
+                :position="props.position"
+                :total="props.total"
+                :has-prev="props.hasPrev"
+                :has-next="props.hasNext"
+                @know="handleRate('know')"
+                @forgot="handleRate('forgot')"
+                @prev="handlePrev"
+                @next="handleNext"
+                @finish="handleFinish"
+            />
+        </div>
     </section>
 </template>
 
@@ -182,6 +252,11 @@
             display: flex;
             align-items: center;
             gap: 1.8rem;
+        }
+
+        // Пилюля висит над подвалом, поэтому у него своё место в разметке.
+        &__foot {
+            position: relative;
         }
 
         &__track {
@@ -200,12 +275,35 @@
             transition: width 0.26s ease;
         }
 
+        // Тон, а не тень: карточка шире слоёв, и в вырезах у её скруглённых углов любая
+        // тень внутри стопки читается серым клином. Слои и так видно — они светлее фона.
+        &__behind {
+            position: absolute;
+            border-radius: 2.4rem;
+            background: var(--behind);
+        }
+
+        &__behind--far {
+            top: 1.6rem;
+            right: 2.6rem;
+            bottom: 0;
+            left: 2.6rem;
+        }
+
+        &__behind--near {
+            top: 0.8rem;
+            right: 1.4rem;
+            bottom: 0.8rem;
+            left: 1.4rem;
+        }
+
         // Уезжающая и приезжающая карточки лежат здесь одновременно, поэтому высоту
-        // держит сцена. Обрезка нужна, чтобы карточка не выезжала за края экрана.
+        // держит сцена. По горизонтали она не обрезает: карточка ровно её ширины, и клип
+        // срезал бы скругления ведущего края в тот же миг, как жест начался. Обрезает
+        // весь экран — там край далеко и незаметен.
         &__stage {
             position: relative;
             flex: 1;
-            overflow: hidden;
             // Горизонталь разбираем сами, вертикаль оставляем браузеру и клиенту:
             // иначе сломается и прокрутка длинной карточки, и жесты Telegram.
             touch-action: pan-y;

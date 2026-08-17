@@ -6,8 +6,12 @@ from apps.common.models import Learner
 
 
 def enabled(learner: Learner | None) -> bool:
-    """Видит ли человек новую логику: по галочке в админке и только в Telegram."""
-    if settings.SCHEDULING_FOR_ALL:
-        return True
+    """Видит ли человек новую логику.
 
-    return learner is not None and learner.telegram_id is not None and learner.scheduling
+    Без опознания — нет: оценки принимает только ручка с человеком, и включённая логика
+    без него дала бы сеанс, который ничего не сохраняет.
+    """
+    if learner is None:
+        return False
+
+    return settings.SCHEDULING_FOR_ALL or (learner.telegram_id is not None and learner.scheduling)

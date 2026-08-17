@@ -162,6 +162,15 @@ export function useProgress(initData: string): IUseProgress {
                 body: JSON.stringify({ answers }),
             });
 
+            // Оценки нас не касаются: писать их некуда, и повторять попытки незачем.
+            if (response.status === 403) {
+                enabled.value = false;
+                queue.value = [];
+                writeAnswers(queue.value);
+
+                return;
+            }
+
             if (!response.ok) return;
 
             queue.value = queue.value.slice(answers.length);

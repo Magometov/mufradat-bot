@@ -2,6 +2,9 @@ import type { ComputedRef } from 'vue';
 
 import type { IEntry } from './entry';
 
+/** Чем занят прогон: повторением с оценкой или просмотром колоды. */
+export type TRunKind = 'review' | 'view';
+
 /** Карточка в прогоне: что показывать и какой стороной вперёд. */
 export interface IRunItem {
     id: string;

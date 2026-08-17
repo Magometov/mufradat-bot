@@ -1,5 +1,8 @@
 <script setup lang="ts">
     // #region Imports
+    // Types
+    import type { TRunKind } from '../../types/run';
+
     // Vue
     import { computed } from 'vue';
 
@@ -10,17 +13,21 @@
     // #region Props
     const props = withDefaults(
         defineProps<{
-            position: number;
-            total: number;
-            hasPrev: boolean;
-            hasNext: boolean;
+            /** Повторение оценивает, просмотр листает. */
+            kind: TRunKind;
+            position?: number;
+            total?: number;
+            hasPrev?: boolean;
+            hasNext?: boolean;
         }>(),
-        {},
+        { position: 0, total: 0, hasPrev: false, hasNext: false },
     );
     // #endregion
 
     // #region Emits
     const emit = defineEmits<{
+        know: [];
+        forgot: [];
         prev: [];
         next: [];
         finish: [];
@@ -57,17 +64,25 @@
 
 <template>
     <footer :class="$style.RunControls">
-        <UiButton variant="plain" :is-disabled="!props.hasPrev" @click="handlePrev">
-            Назад
-        </UiButton>
+        <template v-if="props.kind === 'review'">
+            <UiButton variant="plain" @click="emit('forgot')">Не помню</UiButton>
 
-        <!-- Счётчик объявляется вслух: для того, кто листает с клавиатуры, это
-             единственный признак, что карточка сменилась. -->
-        <p :class="$style.RunControls__counter" aria-live="polite">
-            {{ props.position }} / {{ props.total }}
-        </p>
+            <UiButton variant="accent" @click="emit('know')">Помню</UiButton>
+        </template>
 
-        <UiButton variant="accent" @click="handleNext">{{ nextLabel }}</UiButton>
+        <template v-else>
+            <UiButton variant="plain" :is-disabled="!props.hasPrev" @click="handlePrev">
+                Назад
+            </UiButton>
+
+            <!-- Счётчик объявляется вслух: для того, кто листает с клавиатуры, это
+                 единственный признак, что карточка сменилась. -->
+            <p :class="$style.RunControls__counter" aria-live="polite">
+                {{ props.position }} / {{ props.total }}
+            </p>
+
+            <UiButton variant="accent" @click="handleNext">{{ nextLabel }}</UiButton>
+        </template>
     </footer>
 </template>
 

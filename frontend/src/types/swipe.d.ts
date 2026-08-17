@@ -11,6 +11,6 @@ export interface ISwipeActions {
 }
 
 export interface IUseSwipe {
-    /** На сколько карточка утянута от пальца. Ноль — палец отпущен. */
-    shift: Ref<number>;
+    /** Куда тянут: -1 влево, 1 вправо, 0 — палец отпущен или сдвиг мал. */
+    direction: Ref<number>;
 }

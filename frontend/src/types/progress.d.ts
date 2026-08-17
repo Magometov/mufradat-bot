@@ -39,7 +39,8 @@ export interface ILimits {
 /** Карточка в очереди сеанса: только то, что нужно для решения о возврате. */
 export interface ISessionCard {
     id: string;
-    level: number;
+    /** `null` — карточку видят впервые: у неё ещё нет уровня. */
+    level: number | null;
     step: number;
 }
 

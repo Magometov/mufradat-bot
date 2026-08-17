@@ -11,6 +11,9 @@ html {
 
 body {
     margin: 0;
+    // Утягиваемая карточка выходит за края разметки. `clip`, а не `hidden`: обрезает по
+    // краю экрана, не заводя горизонтальной прокрутки.
+    overflow-x: clip;
     font-family: var(--font-ui);
     font-size: 1.6rem;
     line-height: 1.4;

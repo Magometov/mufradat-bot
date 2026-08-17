@@ -16,12 +16,19 @@ const LEARNING = 0;
  * Уровень и счёт здесь считаются только чтобы решить, закрылась ли карточка; настоящие
  * уровень и срок пишет сервер.
  */
-export function answer(queue: ISessionCard[], verdict: TVerdict, needed: number): ISessionCard[] {
+export function answer<TCard extends ISessionCard>(
+    queue: TCard[],
+    verdict: TVerdict,
+    needed: number,
+): TCard[] {
     const [card, ...rest] = queue;
 
     if (card === undefined) return [];
 
     if (verdict === 'forgot') return back(rest, { ...card, level: LEARNING, step: 0 });
+
+    // Узнал с первого взгляда — карточка знакомая и уходит сразу, как и на сервере.
+    if (card.level === null) return rest;
 
     // Знакомая карточка закрывается с первого верного ответа, изучение — со второго.
     if (card.level !== LEARNING) return rest;
@@ -34,7 +41,7 @@ export function answer(queue: ISessionCard[], verdict: TVerdict, needed: number)
 /**
  * Ставит карточку в очередь через `RETURN_AFTER` других или в конец, если их меньше.
  */
-function back(queue: ISessionCard[], card: ISessionCard): ISessionCard[] {
+function back<TCard extends ISessionCard>(queue: TCard[], card: TCard): TCard[] {
     const at = Math.min(RETURN_AFTER, queue.length);
 
     return [...queue.slice(0, at), card, ...queue.slice(at)];
