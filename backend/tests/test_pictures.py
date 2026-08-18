@@ -9,7 +9,7 @@ from django.test import override_settings
 from PIL import Image
 
 from apps.vocabulary.models import Phrase
-from apps.vocabulary.services import photo_url, postcard_url
+from apps.vocabulary.services import postcard_url
 
 # Бакет как на сервере, только адрес выдуманный: `url()` строит строку, никуда не ходя.
 BUCKET = override_settings(
@@ -52,18 +52,15 @@ def drawn(form):
 
 
 @pytest.mark.django_db
-def test_saving_a_card_prepares_its_pictures(drawn):
+def test_saving_a_card_prepares_its_picture(drawn):
     """Собирается при сохранении, а не по запросу: инлайн показывает полсотни разом."""
-    assert len(ready()) == 2
+    assert len(ready()) == 1
 
 
 @pytest.mark.django_db
-def test_the_addresses_point_at_the_prepared_files(drawn):
+def test_the_address_points_at_the_prepared_file(drawn):
     """Адрес ведёт ровно к тому файлу, который лежит рядом."""
-    names = ready()
-
-    assert postcard_url(drawn).endswith(next(name for name in names if name.startswith("card-")))
-    assert photo_url(drawn).endswith(next(name for name in names if name.startswith("photo-")))
+    assert postcard_url(drawn).endswith(ready()[0])
 
 
 @pytest.mark.django_db
@@ -83,7 +80,7 @@ def test_editing_the_text_prepares_new_files(drawn):
     drawn.save(update_fields=["translation_ru"])
 
     assert postcard_url(drawn) != before
-    assert len(ready()) == 4
+    assert len(ready()) == 2
 
 
 @pytest.mark.django_db
@@ -91,7 +88,7 @@ def test_saving_twice_prepares_nothing_new(drawn):
     """Второе сохранение ничего не пересобирает: имя файла то же."""
     drawn.save()
 
-    assert len(ready()) == 2
+    assert len(ready()) == 1
 
 
 @pytest.mark.django_db
@@ -99,14 +96,12 @@ def test_the_bucket_gives_an_absolute_address(drawn):
     """С бакетом адрес абсолютный и ведёт в Cloudflare — до нас Telegram не доходит."""
     with BUCKET:
         assert postcard_url(drawn).startswith("https://pub-test.r2.dev/telegram/card-")
-        assert photo_url(drawn).startswith("https://pub-test.r2.dev/telegram/photo-")
 
 
 @pytest.mark.django_db
-def test_a_card_without_a_picture_has_no_addresses(form):
+def test_a_card_without_a_picture_has_no_address(form):
     """Собирать нечего — и адреса нет, бот отправит карточку текстом."""
     assert postcard_url(form) is None
-    assert photo_url(form) is None
     assert not default_storage.exists("telegram")
 
 
@@ -117,4 +112,4 @@ def test_phrases_are_prepared_too(db):
     phrase.image.save("probe.png", picture(), save=True)
 
     assert postcard_url(phrase) is not None
-    assert len(ready()) == 2
+    assert len(ready()) == 1

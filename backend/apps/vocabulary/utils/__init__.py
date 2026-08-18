@@ -2,7 +2,7 @@
 
 from apps.vocabulary.utils.arabic import for_drawing
 from apps.vocabulary.utils.cardref import PHRASE, WORD, card_id, parse, to_id
-from apps.vocabulary.utils.images import to_jpeg, to_webp
+from apps.vocabulary.utils.images import to_webp
 from apps.vocabulary.utils.postcard import render
 
 __all__ = [
@@ -13,6 +13,5 @@ __all__ = [
     "parse",
     "render",
     "to_id",
-    "to_jpeg",
     "to_webp",
 ]

@@ -11,7 +11,7 @@ from django.db.models import QuerySet
 
 from apps.vocabulary.constants import Theme
 from apps.vocabulary.models import Phrase, Word, WordForm
-from apps.vocabulary.utils import card_id, parse, render, to_id, to_jpeg, to_webp
+from apps.vocabulary.utils import card_id, parse, render, to_id, to_webp
 
 # Единицы, которыми колоду разбирают: слово со всеми формами и отдельная фраза.
 UNITS = {"word": Word, "phrase": Phrase}
@@ -23,9 +23,8 @@ Card = WordForm | Phrase
 # Готовое для Telegram лежит рядом с колодой: собирается один раз и потом только читается.
 READY = "telegram"
 
-# Что готовим: собранную карточку и голую иллюстрацию. Слова попадают в имена файлов.
+# Что готовим: собранную карточку. Слово попадает в имя файла.
 POSTCARD = "card"
-PHOTO = "photo"
 
 
 class Occupied(Exception):
@@ -115,13 +114,8 @@ def _drawn(card: Card, original: bytes) -> ContentFile:
     )
 
 
-def _jpeg(card: Card, original: bytes) -> ContentFile:
-    """Иллюстрация джипегом: в напоминаниях спойлер прячет именно её."""
-    return to_jpeg(ContentFile(original, name=card.image.name))
-
-
 def refresh_pictures(card: Card) -> None:
-    """Готовит картинки для чата, если их ещё нет.
+    """Готовит карточку для чата, если её ещё нет.
 
     Зовётся при каждом сохранении карточки, а не по запросу: инлайн показывает
     полсотни результатов разом, и собирать их в этот момент уже поздно.
@@ -129,30 +123,18 @@ def refresh_pictures(card: Card) -> None:
     if not card.image:
         return
 
-    postcard, photo = _ready(card, POSTCARD), _ready(card, PHOTO)
+    postcard = _ready(card, POSTCARD)
 
-    if default_storage.exists(postcard) and default_storage.exists(photo):
+    if default_storage.exists(postcard):
         return
 
-    # Оригинал читается один раз: из бакета это сеть, а нужен он обоим.
     with card.image.open("rb") as source:
-        original = source.read()
-
-    if not default_storage.exists(postcard):
-        default_storage.save(postcard, _drawn(card, original))
-
-    if not default_storage.exists(photo):
-        default_storage.save(photo, _jpeg(card, original))
+        default_storage.save(postcard, _drawn(card, source.read()))
 
 
 def postcard_url(card: Card) -> str | None:
     """Адрес собранной карточки. `None` — картинки нет, и собирать нечего."""
     return default_storage.url(_ready(card, POSTCARD)) if card.image else None
-
-
-def photo_url(card: Card) -> str | None:
-    """Адрес голой иллюстрации джипегом."""
-    return default_storage.url(_ready(card, PHOTO)) if card.image else None
 
 
 def add_form(
