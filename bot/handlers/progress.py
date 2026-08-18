@@ -1,6 +1,7 @@
 import logging
 
 from aiogram import F, Router
+from aiogram.enums import ChatType
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message, User
 
@@ -143,5 +144,6 @@ async def handle_help(message: Message) -> None:
     настройках однажды разойдётся с настоящим именем.
     """
     me = await message.bot.me()
+    keyboard = keyboards.tips(private=message.chat.type == ChatType.PRIVATE)
 
-    await message.answer(texts.HELP.format(bot=me.username), reply_markup=keyboards.tips())
+    await message.answer(texts.HELP.format(bot=me.username), reply_markup=keyboard)

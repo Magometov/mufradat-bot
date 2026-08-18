@@ -156,9 +156,13 @@ def reset() -> InlineKeyboardMarkup:
     )
 
 
-def tips() -> InlineKeyboardMarkup | None:
-    """Кнопка в подсказки приложения. Без адреса приложения её нет."""
-    if not config.WEBAPP_URL:
+def tips(*, private: bool) -> InlineKeyboardMarkup | None:
+    """Кнопка в подсказки приложения. Без адреса приложения её нет.
+
+    В беседе её нет тоже: кнопку приложения Telegram разрешает только в личном чате, а
+    сообщение с ней отвергает целиком — с такой кнопкой `/help` в беседе молчал.
+    """
+    if not config.WEBAPP_URL or not private:
         return None
 
     return InlineKeyboardMarkup(
