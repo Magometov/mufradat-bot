@@ -9,7 +9,7 @@ import type { ISessionItem, IUseSession } from '../types/session';
 
 // Utils
 import { preload } from '../utils/preload';
-import { answer as move } from '../utils/session';
+import { answer as move, isReversedAt } from '../utils/session';
 import { shuffle } from '../utils/shuffle';
 
 // Vue
@@ -53,16 +53,17 @@ export function useSession(entries: Ref<IEntry[]>, needed: Ref<number>): IUseSes
     );
 
     /**
-     * Набирает сеанс из готовой порции: порядок перемешан, сторона брошена монеткой.
+     * Набирает сеанс из готовой порции: порядок перемешан, сторона взята из ступени.
      */
     function start(portion: IEntry[], progress: Map<string, IProgress>): void {
         const items = portion.map((entry) => {
             const state = progress.get(entry.id);
+            const level = state?.level ?? null;
 
             return {
                 id: entry.id,
-                isReversed: Math.random() < 0.5,
-                level: state?.level ?? null,
+                isReversed: isReversedAt(level),
+                level,
                 step: state?.step ?? 0,
                 misses: 0,
             };

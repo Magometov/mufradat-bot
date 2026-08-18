@@ -3,7 +3,7 @@
 import type { ISessionCard } from '../types/progress';
 
 // Utils
-import { MIN_GAP, RETURN_STEPS, SPREAD, answer } from './session';
+import { MIN_GAP, RETURN_STEPS, SPREAD, answer, isReversedAt } from './session';
 
 // Vitest
 import { describe, expect, it } from 'vitest';
@@ -63,6 +63,34 @@ function within(next: ISessionCard[], id: string, floor: number): boolean {
 
     return place >= floor && place <= floor + floor * SPREAD;
 }
+
+describe('сторона карточки', () => {
+    it.each([
+        [1, true],
+        [2, false],
+        [3, true],
+        [4, false],
+        [5, true],
+    ])('ступень %i спрашивается своей стороной', (level, isReversed) => {
+        expect(isReversedAt(level)).toBe(isReversed);
+    });
+
+    it('изучение начинается арабской стороной, а возврат даёт русскую', () => {
+        const next = answer(
+            [{ ...card('w1'), isReversed: isReversedAt(0) }, ...queue().slice(1)],
+            'forgot',
+            NEEDED,
+        );
+
+        expect(isReversedAt(0)).toBe(false);
+        expect(found(next, 'w1')?.isReversed).toBe(true);
+    });
+
+    it('новая карточка показывается арабской стороной', () => {
+        // Русским вперёд её не вспомнить: слово ещё ни разу не видели.
+        expect(isReversedAt(null)).toBe(false);
+    });
+});
 
 describe('очередь сеанса', () => {
     it('первый промах возвращает через полтора десятка карточек', () => {

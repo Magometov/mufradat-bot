@@ -4,11 +4,9 @@ import type { IEntry } from '../types/entry';
 import type { ILimits, IProgress } from '../types/progress';
 
 // Utils
+import { LEARNING } from './levels';
 import { shuffle } from './shuffle';
 // #endregion
-
-// Уровень изучения: срок «сейчас», поэтому такие карточки идут первыми.
-const LEARNING = 0;
 
 /**
  * Что попадает в сеанс: сначала изучение, потом просроченные, потом новые.

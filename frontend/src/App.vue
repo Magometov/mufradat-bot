@@ -11,6 +11,7 @@
     // Utils
     import { API_URL } from './utils/api';
     import { countDue, nextDueAt, soonText, summarize } from './utils/due';
+    import { LEARNING } from './utils/levels';
     import { MODE_TITLES } from './utils/modes';
     import { dayWord } from './utils/plural';
     import { buildPortion } from './utils/portion';
@@ -36,9 +37,6 @@
     // #endregion
 
     // #region Data
-    // Уровень изучения: срока у такой карточки нет, она вернётся в этом же сеансе.
-    const LEARNING = 0;
-
     const CARDS_URL = `${API_URL}/api/v1/cards/`;
     const THEMES_URL = `${API_URL}/api/v1/themes/`;
     const VISITS_URL = `${API_URL}/api/v1/visits/`;
