@@ -21,8 +21,8 @@ class Command(BaseCommand):
     help = "Переносит картинки колоды в бакет и собирает карточки для чата."
 
     def handle(self, *args: object, **options: object) -> None:
-        if not settings.BUCKET_URL:
-            raise CommandError("BUCKET_URL не задан — переносить некуда")
+        if not settings.BUCKET_ENABLED:
+            raise CommandError("BUCKET_ENABLED выключен — переносить некуда")
 
         moved, lost = 0, []
 
