@@ -105,6 +105,10 @@ LOGGING = {
 
 # Частота запросов; считается по адресу, потому что опознание у ручек разное.
 REST_FRAMEWORK = {
+    # Сессию Django API не опознаёт: люди опознаются подписью Telegram, бот — токеном.
+    # С опознанием по сессии DRF начинал требовать CSRF, и вход из браузера, где открыта
+    # админка, получал 403 вместо записи в журнал.
+    "DEFAULT_AUTHENTICATION_CLASSES": [],
     "DEFAULT_THROTTLE_RATES": {
         "visits": getenv("VISITS_RATE") or "60/hour",
         "answers": getenv("ANSWERS_RATE") or "120/hour",
