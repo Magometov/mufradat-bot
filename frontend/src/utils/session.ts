@@ -53,12 +53,14 @@ export function answer<TCard extends ISessionCard>(
 /**
  * Ставит карточку дальше по очереди или в конец, если та короче нужного шага.
  *
- * Шаг берётся по числу уже случившихся промахов: первый возврат — первый шаг.
+ * Шаг берётся по числу уже случившихся промахов: первый возврат — первый шаг. Сторона
+ * при возврате меняется: иначе слово весь сеанс спрашивается одним и тем же письмом.
  */
 function back<TCard extends ISessionCard>(queue: TCard[], card: TCard): TCard[] {
     const at = free(queue, Math.min(step(card.misses), queue.length));
+    const turned = { ...card, isReversed: !card.isReversed };
 
-    return [...queue.slice(0, at), card, ...queue.slice(at)];
+    return [...queue.slice(0, at), turned, ...queue.slice(at)];
 }
 
 /**

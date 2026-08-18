@@ -13,10 +13,23 @@ const NEEDED = 2;
 const [FIRST, SECOND, THIRD] = RETURN_STEPS;
 
 /**
- * Карточка очереди: номер, уровень, счёт верных и число промахов.
+ * Карточка очереди: номер, уровень, счёт верных, число промахов и сторона.
  */
-function card(id: string, level: number | null = 0, step = 0, misses = 0): ISessionCard {
-    return { id, level, step, misses };
+function card(
+    id: string,
+    level: number | null = 0,
+    step = 0,
+    misses = 0,
+    isReversed = false,
+): ISessionCard {
+    return { id, isReversed, level, step, misses };
+}
+
+/**
+ * Та же карточка после возврата: сторона у неё уже перевёрнута.
+ */
+function returned(id: string, level: number | null = 0, step = 0, misses = 0): ISessionCard {
+    return card(id, level, step, misses, true);
 }
 
 const ids = (queue: ISessionCard[]): string[] => queue.map((item) => item.id);
@@ -87,16 +100,24 @@ describe('очередь сеанса', () => {
         expect(within(far, 'w1', THIRD!)).toBe(true);
     });
 
+    it('возврат спрашивает слово другой стороной', () => {
+        const once = answer(queue(), 'forgot', NEEDED);
+        const twice = answer([card('w1', 0, 0, 1, true), ...queue().slice(1)], 'forgot', NEEDED);
+
+        expect(found(once, 'w1')?.isReversed).toBe(true);
+        expect(found(twice, 'w1')?.isReversed).toBe(false);
+    });
+
     it('промахи помнятся в самой карточке', () => {
         const next = answer(queue(), 'forgot', NEEDED);
 
-        expect(found(next, 'w1')).toEqual(card('w1', 0, 0, 1));
+        expect(found(next, 'w1')).toEqual(returned('w1', 0, 0, 1));
     });
 
     it('первый верный ответ в изучении только считается', () => {
         const next = answer(queue(), 'know', NEEDED);
 
-        expect(found(next, 'w1')).toEqual(card('w1', 0, 1, 0));
+        expect(found(next, 'w1')).toEqual(returned('w1', 0, 1, 0));
     });
 
     it('вспомнил — подтверждение спрашивается скорее, а не дальше', () => {
@@ -114,7 +135,7 @@ describe('очередь сеанса', () => {
     it('промах обнуляет счёт верных', () => {
         const next = answer([card('w1', 0, 1), card('w2')], 'forgot', NEEDED);
 
-        expect(next.at(-1)).toEqual(card('w1', 0, 0, 1));
+        expect(next.at(-1)).toEqual(returned('w1', 0, 0, 1));
     });
 
     it('знакомая карточка закрывается с первого ответа', () => {
@@ -124,7 +145,7 @@ describe('очередь сеанса', () => {
     it('забытая знакомая падает в изучение и возвращается', () => {
         const next = answer([card('w1', 4), card('w2')], 'forgot', NEEDED);
 
-        expect(next.at(-1)).toEqual(card('w1', 0, 0, 1));
+        expect(next.at(-1)).toEqual(returned('w1', 0, 0, 1));
     });
 
     it('узнанная с первого взгляда уходит сразу', () => {
@@ -134,7 +155,7 @@ describe('очередь сеанса', () => {
     it('незнакомая новая падает в изучение и возвращается', () => {
         const next = answer([card('w1', null), card('w2')], 'forgot', NEEDED);
 
-        expect(next.at(-1)).toEqual(card('w1', 0, 0, 1));
+        expect(next.at(-1)).toEqual(returned('w1', 0, 0, 1));
     });
 
     it('промахи подряд не возвращаются кучей', () => {
@@ -171,6 +192,6 @@ describe('очередь сеанса', () => {
     it('число верных ответов задаётся снаружи, а не зашито', () => {
         const next = answer([card('w1', 0, 1), ...queue().slice(1)], 'know', 3);
 
-        expect(found(next, 'w1')).toEqual(card('w1', 0, 2, 0));
+        expect(found(next, 'w1')).toEqual(returned('w1', 0, 2, 0));
     });
 });

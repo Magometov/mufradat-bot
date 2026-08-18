@@ -36,9 +36,11 @@ export interface ILimits {
     newLimit: number;
 }
 
-/** Карточка в очереди сеанса: только то, что нужно для решения о возврате. */
+/** Карточка в очереди сеанса: сторона и то, что нужно для решения о возврате. */
 export interface ISessionCard {
     id: string;
+    /** Русский вперёд: лицо — перевод, оборот — арабское. */
+    isReversed: boolean;
     /** `null` — карточку видят впервые: у неё ещё нет уровня. */
     level: number | null;
     step: number;
