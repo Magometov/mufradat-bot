@@ -4,9 +4,12 @@ import type { ISessionCard, TVerdict } from '../types/progress';
 // #endregion
 
 // Через сколько других карточек возвращается забытая: с каждым промахом дальше. Первый
-// возврат близко, чтобы слово не успело выветриться; дальше — иначе в длинном сеансе одно
-// и то же слово лезет в лицо каждые три карточки.
-export const RETURN_STEPS = [5, 10, 20];
+// возврат — за полтора десятка: раньше слово ещё висит в голове, и «помню» говорится
+// памятью о прошлой карточке, а не о самом слове.
+export const RETURN_STEPS = [15, 30, 60];
+
+// Сколько чужих карточек обязано лежать между двумя возвращёнными.
+export const MIN_GAP = 3;
 
 const LEARNING = 0;
 
@@ -50,7 +53,29 @@ export function answer<TCard extends ISessionCard>(
  */
 function back<TCard extends ISessionCard>(queue: TCard[], card: TCard): TCard[] {
     const index = Math.min(Math.max(card.misses - 1, 0), RETURN_STEPS.length - 1);
-    const at = Math.min(RETURN_STEPS[index], queue.length);
+    const at = free(queue, Math.min(RETURN_STEPS[index], queue.length));
 
     return [...queue.slice(0, at), card, ...queue.slice(at)];
+}
+
+/**
+ * Ближайшее с этого место, рядом с которым нет другой возвращённой карточки.
+ *
+ * Без него промахи, сделанные подряд, встают на одно и то же место остатка очереди и
+ * возвращаются кучей: шаг у них общий, а очередь к каждому следующему короче ровно на
+ * предыдущий.
+ */
+function free<TCard extends ISessionCard>(queue: TCard[], at: number): number {
+    let place = at;
+
+    while (place < queue.length && crowded(queue, place)) place += 1;
+
+    return place;
+}
+
+/**
+ * Есть ли возвращённая карточка в зазоре вокруг места.
+ */
+function crowded<TCard extends ISessionCard>(queue: TCard[], at: number): boolean {
+    return queue.slice(Math.max(at - MIN_GAP, 0), at + MIN_GAP).some((item) => item.misses > 0);
 }

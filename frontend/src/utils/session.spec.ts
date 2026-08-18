@@ -3,7 +3,7 @@
 import type { ISessionCard } from '../types/progress';
 
 // Utils
-import { RETURN_STEPS, answer } from './session';
+import { MIN_GAP, RETURN_STEPS, answer } from './session';
 
 // Vitest
 import { describe, expect, it } from 'vitest';
@@ -24,7 +24,7 @@ const ids = (queue: ISessionCard[]): string[] => queue.map((item) => item.id);
 /**
  * Длинная очередь: в короткой карточка встаёт в конец и шаг не проверить.
  */
-function queue(size = 30): ISessionCard[] {
+function queue(size = 80): ISessionCard[] {
     return Array.from({ length: size }, (_, index) => card(`w${index + 1}`));
 }
 
@@ -36,11 +36,11 @@ function placeOf(next: ISessionCard[], id: string): number {
 }
 
 describe('очередь сеанса', () => {
-    it('первый промах возвращает через пять карточек', () => {
+    it('первый промах возвращает через полтора десятка карточек', () => {
         const next = answer(queue(), 'forgot', NEEDED);
 
         expect(placeOf(next, 'w1')).toBe(FIRST);
-        expect(next).toHaveLength(30);
+        expect(next).toHaveLength(80);
     });
 
     it('с каждым промахом карточка уходит дальше', () => {
@@ -53,7 +53,7 @@ describe('очередь сеанса', () => {
 
         expect(placeOf(again, 'w1')).toBe(SECOND);
         expect(placeOf(third, 'w1')).toBe(THIRD);
-        expect(twice).toHaveLength(30);
+        expect(twice).toHaveLength(80);
     });
 
     it('дальше последнего шага не отодвигает', () => {
@@ -110,6 +110,18 @@ describe('очередь сеанса', () => {
         const next = answer([card('w1', null), card('w2')], 'forgot', NEEDED);
 
         expect(next.at(-1)).toEqual(card('w1', 0, 0, 1));
+    });
+
+    it('промахи подряд не возвращаются кучей', () => {
+        const first = answer(queue(), 'forgot', NEEDED);
+        const second = answer(first, 'forgot', NEEDED);
+        const third = answer(second, 'forgot', NEEDED);
+
+        const places = ['w1', 'w2', 'w3'].map((id) => placeOf(third, id));
+        const gaps = [places[1]! - places[0]!, places[2]! - places[1]!];
+
+        expect(places[0]).toBeGreaterThanOrEqual(FIRST - 3);
+        expect(gaps.every((gap) => gap > MIN_GAP)).toBe(true);
     });
 
     it('в короткой очереди карточка встаёт в конец', () => {
