@@ -19,29 +19,22 @@ AFTER_ERROR = 60
 
 
 def _caption(card: api.Reminder) -> str:
-    """Сообщение с карточкой: арабское открыто, ответ под спойлером."""
-    body = cards.caption(
+    """Карточка словами: нужна только там, где картинки нет."""
+    return cards.caption(
         texts.REMINDER_CARD,
         arabic=card.arabic,
         translation=card.translation_ru,
         transliteration=card.transliteration,
     )
 
-    if not card.is_first:
-        return body
-
-    return f"{texts.REMINDER_INTRO}\n\n{body}\n\n{texts.REMINDER_OFF_HINT}"
-
 
 async def _deliver(bot: Bot, card: api.Reminder) -> None:
-    """Отправляет одну карточку. Картинка тоже под спойлером: на ней и есть ответ."""
-    text = _caption(card)
-
+    """Отправляет одну карточку. Подписи под картинкой нет: слова нарисованы на ней."""
     if card.image is None:
-        await bot.send_message(card.telegram_id, text)
+        await bot.send_message(card.telegram_id, _caption(card))
         return
 
-    await bot.send_photo(card.telegram_id, card.image, caption=text, has_spoiler=True)
+    await bot.send_photo(card.telegram_id, card.image)
 
 
 async def _round(bot: Bot) -> None:

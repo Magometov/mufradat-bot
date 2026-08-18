@@ -63,8 +63,6 @@ def take_reminders(*, now: datetime | None = None) -> list[CardState]:
         if card is None:
             continue
 
-        # Первое сообщение идёт со вступлением, поэтому бот должен знать, оно ли это.
-        card.is_first = last is None
         card.reminded_at = now
         card.save(update_fields=["reminded_at"])
         taken.append(card)

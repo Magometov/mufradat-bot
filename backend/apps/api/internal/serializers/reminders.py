@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from apps.learning.models import CardState
-from apps.vocabulary.services import photo_url
+from apps.vocabulary.services import postcard_url
 
 
 class ReminderSerializer(serializers.Serializer):
@@ -11,11 +11,8 @@ class ReminderSerializer(serializers.Serializer):
     arabic = serializers.CharField(source="card.arabic")
     translation_ru = serializers.CharField(source="card.translation_ru")
     transliteration = serializers.CharField(source="card.transliteration")
-    # Голая иллюстрация, а не собранная карточка: спойлер прячет ответ, а на собранной
-    # он написан.
+    # Собранная карточка, как в группе: слова нарисованы на ней, прятать нечего.
     image = serializers.SerializerMethodField()
-    # Первое сообщение человеку идёт со вступлением.
-    is_first = serializers.BooleanField()
 
     def get_image(self, state: CardState) -> str | None:
-        return photo_url(state.card)
+        return postcard_url(state.card)

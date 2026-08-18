@@ -48,7 +48,6 @@ class Reminder:
     translation_ru: str
     transliteration: str
     image: str | None
-    is_first: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -239,7 +238,6 @@ async def reminders() -> list[Reminder]:
             translation_ru=card["translation_ru"],
             transliteration=card["transliteration"],
             image=_image_url(card["image"]),
-            is_first=bool(card["is_first"]),
         )
         for card in body
     ]
