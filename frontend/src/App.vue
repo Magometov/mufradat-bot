@@ -36,6 +36,9 @@
     // #endregion
 
     // #region Data
+    // Уровень изучения: срока у такой карточки нет, она вернётся в этом же сеансе.
+    const LEARNING = 0;
+
     const CARDS_URL = `${API_URL}/api/v1/cards/`;
     const THEMES_URL = `${API_URL}/api/v1/themes/`;
     const VISITS_URL = `${API_URL}/api/v1/visits/`;
@@ -209,7 +212,8 @@
             void flush();
         }
 
-        if (state === null || verdict === 'forgot' || rules.value === null) {
+        // Пилюля обещает срок, а карточке в изучении обещать нечего: она ещё вернётся.
+        if (state === null || rules.value === null || state.level === LEARNING) {
             pill.value = '';
             return;
         }
