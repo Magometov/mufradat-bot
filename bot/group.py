@@ -24,14 +24,12 @@ def _caption(card: api.GroupCard) -> str:
 
 
 async def _deliver(bot: Bot, card: api.GroupCard) -> None:
-    """Отправляет карточку в группу. Картинка открыта: скрывать нечего."""
-    text = _caption(card)
-
+    """Отправляет карточку в группу. Подписи под картинкой нет: слова нарисованы на ней."""
     if card.image is None:
-        await bot.send_message(card.chat_id, text)
+        await bot.send_message(card.chat_id, _caption(card))
         return
 
-    await bot.send_photo(card.chat_id, card.image, caption=text)
+    await bot.send_photo(card.chat_id, card.image)
 
 
 async def send(bot: Bot, *, forced: bool = False) -> api.GroupCard | None:

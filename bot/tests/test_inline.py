@@ -17,13 +17,13 @@ CARD = Found(
 
 
 def test_card_with_a_picture_goes_as_a_photo():
-    """С картинкой карточка уезжает картинкой с подписью."""
+    """С картинкой карточка уезжает картинкой без подписи: слова нарисованы на ней."""
     item = as_result(CARD)
 
     assert isinstance(item, InlineQueryResultPhoto)
     assert item.photo_url == CARD.image
     assert item.thumbnail_url == CARD.image
-    assert item.caption == "قَلَم\n\nручка\nqalam"
+    assert item.caption is None
 
 
 def test_card_without_a_picture_goes_as_text():
@@ -41,6 +41,6 @@ def test_the_number_becomes_the_result_id():
 
 def test_markup_characters_are_escaped():
     """«&» и «<» в переводе не должны ломать разметку сообщения."""
-    item = as_result(replace(CARD, translation_ru="сложно & просто"))
+    item = as_result(replace(CARD, image=None, translation_ru="сложно & просто"))
 
-    assert "&amp;" in item.caption
+    assert "&amp;" in item.input_message_content.message_text

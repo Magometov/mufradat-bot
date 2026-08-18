@@ -34,16 +34,18 @@ def _caption(card: api.Found) -> str:
 
 
 def as_result(card: api.Found) -> InlineQueryResult:
-    """Одна строка в списке выбора. Без картинки карточка уезжает текстом."""
-    text = _caption(card)
+    """Одна строка в списке выбора. Без картинки карточка уезжает текстом.
 
+    Под картинкой подписи нет: те же слова на ней нарисованы. Название и пояснение
+    видно только в списке выбора, в чат они не уезжают.
+    """
     if card.image is None:
         return InlineQueryResultArticle(
             id=card.id,
             title=card.translation_ru,
             description=card.arabic,
             input_message_content=InputTextMessageContent(
-                message_text=text, parse_mode=ParseMode.HTML
+                message_text=_caption(card), parse_mode=ParseMode.HTML
             ),
         )
 
@@ -53,8 +55,6 @@ def as_result(card: api.Found) -> InlineQueryResult:
         thumbnail_url=card.image,
         title=card.translation_ru,
         description=card.arabic,
-        caption=text,
-        parse_mode=ParseMode.HTML,
     )
 
 
