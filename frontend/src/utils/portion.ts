@@ -2,6 +2,9 @@
 // Types
 import type { IEntry } from '../types/entry';
 import type { ILimits, IProgress } from '../types/progress';
+
+// Utils
+import { shuffle } from './shuffle';
 // #endregion
 
 // Уровень изучения: срок «сейчас», поэтому такие карточки идут первыми.
@@ -50,5 +53,7 @@ export function buildPortion(
     const repeats = [...learning, ...due].slice(0, limits.sessionLimit);
     const room = Math.min(limits.sessionLimit - repeats.length, limits.newLimit);
 
-    return [...repeats, ...fresh.slice(0, Math.max(room, 0))];
+    // Новые берутся вразброс, а не с головы колоды: там лежит последний урок, и первый
+    // же сеанс состоял бы из него одного.
+    return [...repeats, ...shuffle(fresh).slice(0, Math.max(room, 0))];
 }

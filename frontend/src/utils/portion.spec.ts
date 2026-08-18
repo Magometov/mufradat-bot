@@ -73,7 +73,21 @@ describe('сборка порции', () => {
     it('с потолком режет сеанс и ограничивает новые', () => {
         const portion = buildPortion(deck, new Map(), NOW, { sessionLimit: 4, newLimit: 2 });
 
-        expect(ids(portion)).toEqual(['w1', 'w2']);
+        expect(portion).toHaveLength(2);
+        expect(new Set(ids(deck)).size).toBeGreaterThan(2);
+        expect(ids(portion).every((id) => ids(deck).includes(id))).toBe(true);
+    });
+
+    it('новые берутся вразброс, а не с головы колоды', () => {
+        const big = Array.from({ length: 40 }, (_, index) => entry(`w${index + 1}`));
+        const limits = { sessionLimit: 20, newLimit: 5 };
+
+        const seen = new Set(
+            Array.from({ length: 10 }, () => ids(buildPortion(big, new Map(), NOW, limits))).flat(),
+        );
+
+        // Голова колоды — последний урок: сеанс новичка не должен состоять из него одного.
+        expect(seen.size).toBeGreaterThan(limits.newLimit);
     });
 
     it('в день с возвратами новых не берёт вовсе', () => {
