@@ -4,7 +4,7 @@
     import type { IRules } from '../../types/progress';
 
     // Utils
-    import { dayWord } from '../../utils/plural';
+    import { dayWord, timeWord } from '../../utils/plural';
 
     // Vue
     import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
@@ -45,7 +45,8 @@
 
         return ladder.value.map((days, index) => ({
             days,
-            height: `${(1.6 + (days / longest) * 6).toFixed(1)}rem`,
+            // Высота по корню из срока: напрямую полугодовая ступень прижимает первые к нулю.
+            height: `${(1.6 + Math.sqrt(days / longest) * 6).toFixed(1)}rem`,
             delay: `${index * 0.2}s`,
         }));
     });
@@ -157,7 +158,7 @@
                 <h2 :class="$style.StartTips__head">Нажми карточку</h2>
                 <p :class="$style.StartTips__text">
                     На обороте перевод и картинка. Сначала попробуй вспомнить сам — в этом весь
-                    смысл.
+                    смысл. Слово приходит то арабской стороной, то русской: чтобы знать его в обе.
                 </p>
             </template>
 
@@ -181,8 +182,8 @@
                 <h2 :class="$style.StartTips__head">Трудное остаётся рядом</h2>
                 <p :class="$style.StartTips__text">
                     Слово, которое не далось, вернётся в этом же заходе — и будет возвращаться, пока
-                    не вспомнишь его {{ needed }} раза подряд. Каждый промах отодвигает его чуть
-                    дальше, чтобы оно не мелькало перед глазами.
+                    не вспомнишь его {{ needed }} {{ timeWord(needed) }} подряд. Каждый промах
+                    отодвигает его чуть дальше, чтобы оно не мелькало перед глазами.
                 </p>
                 <p :class="$style.StartTips__again">
                     Забыл, как это работает? Открой <b>«?»</b> слева наверху — эти шаги всегда там.
@@ -343,12 +344,12 @@
         &__ladder {
             display: flex;
             align-items: flex-end;
-            gap: 0.8rem;
+            gap: 0.6rem;
         }
 
         &__rung {
             display: flex;
-            width: 4rem;
+            width: 3.2rem;
             flex-direction: column;
             justify-content: flex-end;
             gap: 0.6rem;

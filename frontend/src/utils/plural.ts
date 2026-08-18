@@ -34,6 +34,13 @@ export function cardWord(count: number): string {
 }
 
 /**
+ * «Раз» в нужном числе.
+ */
+export function timeWord(count: number): string {
+    return plural(count, ['раз', 'раза', 'раз']);
+}
+
+/**
  * «Раздел» в родительном падеже: слово всегда идёт после «из».
  */
 export function sectionWord(count: number): string {

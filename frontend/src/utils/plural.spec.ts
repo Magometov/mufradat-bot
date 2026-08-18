@@ -1,6 +1,6 @@
 // #region Imports
 // Utils
-import { cardWord, dayWord, sectionWord, wordWord } from './plural';
+import { cardWord, dayWord, sectionWord, timeWord, wordWord } from './plural';
 
 // Vitest
 import { describe, expect, it } from 'vitest';
@@ -40,6 +40,12 @@ describe('склонение прочих слов', () => {
         expect(wordWord(1)).toBe('слово');
         expect(wordWord(2)).toBe('слова');
         expect(wordWord(8)).toBe('слов');
+    });
+
+    it('разы — столько подтверждений нужно карточке', () => {
+        expect(timeWord(1)).toBe('раз');
+        expect(timeWord(2)).toBe('раза');
+        expect(timeWord(5)).toBe('раз');
     });
 
     it('разделы — всегда после «из», поэтому родительный', () => {
