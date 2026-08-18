@@ -34,7 +34,7 @@ function entry(id: string): IEntry {
  * Состояние карточки: уровень, счёт и срок в миллисекундах.
  */
 function state(level: number, dueAt: number, step = 0): IProgress {
-    return { level, step, dueAt };
+    return { level, step, lapsedFrom: 0, dueAt };
 }
 
 const deck = ['w1', 'w2', 'w3', 'w4', 'w5'].map(entry);

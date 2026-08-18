@@ -2,6 +2,7 @@
 
 import pytest
 from django.test import override_settings
+from rest_framework import status
 from rest_framework.test import APIClient
 
 from apps.common.constants import INIT_DATA_HEADER
@@ -20,93 +21,102 @@ def client() -> APIClient:
 
 
 def ask(client: APIClient, *, signed: bool = False):
+    """Спрашивает состояние. С подписью — от опознанного человека."""
     headers = {INIT_DATA_HEADER: init_data()} if signed else {}
 
     return client.get(URL, headers=headers)
 
 
 @pytest.mark.django_db
-def test_stranger_gets_rules_but_no_cards(client):
-    """Неопознанному новая логика не видна, но правила приезжают: они не секрет."""
-    body = ask(client).json()
+class TestStateAccess:
+    """Кому видна новая логика: подпись опознаёт, галочка включает."""
 
-    assert body["enabled"] is False
-    assert body["cards"] == []
-    assert body["ladder"]
+    def test_stranger_gets_rules_but_no_cards(self, client, django_assert_num_queries):
+        """Неопознанному новая логика не видна, но правила приезжают: они не секрет."""
+        with django_assert_num_queries(0):
+            response = ask(client)
+
+        body = response.json()
+
+        assert response.status_code == status.HTTP_200_OK
+        assert body["enabled"] is False
+        assert body["cards"] == []
+        assert body["ladder"]
+
+    @signature
+    def test_signature_without_the_checkbox_is_not_enough(self, client):
+        """Подпись опознаёт человека, но логику включает галочка."""
+        body = ask(client, signed=True).json()
+
+        assert body["enabled"] is False
+        assert Learner.objects.get().scheduling is False
+
+    @signature
+    def test_checkbox_turns_the_logic_on(self, client):
+        """Галочка в админке — единственный способ включить логику до открытия всем."""
+        ask(client, signed=True)
+        Learner.objects.update(scheduling=True)
+
+        assert ask(client, signed=True).json()["enabled"] is True
+
+    @override_settings(SCHEDULING_FOR_ALL=True, BOT_TOKEN=TOKEN)
+    def test_open_to_all_ignores_the_checkbox(self, client):
+        """Открыли всем — галочка больше не нужна, но опознание нужно."""
+        assert ask(client, signed=True).json()["enabled"] is True
+
+    @override_settings(SCHEDULING_FOR_ALL=True)
+    def test_stranger_gets_nothing_even_when_open_to_all(self, client):
+        """Неопознанному логика не включается: его оценки некуда писать."""
+        assert ask(client).json()["enabled"] is False
 
 
-@signature
 @pytest.mark.django_db
-def test_signature_without_the_checkbox_is_not_enough(client):
-    """Подпись опознаёт человека, но логику включает галочка."""
-    body = ask(client, signed=True).json()
+class TestStateContents:
+    """Что уезжает в приложение: правила из настроек и свой прогресс."""
 
-    assert body["enabled"] is False
-    assert Learner.objects.get().scheduling is False
+    @override_settings(
+        LADDER=[2, 9],
+        JITTER_PERCENT=4,
+        SESSION_LIMIT=7,
+        NEW_LIMIT=3,
+        FIRST_SIGHT_LEVEL=2,
+        LEARNING_NEEDED=3,
+        LAPSE_DROP=3,
+        ANSWERS_LIMIT=5,
+    )
+    def test_rules_travel_as_data(self, client):
+        """Правила уезжают в приложение из настроек: считать сеанс будет оно."""
+        body = ask(client).json()
 
+        assert body["ladder"] == [2, 9]
+        assert body["jitter"] == 4
+        assert body["session_limit"] == 7
+        assert body["new_limit"] == 3
+        assert body["first_sight_level"] == 2
+        assert body["needed"] == 3
+        assert body["lapse_drop"] == 3
+        assert body["answers_limit"] == 5
+        assert body["now"]
 
-@signature
-@pytest.mark.django_db
-def test_checkbox_turns_the_logic_on(client):
-    """Галочка в админке — единственный способ включить логику до открытия всем."""
-    ask(client, signed=True)
-    Learner.objects.update(scheduling=True)
+    @signature
+    def test_cards_carry_level_fall_and_due(self, client, form, phrase):
+        """Карточки приезжают с уровнем, ступенью падения и сроком — под номерами приложения."""
+        ask(client, signed=True)
+        learner = Learner.objects.get()
+        apply(learner=learner, card=form, knows=True)
+        apply(learner=learner, card=phrase, knows=False)
 
-    assert ask(client, signed=True).json()["enabled"] is True
+        cards = {card["id"]: card for card in ask(client, signed=True).json()["cards"]}
 
+        assert cards[f"w{form.pk}"]["level"] > 0
+        assert cards[f"p{phrase.pk}"]["level"] == 0
+        assert cards[f"p{phrase.pk}"]["lapsed_from"] == 0
+        assert cards[f"p{phrase.pk}"]["due_at"]
 
-@override_settings(SCHEDULING_FOR_ALL=True, BOT_TOKEN=TOKEN)
-@pytest.mark.django_db
-def test_open_to_all_ignores_the_checkbox(client):
-    """Открыли всем — галочка больше не нужна, но опознание нужно."""
-    assert ask(client, signed=True).json()["enabled"] is True
+    @signature
+    def test_foreign_progress_stays_foreign(self, client, form):
+        """Чужие карточки в ответ не попадают."""
+        stranger = Learner.objects.create(telegram_id=5005)
+        apply(learner=stranger, card=form, knows=True)
 
-
-@override_settings(SCHEDULING_FOR_ALL=True)
-@pytest.mark.django_db
-def test_stranger_gets_nothing_even_when_open_to_all(client):
-    """Неопознанному логика не включается: его оценки некуда писать."""
-    assert ask(client).json()["enabled"] is False
-
-
-@override_settings(
-    LADDER=[2, 9], JITTER_PERCENT=4, SESSION_LIMIT=7, NEW_LIMIT=3, FIRST_SIGHT_LEVEL=2
-)
-@pytest.mark.django_db
-def test_rules_travel_as_data(client):
-    """Правила уезжают в приложение из настроек: считать сеанс будет оно."""
-    body = ask(client).json()
-
-    assert body["ladder"] == [2, 9]
-    assert body["jitter"] == 4
-    assert body["session_limit"] == 7
-    assert body["new_limit"] == 3
-    assert body["first_sight_level"] == 2
-    assert body["needed"] == 2
-    assert body["now"]
-
-
-@signature
-@pytest.mark.django_db
-def test_cards_carry_level_and_due(client, form, phrase):
-    """Карточки приезжают с уровнем, счётом и сроком — под номерами приложения."""
-    ask(client, signed=True)
-    learner = Learner.objects.get()
-    apply(learner=learner, card=form, knows=True)
-    apply(learner=learner, card=phrase, knows=False)
-
-    cards = {card["id"]: card for card in ask(client, signed=True).json()["cards"]}
-
-    assert cards[f"w{form.pk}"]["level"] > 0
-    assert cards[f"p{phrase.pk}"]["level"] == 0
-    assert cards[f"p{phrase.pk}"]["due_at"]
-
-
-@signature
-@pytest.mark.django_db
-def test_foreign_progress_stays_foreign(client, form):
-    """Чужие карточки в ответ не попадают."""
-    stranger = Learner.objects.create(telegram_id=5005)
-    apply(learner=stranger, card=form, knows=True)
-
-    assert ask(client, signed=True).json()["cards"] == []
+        assert ask(client, signed=True).json()["cards"] == []

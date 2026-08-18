@@ -1,6 +1,13 @@
 // #region Imports
 // Types
-import type { IAnswer, IProgress, IRules, IUseProgress, TVerdict } from '../types/progress';
+import type {
+    IAnswer,
+    IProgress,
+    IRules,
+    IServerState,
+    IUseProgress,
+    TVerdict,
+} from '../types/progress';
 
 // Utils
 import { API_URL } from '../utils/api';
@@ -14,6 +21,9 @@ import { onBeforeUnmount, onMounted, ref } from 'vue';
 const STATE_URL = `${API_URL}/api/v1/state/`;
 const ANSWERS_URL = `${API_URL}/api/v1/answers/`;
 const INIT_DATA_HEADER = 'X-Init-Data';
+
+// Длина пачки на случай, когда правила ещё не приехали: обычно предел берётся из них.
+const ANSWERS_BATCH = 100;
 
 // Как часто очередь пробует уехать. Реже — и оценки дольше висят в браузере; чаще — и
 // отменять промах становится некогда.
@@ -55,13 +65,14 @@ export function useProgress(initData: string): IUseProgress {
     /**
      * Складывает состояния карточек в карту по номерам.
      */
-    function collect(cards: { id: string; level: number; step: number; due_at: string }[]): void {
+    function collect(cards: IServerState[]): void {
         const fresh = new Map(progress.value);
 
         cards.forEach((card) => {
             fresh.set(card.id, {
                 level: card.level,
                 step: card.step,
+                lapsedFrom: card.lapsed_from,
                 dueAt: Date.parse(card.due_at),
             });
         });
@@ -88,6 +99,8 @@ export function useProgress(initData: string): IUseProgress {
                 newLimit: body.new_limit,
                 firstSightLevel: body.first_sight_level,
                 needed: body.needed,
+                lapseDrop: body.lapse_drop,
+                answersLimit: body.answers_limit,
             };
             progress.value = new Map();
             collect(body.cards);
@@ -102,10 +115,14 @@ export function useProgress(initData: string): IUseProgress {
     function record(id: string, verdict: TVerdict): IProgress | null {
         if (rules.value === null) return null;
 
-        const state = predict(progress.value.get(id), verdict, rules.value, now());
+        const pressed = now();
+        const state = predict(progress.value.get(id), verdict, rules.value, pressed);
 
         before = { id, state: progress.value.get(id) };
-        queue.value = [...queue.value, { card_id: id, verdict }];
+        queue.value = [
+            ...queue.value,
+            { card_id: id, verdict, answered_at: new Date(pressed).toISOString() },
+        ];
         writeAnswers(queue.value);
 
         const fresh = new Map(progress.value);
@@ -136,13 +153,12 @@ export function useProgress(initData: string): IUseProgress {
     }
 
     /**
-     * Отправляет очередь пачкой. Не дошло — оценки остаются ждать следующего раза.
+     * Отправляет очередь. Не дошло — оценки остаются ждать следующего раза.
      */
     async function flush(): Promise<void> {
         if (queue.value.length === 0 || sending !== null) return;
 
-        const sent = queue.value;
-        sending = send(sent);
+        sending = drain();
 
         try {
             await sending;
@@ -152,9 +168,22 @@ export function useProgress(initData: string): IUseProgress {
     }
 
     /**
-     * Одна попытка отправки: успех очищает очередь от уехавшего.
+     * Пачка за пачкой, пока очередь не кончится или пока пачка не застрянет.
+     *
+     * Целиком отправлять нельзя: очередь длиннее серверного предела не уехала бы никогда.
      */
-    async function send(answers: IAnswer[]): Promise<void> {
+    async function drain(): Promise<void> {
+        const batch = rules.value?.answersLimit ?? ANSWERS_BATCH;
+
+        while (queue.value.length > 0) {
+            if (!(await send(queue.value.slice(0, batch)))) return;
+        }
+    }
+
+    /**
+     * Одна попытка отправки: успех убирает уехавшее из очереди. `false` — не уехало.
+     */
+    async function send(answers: IAnswer[]): Promise<boolean> {
         try {
             const response = await fetch(ANSWERS_URL, {
                 method: 'POST',
@@ -168,17 +197,20 @@ export function useProgress(initData: string): IUseProgress {
                 queue.value = [];
                 writeAnswers(queue.value);
 
-                return;
+                return false;
             }
 
-            if (!response.ok) return;
+            if (!response.ok) return false;
 
             queue.value = queue.value.slice(answers.length);
             writeAnswers(queue.value);
             before = null;
             collect(await response.json());
+
+            return true;
         } catch {
             // Связи нет: очередь остаётся, уедет со следующей попыткой.
+            return false;
         }
     }
 

@@ -6,8 +6,9 @@ import type { IRunItem, ISavedRun } from '../types/run';
 // с чисел на строки: старый прогон не упал бы, а молча подставил чужие карточки.
 const RUN_KEY = 'mufradat.run.2';
 
-// Оценки, ещё не уехавшие на сервер. Номер в ключе — версия формата.
-const ANSWERS_KEY = 'mufradat.answers.1';
+// Оценки, ещё не уехавшие на сервер. Номер в ключе — версия формата: у оценки появилось
+// время нажатия, и без него сервер её не примет.
+const ANSWERS_KEY = 'mufradat.answers.2';
 
 // Показывали ли подсказки про расписание.
 const TIPS_KEY = 'mufradat.tips.1';
@@ -141,6 +142,7 @@ function isAnswer(value: unknown): value is IAnswer {
 
     return (
         typeof candidate.card_id === 'string' &&
+        typeof candidate.answered_at === 'string' &&
         (candidate.verdict === 'know' || candidate.verdict === 'forgot')
     );
 }

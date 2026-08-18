@@ -1,10 +1,21 @@
 import type { Ref } from 'vue';
 
+/** Состояние карточки, каким его отдаёт сервер: имена полей его, время строкой. */
+export interface IServerState {
+    id: string;
+    level: number;
+    step: number;
+    lapsed_from: number;
+    due_at: string;
+}
+
 /** Что человек помнит про одну карточку. Приходит из `GET /api/v1/state/`. */
 export interface IProgress {
     level: number;
     /** Верных ответов подряд в изучении: 0 или 1. */
     step: number;
+    /** Ступень, с которой карточка упала: на неё же и вернётся, только ниже. */
+    lapsedFrom: number;
     /** Срок показа в миллисекундах — сравнивать дешевле, чем строки. */
     dueAt: number;
 }
@@ -19,6 +30,10 @@ export interface IRules {
     firstSightLevel: number;
     /** Столько верных ответов подряд закрывает изучение. */
     needed: number;
+    /** На столько ступеней опускается забытая карточка. */
+    lapseDrop: number;
+    /** Сколько оценок ручка принимает за раз: очередь уезжает пачками по столько. */
+    answersLimit: number;
 }
 
 /** Ответ ручки состояния целиком. */
@@ -55,6 +70,8 @@ export type TVerdict = 'know' | 'forgot';
 export interface IAnswer {
     card_id: string;
     verdict: TVerdict;
+    /** Когда нажали, по часам сервера: от него считается срок. */
+    answered_at: string;
 }
 
 /** Что вернул `useProgress`. */

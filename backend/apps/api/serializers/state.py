@@ -10,6 +10,8 @@ class CardStateSerializer(serializers.Serializer):
     id = serializers.SerializerMethodField()
     level = serializers.IntegerField()
     step = serializers.IntegerField()
+    # Ступень падения: по ней приложение предсказывает срок переученной карточки.
+    lapsed_from = serializers.IntegerField()
     due_at = serializers.DateTimeField()
 
     def get_id(self, state: CardState) -> str:
@@ -28,4 +30,7 @@ class StateSerializer(serializers.Serializer):
     new_limit = serializers.IntegerField()
     first_sight_level = serializers.IntegerField()
     needed = serializers.IntegerField()
+    lapse_drop = serializers.IntegerField()
+    # Сколько оценок принимает ручка за раз: приложение по этому числу нарезает очередь.
+    answers_limit = serializers.IntegerField()
     cards = CardStateSerializer(many=True)

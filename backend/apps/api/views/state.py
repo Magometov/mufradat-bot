@@ -7,7 +7,6 @@ from rest_framework.views import APIView
 from apps.api.serializers import StateSerializer
 from apps.common.constants import INIT_DATA_HEADER
 from apps.common.services import visitor
-from apps.learning.constants import NEEDED
 from apps.learning.services import states
 from apps.learning.utils import enabled
 
@@ -26,7 +25,9 @@ class StateView(APIView):
             "session_limit": settings.SESSION_LIMIT,
             "new_limit": settings.NEW_LIMIT,
             "first_sight_level": settings.FIRST_SIGHT_LEVEL,
-            "needed": NEEDED,
+            "needed": settings.LEARNING_NEEDED,
+            "lapse_drop": settings.LAPSE_DROP,
+            "answers_limit": settings.ANSWERS_LIMIT,
             "cards": states(learner) if learner is not None else [],
         }
 

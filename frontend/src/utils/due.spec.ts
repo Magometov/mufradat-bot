@@ -32,7 +32,7 @@ function entry(id: string): IEntry {
 }
 
 function state(dueAt: number): IProgress {
-    return { level: 3, step: 0, dueAt };
+    return { level: 3, step: 0, lapsedFrom: 0, dueAt };
 }
 
 const deck = ['w1', 'w2', 'w3'].map(entry);

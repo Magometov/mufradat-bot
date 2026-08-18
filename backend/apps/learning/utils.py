@@ -21,6 +21,11 @@ def enabled(learner: Learner | None) -> bool:
     return settings.SCHEDULING_FOR_ALL or (learner.telegram_id is not None and learner.scheduling)
 
 
+def pressed(at: datetime, now: datetime) -> datetime:
+    """Время нажатия, каким его можно засчитать: вперёд своих часов не верим."""
+    return min(at, now)
+
+
 def is_awake(now: datetime) -> bool:
     """Попадает ли время в окно, когда бот пишет. Вне его — тишина."""
     hour = localtime(now).hour

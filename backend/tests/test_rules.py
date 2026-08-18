@@ -12,101 +12,154 @@ NOW = datetime(2026, 8, 17, 12, 0, tzinfo=UTC)
 # Читается ли она из настроек, проверяет отдельный тест с другой лестницей.
 LADDER = [1, 3, 7, 16, 35]
 
-settings = override_settings(LADDER=LADDER, JITTER_PERCENT=10, FIRST_SIGHT_LEVEL=3)
+settings = override_settings(
+    LADDER=LADDER, JITTER_PERCENT=10, FIRST_SIGHT_LEVEL=3, LAPSE_DROP=2, LEARNING_NEEDED=2
+)
 
 
-def days_between(due, now=NOW) -> float:
+def days_between(due: datetime, now: datetime = NOW) -> float:
+    """Сколько дней между сроком и отсчётом: в днях ожидания читаются проще."""
     return (due - now) / timedelta(days=1)
 
 
-@settings
-def test_first_sight_goes_far():
-    """Узнал с первого взгляда — знал заранее: сразу третий уровень, неделя."""
-    state, due = next_state(None, knows=True, now=NOW)
+class TestNextState:
+    """Правило расписания: уровень, счёт верных, след промахов и срок после оценки."""
 
-    assert state == State(level=3, step=0)
-    assert days_between(due) == pytest.approx(7, rel=0.1)
+    @settings
+    def test_first_sight_goes_far(self):
+        """Узнал с первого взгляда — знал заранее: сразу третий уровень, неделя."""
+        state, due = next_state(None, knows=True, now=NOW)
+
+        assert state == State(level=3, step=0)
+        assert days_between(due) == pytest.approx(7, rel=0.1)
+
+    @settings
+    def test_unknown_new_card_goes_to_learning(self):
+        """Новая и не вспомнилась — в изучение со сроком «сейчас». Падать ей не с чего."""
+        state, due = next_state(None, knows=False, now=NOW)
+
+        assert state == State(level=0, step=0, lapses=1, lapsed_from=0)
+        assert due == NOW
+
+    @settings
+    def test_first_correct_in_learning_only_counts(self):
+        """Первый верный в изучении срок не двигает: нужен второй подряд."""
+        state, due = next_state(State(level=0, step=0), knows=True, now=NOW)
+
+        assert state == State(level=0, step=1)
+        assert due == NOW
+
+    @settings
+    def test_second_correct_closes_learning(self):
+        """Второй верный подряд закрывает изучение — на завтра."""
+        state, due = next_state(State(level=0, step=1), knows=True, now=NOW)
+
+        assert state == State(level=1, step=0)
+        assert days_between(due) == pytest.approx(1, rel=0.1)
+
+    @settings
+    @pytest.mark.parametrize(
+        ("lapsed_from", "level", "days"),
+        [(5, 3, 7), (3, 1, 1), (2, 1, 1)],
+        ids=["с пятой на третью", "с третьей на первую", "ниже первой некуда"],
+    )
+    def test_relearned_card_returns_below_the_step_it_fell_from(self, lapsed_from, level, days):
+        """Переученная карточка встаёт ниже прежней ступени, но не ниже первой."""
+        current = State(level=0, step=1, lapses=1, lapsed_from=lapsed_from)
+
+        state, due = next_state(current, knows=True, now=NOW)
+
+        assert state == State(level=level, lapses=1)
+        assert days_between(due) == pytest.approx(days, rel=0.1)
+
+    @settings
+    def test_miss_remembers_the_step_it_fell_from(self):
+        """Промах помнит ступень падения и считает себя в счёте промахов."""
+        state, _ = next_state(State(level=4, lapses=1), knows=False, now=NOW)
+
+        assert state == State(level=0, step=0, lapses=2, lapsed_from=4)
+
+    @settings
+    def test_miss_in_learning_keeps_the_old_fall(self):
+        """Промах в изучении прежнее падение не стирает: возвращаться на ту же ступень."""
+        current = State(level=0, step=1, lapses=2, lapsed_from=5)
+
+        state, _ = next_state(current, knows=False, now=NOW)
+
+        assert state == State(level=0, step=0, lapses=3, lapsed_from=5)
+
+    @settings
+    def test_miss_in_learning_resets_the_count_of_correct_answers(self):
+        """Промах в изучении обнуляет счёт верных, а промахи считает дальше."""
+        state, due = next_state(State(level=0, step=1), knows=False, now=NOW)
+
+        assert state == State(level=0, step=0, lapses=1)
+        assert due == NOW
+
+    @settings
+    def test_known_card_climbs_one_step(self):
+        """Знакомая карточка поднимается на уровень, не забывая счёт промахов."""
+        state, due = next_state(State(level=3, lapses=2), knows=True, now=NOW)
+
+        assert state == State(level=4, step=0, lapses=2)
+        assert days_between(due) == pytest.approx(16, rel=0.1)
+
+    @settings
+    def test_top_level_stays_on_top(self):
+        """С последнего уровня подниматься некуда."""
+        state, due = next_state(State(level=len(LADDER)), knows=True, now=NOW)
+
+        assert state == State(level=len(LADDER), step=0)
+        assert days_between(due) == pytest.approx(35, rel=0.1)
+
+    @settings
+    def test_forgotten_card_falls_to_learning(self):
+        """Забытая карточка падает в изучение с любого уровня."""
+        state, due = next_state(State(level=5), knows=False, now=NOW)
+
+        assert state == State(level=0, step=0, lapses=1, lapsed_from=5)
+        assert due == NOW
+
+    @settings
+    def test_intervals_are_spread(self):
+        """Разброс работает и держится в пределах: одинаковых сроков подряд не бывает."""
+        spans = {
+            days_between(next_state(State(level=3), knows=True, now=NOW)[1]) for _ in range(20)
+        }
+
+        assert len(spans) > 1
+        assert all(14.4 <= span <= 17.6 for span in spans)
 
 
-@settings
-def test_unknown_new_card_goes_to_learning():
-    """Новая и не вспомнилась — в изучение со сроком «сейчас»."""
-    state, due = next_state(None, knows=False, now=NOW)
+class TestRulesFromSettings:
+    """Числа расписания приходят из настроек, а не зашиты в правило."""
 
-    assert state == State(level=0, step=0)
-    assert due == NOW
+    @override_settings(LADDER=[2, 9], JITTER_PERCENT=0, FIRST_SIGHT_LEVEL=1)
+    def test_ladder_and_first_sight_come_from_settings(self):
+        """Лестница и уровень первого взгляда берутся из настроек."""
+        first, due = next_state(None, knows=True, now=NOW)
 
+        assert first == State(level=1)
+        assert days_between(due) == 2
 
-@settings
-def test_first_correct_in_learning_only_counts():
-    """Первый верный в изучении срок не двигает: нужен второй подряд."""
-    state, due = next_state(State(level=0, step=0), knows=True, now=NOW)
+        second, due = next_state(first, knows=True, now=NOW)
 
-    assert state == State(level=0, step=1)
-    assert due == NOW
+        assert second == State(level=2)
+        assert days_between(due) == 9
 
+    @override_settings(LADDER=LADDER, JITTER_PERCENT=0, LEARNING_NEEDED=3)
+    def test_strictness_of_learning_comes_from_settings(self):
+        """Сколько верных закрывают изучение — настройка: с тремя нужен третий ответ."""
+        second, _ = next_state(State(level=0, step=1), knows=True, now=NOW)
+        third, due = next_state(second, knows=True, now=NOW)
 
-@settings
-def test_second_correct_closes_learning():
-    """Второй верный подряд закрывает изучение — на завтра."""
-    state, due = next_state(State(level=0, step=1), knows=True, now=NOW)
+        assert second == State(level=0, step=2)
+        assert third == State(level=1)
+        assert days_between(due) == 1
 
-    assert state == State(level=1, step=0)
-    assert days_between(due) == pytest.approx(1, rel=0.1)
+    @override_settings(LADDER=LADDER, JITTER_PERCENT=0, LAPSE_DROP=4)
+    def test_lapse_drop_comes_from_settings(self):
+        """На сколько ступеней опускать забытую — настройка: с четырьмя падение глубже."""
+        state, _ = next_state(State(level=0, step=1, lapsed_from=5), knows=True, now=NOW)
 
-
-@settings
-def test_miss_in_learning_resets_the_count():
-    """Промах в изучении обнуляет счёт верных."""
-    state, due = next_state(State(level=0, step=1), knows=False, now=NOW)
-
-    assert state == State(level=0, step=0)
-    assert due == NOW
-
-
-@settings
-def test_known_card_climbs_one_step():
-    """Знакомая карточка поднимается на один уровень."""
-    state, due = next_state(State(level=3), knows=True, now=NOW)
-
-    assert state == State(level=4, step=0)
-    assert days_between(due) == pytest.approx(16, rel=0.1)
-
-
-@settings
-def test_top_level_stays_on_top():
-    """С последнего уровня подниматься некуда."""
-    state, due = next_state(State(level=len(LADDER)), knows=True, now=NOW)
-
-    assert state == State(level=len(LADDER), step=0)
-    assert days_between(due) == pytest.approx(35, rel=0.1)
-
-
-@settings
-def test_forgotten_card_falls_to_learning():
-    """Забытая карточка падает в изучение с любого уровня."""
-    state, due = next_state(State(level=5), knows=False, now=NOW)
-
-    assert state == State(level=0, step=0)
-    assert due == NOW
-
-
-@settings
-def test_intervals_are_spread():
-    """Разброс работает и держится в пределах: одинаковых сроков подряд не бывает."""
-    spans = {days_between(next_state(State(level=3), knows=True, now=NOW)[1]) for _ in range(20)}
-
-    assert len(spans) > 1
-    assert all(14.4 <= span <= 17.6 for span in spans)
-
-
-@override_settings(LADDER=[2, 9], JITTER_PERCENT=0, FIRST_SIGHT_LEVEL=1)
-def test_ladder_comes_from_settings():
-    """Лестница и уровень первого взгляда берутся из настроек, а не из кода."""
-    first, due = next_state(None, knows=True, now=NOW)
-    assert first == State(level=1)
-    assert days_between(due) == 2
-
-    second, due = next_state(first, knows=True, now=NOW)
-    assert second == State(level=2)
-    assert days_between(due) == 9
+        assert state == State(level=1)

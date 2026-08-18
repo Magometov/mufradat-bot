@@ -10,6 +10,8 @@ class AnswerSerializer(serializers.Serializer):
 
     card_id = serializers.RegexField(rf"^[{WORD}{PHRASE}]\d+$")
     verdict = serializers.ChoiceField(choices=Verdict.choices)
+    # Когда нажали: срок считается от него, а не от того, когда доехала пачка.
+    answered_at = serializers.DateTimeField()
 
 
 class AnswerListSerializer(serializers.Serializer):

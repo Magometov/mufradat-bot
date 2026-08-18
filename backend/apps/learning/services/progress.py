@@ -31,26 +31,43 @@ def apply(
     """Записывает оценку: считает новый уровень и срок по правилам."""
     now = now or timezone.now()
     state = CardState.objects.filter(learner=learner).for_card(card).first()
-    current = State(level=state.level, step=state.step) if state is not None else None
-    fresh, due_at = next_state(current, knows=knows, now=now)
+
+    # Оценка не новее записанной — эту пачку уже применяли: повтор уровень не двигает.
+    if state is not None and state.answered_at is not None and now <= state.answered_at:
+        return state
+
+    fresh, due_at = next_state(_current(state), knows=knows, now=now)
+    fields = {
+        "level": fresh.level,
+        "step": fresh.step,
+        "lapses": fresh.lapses,
+        "lapsed_from": fresh.lapsed_from,
+        "due_at": due_at,
+        "answered_at": now,
+    }
 
     if state is None:
-        return CardState.objects.create(
-            learner=learner,
-            level=fresh.level,
-            step=fresh.step,
-            due_at=due_at,
-            answered_at=now,
-            **link(card),
-        )
+        return CardState.objects.create(learner=learner, **fields, **link(card))
 
-    state.level = fresh.level
-    state.step = fresh.step
-    state.due_at = due_at
-    state.answered_at = now
-    state.save(update_fields=["level", "step", "due_at", "answered_at"])
+    for name, value in fields.items():
+        setattr(state, name, value)
+
+    state.save(update_fields=list(fields))
 
     return state
+
+
+def _current(state: CardState | None) -> State | None:
+    """Состояние карточки, каким его видят правила. `None` — карточку видят впервые."""
+    if state is None:
+        return None
+
+    return State(
+        level=state.level,
+        step=state.step,
+        lapses=state.lapses,
+        lapsed_from=state.lapsed_from,
+    )
 
 
 def reset_progress(learner: Learner) -> int:

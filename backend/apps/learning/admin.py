@@ -9,8 +9,8 @@ from apps.learning.models import CardState, GroupPost
 
 @admin.register(CardState)
 class CardStateAdmin(admin.ModelAdmin):
-    list_display = ("learner", "card", "level", "step", "due_at", "reminded_at")
-    list_filter = ("level", "due_at")
+    list_display = ("learner", "card", "level", "step", "lapses", "due_at", "reminded_at")
+    list_filter = ("level", "lapses", "due_at")
     search_fields = ("learner__username", "form__arabic", "phrase__arabic")
     date_hierarchy = "due_at"
 

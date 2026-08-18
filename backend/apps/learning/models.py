@@ -32,6 +32,8 @@ class CardState(BaseModel):
     )
     level = models.PositiveSmallIntegerField("Уровень", default=0)
     step = models.PositiveSmallIntegerField("Верных подряд", default=0)
+    lapses = models.PositiveSmallIntegerField("Промахов за жизнь", default=0)
+    lapsed_from = models.PositiveSmallIntegerField("Упала с уровня", default=0)
     due_at = models.DateTimeField("Показать", db_index=True)
     answered_at = models.DateTimeField("Оценили", **BLANK_AND_NULL)
     reminded_at = models.DateTimeField("Отправляли в чат", **BLANK_AND_NULL)
