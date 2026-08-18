@@ -10,6 +10,7 @@ from rest_framework.test import APIClient
 
 from apps.api.internal.permissions import HEADER
 from apps.api.internal.views import group as view
+from apps.vocabulary.services import postcard_url
 
 URL = "/api/v1/internal/group/take/"
 
@@ -77,7 +78,7 @@ def test_group_gets_the_postcard(client, monkeypatch, form):
 
     image = client.post(URL, headers={HEADER: TOKEN}).json()["image"]
 
-    assert image == f"/api/v1/card/w{form.pk}.jpg"
+    assert image == postcard_url(form)
 
 
 @signed

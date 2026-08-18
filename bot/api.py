@@ -101,15 +101,18 @@ def _headers() -> dict[str, str]:
 
 
 def _image_url(path: str | None) -> str | None:
-    """Публичный адрес картинки. Бэкенд отдаёт путь: свой адрес — внутренний, и с него
-    Telegram картинку не скачает.
+    """Публичный адрес картинки.
 
-    Без `WEBAPP_URL` собрать его не из чего, и карточка уедет без картинки.
+    Из бакета он приезжает готовым. С диска — путём, и тогда хост берётся из
+    `WEBAPP_URL`: свой адрес у бэкенда внутренний, с него Telegram ничего не скачает.
     """
-    if not path or not config.WEBAPP_URL:
+    if not path:
         return None
 
-    return urljoin(config.WEBAPP_URL, path)
+    if path.startswith("http"):
+        return path
+
+    return urljoin(config.WEBAPP_URL, path) if config.WEBAPP_URL else None
 
 
 def _reason(response: httpx.Response) -> str:

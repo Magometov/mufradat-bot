@@ -91,9 +91,9 @@ superuser: ## Создать суперпользователя админки
 shell: ## Django shell в контейнере
 	$(COMPOSE) exec backend python manage.py shell
 
-.PHONY: move-media
-move-media: ## Перенести картинки колоды с диска в бакет. Разово, после выкладки
-	$(COMPOSE) exec backend python manage.py move_media
+.PHONY: pictures
+pictures: ## Перенести картинки колоды в бакет и собрать карточки для чата
+	$(COMPOSE) exec backend python manage.py sync_pictures
 
 .PHONY: word
 word: ## Отправить слово в группу сейчас, не дожидаясь часа

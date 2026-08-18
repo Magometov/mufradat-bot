@@ -1,8 +1,8 @@
 from django.conf import settings
 from rest_framework import serializers
 
-from apps.api.utils import postcard_path
 from apps.learning.queryset import AnyCard
+from apps.vocabulary.services import postcard_url
 
 
 class GroupTakeSerializer(serializers.Serializer):
@@ -26,4 +26,4 @@ class GroupCardSerializer(serializers.Serializer):
         return settings.GROUP_CHAT_ID
 
     def get_image(self, card: AnyCard) -> str | None:
-        return postcard_path(card)
+        return postcard_url(card)

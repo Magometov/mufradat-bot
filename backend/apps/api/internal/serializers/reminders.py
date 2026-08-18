@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
-from apps.api.utils import photo_path
 from apps.learning.models import CardState
+from apps.vocabulary.services import photo_url
 
 
 class ReminderSerializer(serializers.Serializer):
@@ -18,4 +18,4 @@ class ReminderSerializer(serializers.Serializer):
     is_first = serializers.BooleanField()
 
     def get_image(self, state: CardState) -> str | None:
-        return photo_path(state.card)
+        return photo_url(state.card)

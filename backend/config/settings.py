@@ -166,14 +166,15 @@ STORAGES = {
 }
 
 if BUCKET_URL:
-    bucket = urlsplit(BUCKET_URL)
+    # Имя с подчёркиванием — не настройка, а разобранная строка доступа.
+    _bucket = urlsplit(BUCKET_URL)
     STORAGES["default"] = {
         "BACKEND": "storages.backends.s3.S3Storage",
         "OPTIONS": {
-            "bucket_name": bucket.path.strip("/"),
-            "endpoint_url": f"https://{bucket.hostname}",
-            "access_key": unquote(bucket.username or ""),
-            "secret_key": unquote(bucket.password or ""),
+            "bucket_name": _bucket.path.strip("/"),
+            "endpoint_url": f"https://{_bucket.hostname}",
+            "access_key": unquote(_bucket.username or ""),
+            "secret_key": unquote(_bucket.password or ""),
             # Адреса в ответах строятся от публичного домена, а не от служебного.
             "custom_domain": BUCKET_PUBLIC_URL.removeprefix("https://").rstrip("/"),
             # Ссылки без подписи: колода и так открыта, а подписанная живёт считаные

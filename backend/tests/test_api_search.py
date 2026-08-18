@@ -11,6 +11,7 @@ from rest_framework.test import APIClient
 from apps.api.internal.permissions import HEADER
 from apps.api.internal.views import search as view
 from apps.vocabulary.constants import SEARCH_LIMIT
+from apps.vocabulary.services import postcard_url
 
 URL = "/api/v1/internal/search/"
 
@@ -63,10 +64,10 @@ def test_card_comes_with_its_number(client, form):
 @signed
 @pytest.mark.django_db
 def test_inline_gets_the_postcard(client, form):
-    """В инлайн уезжает собранная карточка, и путём, а не адресом: хост знает бот."""
+    """В инлайн уезжает адрес собранной карточки, а не иллюстрации."""
     form.image.save("probe.png", picture(), save=True)
 
-    assert ask(client, query="книга").json()[0]["image"] == f"/api/v1/card/w{form.pk}.jpg"
+    assert ask(client, query="книга").json()[0]["image"] == postcard_url(form)
 
 
 @signed

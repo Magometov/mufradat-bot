@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
-from apps.api.utils import postcard_path
 from apps.vocabulary.models import Phrase, WordForm
+from apps.vocabulary.services import postcard_url
 from apps.vocabulary.utils import card_id
 
 
@@ -25,4 +25,4 @@ class FoundCardSerializer(serializers.Serializer):
         return card_id(card)
 
     def get_image(self, card: WordForm | Phrase) -> str | None:
-        return postcard_path(card)
+        return postcard_url(card)

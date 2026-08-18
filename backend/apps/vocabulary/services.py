@@ -2,6 +2,7 @@
 
 from collections.abc import Iterable
 from hashlib import sha1
+from io import BytesIO
 
 from django.core.files.base import ContentFile, File
 from django.core.files.storage import default_storage
@@ -21,6 +22,10 @@ Card = WordForm | Phrase
 
 # Готовое для Telegram лежит рядом с колодой: собирается один раз и потом только читается.
 READY = "telegram"
+
+# Что готовим: собранную карточку и голую иллюстрацию. Слова попадают в имена файлов.
+POSTCARD = "card"
+PHOTO = "photo"
 
 
 class Occupied(Exception):
@@ -98,38 +103,56 @@ def _ready(card: Card, kind: str) -> str:
     return f"{READY}/{kind}-{card_id(card)}-{stamp}.jpg"
 
 
-def postcard(card: Card) -> File | None:
-    """Собранная карточка для чата. `None` — картинки нет, и собирать нечего."""
+def _drawn(card: Card, original: bytes) -> ContentFile:
+    """Собранная карточка: слово, перевод, иллюстрация и транслитерация одной картинкой."""
+    return ContentFile(
+        render(
+            arabic=card.arabic,
+            translation=card.translation_ru,
+            transliteration=card.transliteration,
+            illustration=BytesIO(original),
+        )
+    )
+
+
+def _jpeg(card: Card, original: bytes) -> ContentFile:
+    """Иллюстрация джипегом: в напоминаниях спойлер прячет именно её."""
+    return to_jpeg(ContentFile(original, name=card.image.name))
+
+
+def refresh_pictures(card: Card) -> None:
+    """Готовит картинки для чата, если их ещё нет.
+
+    Зовётся при каждом сохранении карточки, а не по запросу: инлайн показывает
+    полсотни результатов разом, и собирать их в этот момент уже поздно.
+    """
     if not card.image:
-        return None
+        return
 
-    name = _ready(card, "card")
+    postcard, photo = _ready(card, POSTCARD), _ready(card, PHOTO)
 
-    if not default_storage.exists(name):
-        with card.image.open("rb") as art:
-            drawn = render(
-                arabic=card.arabic,
-                translation=card.translation_ru,
-                transliteration=card.transliteration,
-                illustration=art,
-            )
-        default_storage.save(name, ContentFile(drawn))
+    if default_storage.exists(postcard) and default_storage.exists(photo):
+        return
 
-    return default_storage.open(name)
+    # Оригинал читается один раз: из бакета это сеть, а нужен он обоим.
+    with card.image.open("rb") as source:
+        original = source.read()
+
+    if not default_storage.exists(postcard):
+        default_storage.save(postcard, _drawn(card, original))
+
+    if not default_storage.exists(photo):
+        default_storage.save(photo, _jpeg(card, original))
 
 
-def photo(card: Card) -> File | None:
-    """Иллюстрация карточки джипегом: в напоминаниях спойлер прячет именно её."""
-    if not card.image:
-        return None
+def postcard_url(card: Card) -> str | None:
+    """Адрес собранной карточки. `None` — картинки нет, и собирать нечего."""
+    return default_storage.url(_ready(card, POSTCARD)) if card.image else None
 
-    name = _ready(card, "photo")
 
-    if not default_storage.exists(name):
-        with card.image.open("rb") as source:
-            default_storage.save(name, to_jpeg(source))
-
-    return default_storage.open(name)
+def photo_url(card: Card) -> str | None:
+    """Адрес голой иллюстрации джипегом."""
+    return default_storage.url(_ready(card, PHOTO)) if card.image else None
 
 
 def add_form(
