@@ -91,10 +91,6 @@ superuser: ## Создать суперпользователя админки
 shell: ## Django shell в контейнере
 	$(COMPOSE) exec backend python manage.py shell
 
-.PHONY: pictures
-pictures: ## Перенести картинки колоды в бакет и собрать карточки для чата
-	$(COMPOSE) exec backend python manage.py sync_pictures
-
 .PHONY: word
 word: ## Отправить слово в группу сейчас, не дожидаясь часа
 	$(COMPOSE) exec bot python -m bot.group
