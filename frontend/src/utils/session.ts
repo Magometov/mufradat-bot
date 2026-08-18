@@ -11,6 +11,10 @@ export const RETURN_STEPS = [15, 30, 60];
 // Сколько чужих карточек обязано лежать между двумя возвращёнными.
 export const MIN_GAP = 3;
 
+// Разброс вверх от шага: возврат перестаёт быть отсчитываемым ритмом, но ближе шага
+// карточка не подходит. Тот же приём, что и у лестницы сроков на сервере.
+export const SPREAD = 0.3;
+
 const LEARNING = 0;
 
 /**
@@ -52,10 +56,19 @@ export function answer<TCard extends ISessionCard>(
  * Шаг берётся по числу уже случившихся промахов: первый возврат — первый шаг.
  */
 function back<TCard extends ISessionCard>(queue: TCard[], card: TCard): TCard[] {
-    const index = Math.min(Math.max(card.misses - 1, 0), RETURN_STEPS.length - 1);
-    const at = free(queue, Math.min(RETURN_STEPS[index], queue.length));
+    const at = free(queue, Math.min(step(card.misses), queue.length));
 
     return [...queue.slice(0, at), card, ...queue.slice(at)];
+}
+
+/**
+ * Через сколько карточек возвращать: порог по числу промахов плюс разброс вверх.
+ */
+function step(misses: number): number {
+    const index = Math.min(Math.max(misses - 1, 0), RETURN_STEPS.length - 1);
+    const floor = RETURN_STEPS[index]!;
+
+    return floor + Math.floor(Math.random() * floor * SPREAD);
 }
 
 /**

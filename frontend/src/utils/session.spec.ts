@@ -3,7 +3,7 @@
 import type { ISessionCard } from '../types/progress';
 
 // Utils
-import { MIN_GAP, RETURN_STEPS, answer } from './session';
+import { MIN_GAP, RETURN_STEPS, SPREAD, answer } from './session';
 
 // Vitest
 import { describe, expect, it } from 'vitest';
@@ -35,12 +35,37 @@ function placeOf(next: ISessionCard[], id: string): number {
     return ids(next).indexOf(id);
 }
 
+/**
+ * Карточка очереди по номеру: место у неё разное, а содержимое проверяется всегда.
+ */
+function found(next: ISessionCard[], id: string): ISessionCard | undefined {
+    return next.find((item) => item.id === id);
+}
+
+/**
+ * Легла ли карточка в вилку своего шага: не ближе порога и не дальше разброса.
+ */
+function within(next: ISessionCard[], id: string, floor: number): boolean {
+    const place = placeOf(next, id);
+
+    return place >= floor && place <= floor + floor * SPREAD;
+}
+
 describe('очередь сеанса', () => {
     it('первый промах возвращает через полтора десятка карточек', () => {
         const next = answer(queue(), 'forgot', NEEDED);
 
-        expect(placeOf(next, 'w1')).toBe(FIRST);
+        expect(within(next, 'w1', FIRST!)).toBe(true);
         expect(next).toHaveLength(80);
+    });
+
+    it('одна и та же карточка возвращается на разные места', () => {
+        const places = new Set(
+            Array.from({ length: 20 }, () => placeOf(answer(queue(), 'forgot', NEEDED), 'w1')),
+        );
+
+        // Ритма быть не должно: шаг мажется разбросом, а не отсчитывается ровно.
+        expect(places.size).toBeGreaterThan(1);
     });
 
     it('с каждым промахом карточка уходит дальше', () => {
@@ -51,33 +76,33 @@ describe('очередь сеанса', () => {
         const again = answer([card('w1', 0, 0, 1), ...queue().slice(1)], 'forgot', NEEDED);
         const third = answer([card('w1', 0, 0, 2), ...queue().slice(1)], 'forgot', NEEDED);
 
-        expect(placeOf(again, 'w1')).toBe(SECOND);
-        expect(placeOf(third, 'w1')).toBe(THIRD);
+        expect(within(again, 'w1', SECOND!)).toBe(true);
+        expect(within(third, 'w1', THIRD!)).toBe(true);
         expect(twice).toHaveLength(80);
     });
 
     it('дальше последнего шага не отодвигает', () => {
         const far = answer([card('w1', 0, 0, 9), ...queue().slice(1)], 'forgot', NEEDED);
 
-        expect(placeOf(far, 'w1')).toBe(THIRD);
+        expect(within(far, 'w1', THIRD!)).toBe(true);
     });
 
     it('промахи помнятся в самой карточке', () => {
         const next = answer(queue(), 'forgot', NEEDED);
 
-        expect(next[FIRST]).toEqual(card('w1', 0, 0, 1));
+        expect(found(next, 'w1')).toEqual(card('w1', 0, 0, 1));
     });
 
     it('первый верный ответ в изучении только считается', () => {
         const next = answer(queue(), 'know', NEEDED);
 
-        expect(next[FIRST]).toEqual(card('w1', 0, 1, 0));
+        expect(found(next, 'w1')).toEqual(card('w1', 0, 1, 0));
     });
 
     it('вспомнил — подтверждение спрашивается скорее, а не дальше', () => {
         const next = answer([card('w1', 0, 0, 1), ...queue().slice(1)], 'know', NEEDED);
 
-        expect(placeOf(next, 'w1')).toBe(FIRST);
+        expect(within(next, 'w1', FIRST!)).toBe(true);
     });
 
     it('второй верный подряд закрывает карточку', () => {
@@ -117,10 +142,13 @@ describe('очередь сеанса', () => {
         const second = answer(first, 'forgot', NEEDED);
         const third = answer(second, 'forgot', NEEDED);
 
-        const places = ['w1', 'w2', 'w3'].map((id) => placeOf(third, id));
+        // Порядок возвратов разбросом не задан — важно, что они не встали вплотную.
+        const places = ['w1', 'w2', 'w3']
+            .map((id) => placeOf(third, id))
+            .sort((first, second) => first - second);
         const gaps = [places[1]! - places[0]!, places[2]! - places[1]!];
 
-        expect(places[0]).toBeGreaterThanOrEqual(FIRST - 3);
+        expect(places[0]).toBeGreaterThanOrEqual(FIRST! - 3);
         expect(gaps.every((gap) => gap > MIN_GAP)).toBe(true);
     });
 
@@ -143,6 +171,6 @@ describe('очередь сеанса', () => {
     it('число верных ответов задаётся снаружи, а не зашито', () => {
         const next = answer([card('w1', 0, 1), ...queue().slice(1)], 'know', 3);
 
-        expect(next[FIRST]).toEqual(card('w1', 0, 2, 0));
+        expect(found(next, 'w1')).toEqual(card('w1', 0, 2, 0));
     });
 });
