@@ -1,5 +1,6 @@
 from os import getenv
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 
 from django.utils.translation import gettext_lazy as _
 from dotenv import load_dotenv
@@ -147,3 +148,38 @@ SCHEDULING_FOR_ALL = getenv("SCHEDULING_FOR_ALL", "").lower() == "true"
 # --- Слово в группу -------------------------------------------------------------
 # Куда шлём. У супергруппы id отрицательный; пустой — рассылки нет вовсе.
 GROUP_CHAT_ID = int(getenv("GROUP_CHAT_ID") or 0)
+
+# --- Картинки в облаке ------------------------------------------------------------
+# Серверы Telegram до нашего хостинга не доходят: вместо картинки они получают
+# страницу-заглушку и отвечают «wrong type of the web page content». Поэтому картинки
+# лежат в Cloudflare R2 и раздаются с его адреса — туда Telegram доходит.
+
+# Куда класть: s3://ключ:секрет@<account>.r2.cloudflarestorage.com/бакет.
+# Пусто — картинки остаются на диске: так живут своя машина и тесты.
+BUCKET_URL = getenv("BUCKET_URL", "")
+# Откуда брать: публичный адрес бакета, его видят и приложение, и Telegram.
+BUCKET_PUBLIC_URL = getenv("BUCKET_PUBLIC_URL", "")
+
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
+
+if BUCKET_URL:
+    bucket = urlsplit(BUCKET_URL)
+    STORAGES["default"] = {
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": {
+            "bucket_name": bucket.path.strip("/"),
+            "endpoint_url": f"https://{bucket.hostname}",
+            "access_key": unquote(bucket.username or ""),
+            "secret_key": unquote(bucket.password or ""),
+            # Адреса в ответах строятся от публичного домена, а не от служебного.
+            "custom_domain": BUCKET_PUBLIC_URL.removeprefix("https://").rstrip("/"),
+            # Ссылки без подписи: колода и так открыта, а подписанная живёт считаные
+            # часы — Telegram по такой второй раз не придёт.
+            "querystring_auth": False,
+            # У R2 регион один и называется так.
+            "region_name": "auto",
+        },
+    }

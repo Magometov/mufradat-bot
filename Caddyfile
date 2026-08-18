@@ -51,8 +51,10 @@
     # оставить: оформление ставится встроенным скриптом до первой отрисовки, а его хэш
     # молча ломался бы при каждой правке. Главное всё равно закрыто — чужие домены для
     # скриптов и запросов, отправка форм и встраивание в чужие страницы.
+    # Картинки колоды лежат в бакете, поэтому его адрес добавлен в img-src: без этого
+    # приложение показывало бы пустые места вместо картинок.
     header {
-        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors https://web.telegram.org https://*.telegram.org"
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data: {$BUCKET_PUBLIC_URL}; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors https://web.telegram.org https://*.telegram.org"
         X-Content-Type-Options "nosniff"
         Referrer-Policy "same-origin"
         -Server

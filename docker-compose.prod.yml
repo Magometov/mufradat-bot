@@ -25,6 +25,9 @@ x-backend-env: &backend-env
   SESSION_LIMIT: ${SESSION_LIMIT:-}
   NEW_LIMIT: ${NEW_LIMIT:-}
   GROUP_CHAT_ID: ${GROUP_CHAT_ID:-}
+  # Картинки в облаке. Пусто — остаются на диске.
+  BUCKET_URL: ${BUCKET_URL:-}
+  BUCKET_PUBLIC_URL: ${BUCKET_PUBLIC_URL:-}
   # Пределы открытых ручек.
   VISITS_RATE: ${VISITS_RATE:-}
   ANSWERS_RATE: ${ANSWERS_RATE:-}
@@ -40,6 +43,8 @@ x-bot-env: &bot-env
 
 x-caddy-env: &caddy-env
   DOMAIN: ${DOMAIN}
+  # Нужен только заголовку безопасности: иначе картинки из бакета не покажутся.
+  BUCKET_PUBLIC_URL: ${BUCKET_PUBLIC_URL:-}
 
 services:
   db:

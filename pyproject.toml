@@ -22,6 +22,8 @@ backend = [
     # соединять буквы сам не умеет.
     "arabic-reshaper>=3.0,<4",
     "python-bidi>=0.6,<0.7",
+    # Картинки лежат в облаке: до нашего сервера Telegram не достаёт.
+    "django-storages[s3]>=1.14,<2",
 ]
 bot = [
     "aiogram>=3.30,<4",
