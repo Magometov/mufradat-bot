@@ -4,6 +4,7 @@ import type { IEntry } from '../types/entry';
 import type { IProgress } from '../types/progress';
 
 // Utils
+import { countDue } from './due';
 import { buildPortion } from './portion';
 
 // Vitest
@@ -116,5 +117,30 @@ describe('сборка порции', () => {
 
     it('пустая колода даёт пустую порцию', () => {
         expect(buildPortion([], new Map(), NOW, { sessionLimit: 20, newLimit: 10 })).toEqual([]);
+    });
+});
+
+describe('порция и цифра на сегодня', () => {
+    it('без потолков в порцию попадает ровно то, что обещано на кнопке', () => {
+        // Иначе на кнопке «на сегодня двенадцать», а сеанс открывается с восемью — или
+        // не открывается вовсе, хотя цифра не нулевая.
+        const progress = new Map([
+            ['w1', state(0, NOW - DAY)],
+            ['w2', state(3, NOW - DAY)],
+            ['w3', state(4, NOW + 7 * DAY)],
+            ['w4', state(1, NOW)],
+        ]);
+
+        const portion = buildPortion(deck, progress, NOW, null);
+
+        expect(portion).toHaveLength(countDue(deck, progress, NOW));
+        expect(ids(portion)).not.toContain('w3');
+    });
+
+    it('пустая цифра значит пустую порцию', () => {
+        const progress = new Map(deck.map((card) => [card.id, state(3, NOW + DAY)]));
+
+        expect(countDue(deck, progress, NOW)).toBe(0);
+        expect(buildPortion(deck, progress, NOW, null)).toEqual([]);
     });
 });

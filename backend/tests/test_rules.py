@@ -170,3 +170,59 @@ class TestRulesFromSettings:
         state, _ = next_state(State(level=0, step=1, lapses=1, lapsed_from=5), knows=True, now=NOW)
 
         assert state == State(level=1, lapses=1)
+
+    @override_settings(LADDER=[1, 3, 7], JITTER_PERCENT=0, FIRST_SIGHT_LEVEL=9, SIDES_NEEDED=2)
+    def test_first_sight_level_above_the_ladder_stops_at_its_top(self):
+        """Ступень выше лестницы — опечатка в настройках, а не повод уронить ручку."""
+        state, due = next_state(State(level=0, step=1), knows=True, now=NOW)
+
+        assert state == State(level=3)
+        assert days_between(due) == 7
+
+    @override_settings(LADDER=[1, 3], JITTER_PERCENT=0, LAPSE_DROP=2, SIDES_NEEDED=2)
+    def test_levels_from_a_longer_ladder_fit_the_shorter_one(self):
+        """Лестницу укоротили при уже расставленных уровнях: карточка встаёт на её верх."""
+        current = State(level=0, step=1, lapses=1, lapsed_from=7)
+
+        state, due = next_state(current, knows=True, now=NOW)
+
+        assert state == State(level=2, lapses=1)
+        assert days_between(due) == 3
+
+
+class TestCardLife:
+    """Жизнь карточки от первого показа до второго переучивания.
+
+    Те же шаги проверяет `frontend/src/utils/predict.spec.ts`: правило живёт в двух
+    местах, и разъехаться они должны с треском, а не тихо.
+    """
+
+    # Оценка за оценкой, а рядом — во что карточка после неё превращается и на сколько
+    # дней уезжает. Ноль дней значит «срок сейчас»: карточка вернётся в этом же сеансе.
+    LIFE = [
+        (True, State(level=0, step=1), 0),
+        (True, State(level=3), 7),
+        (True, State(level=3, step=1), 0),
+        (True, State(level=4), 16),
+        (False, State(lapses=1, lapsed_from=4), 0),
+        (True, State(step=1, lapses=1, lapsed_from=4), 0),
+        (True, State(level=2, lapses=1), 3),
+        (True, State(level=2, step=1, lapses=1), 0),
+        (True, State(level=3, lapses=1), 7),
+        (False, State(lapses=2, lapsed_from=3), 0),
+        (False, State(lapses=3, lapsed_from=3), 0),
+        (True, State(step=1, lapses=3, lapsed_from=3), 0),
+        (True, State(level=1, lapses=3), 1),
+    ]
+
+    @override_settings(
+        LADDER=LADDER, JITTER_PERCENT=0, FIRST_SIGHT_LEVEL=3, LAPSE_DROP=2, SIDES_NEEDED=2
+    )
+    def test_card_lives_the_life_the_app_predicts(self):
+        """Каждый шаг жизни даёт тот же уровень, счёт, след падения и срок, что в приложении."""
+        state = None
+
+        for knows, expected, days in self.LIFE:
+            state, due = next_state(state, knows=knows, now=NOW)
+
+            assert (state, days_between(due)) == (expected, days)

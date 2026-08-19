@@ -1,6 +1,6 @@
 // #region Imports
 // Types
-import type { IProgress, IRules } from '../types/progress';
+import type { IProgress, IRules, TVerdict } from '../types/progress';
 
 // Utils
 import { days, predict } from './predict';
@@ -140,5 +140,56 @@ describe('предсказание срока', () => {
         const other: IRules = { ...rules, lapseDrop: 4 };
 
         expect(predict(state(0, 1, 1, 5), 'know', other, NOW).level).toBe(1);
+    });
+
+    it('ступень первого взгляда выше лестницы упирается в её верх', () => {
+        const other: IRules = { ...rules, firstSightLevel: 9 };
+
+        expect(predict(state(0, 1), 'know', other, NOW)).toMatchObject({
+            level: 5,
+            dueAt: NOW + 35 * DAY,
+        });
+    });
+
+    it('укороченная лестница вмещает уровни от прежней, длинной', () => {
+        const other: IRules = { ...rules, ladder: [1, 3] };
+
+        expect(predict(state(0, 1, 1, 7), 'know', other, NOW)).toMatchObject({
+            level: 2,
+            dueAt: NOW + 3 * DAY,
+        });
+    });
+});
+
+describe('жизнь карточки', () => {
+    // Оценка за оценкой, а рядом — во что карточка после неё превращается и на сколько
+    // дней уезжает. Ноль дней значит «срок сейчас»: она вернётся в этом же сеансе.
+    //
+    // Те же шаги проверяет `backend/tests/test_rules.py`: правило живёт в двух местах,
+    // и разъехаться они должны с треском, а не тихо.
+    const LIFE: [TVerdict, IProgress, number][] = [
+        ['know', state(0, 1), 0],
+        ['know', state(3), 7],
+        ['know', state(3, 1), 0],
+        ['know', state(4), 16],
+        ['forgot', state(0, 0, 1, 4), 0],
+        ['know', state(0, 1, 1, 4), 0],
+        ['know', state(2, 0, 1), 3],
+        ['know', state(2, 1, 1), 0],
+        ['know', state(3, 0, 1), 7],
+        ['forgot', state(0, 0, 2, 3), 0],
+        ['forgot', state(0, 0, 3, 3), 0],
+        ['know', state(0, 1, 3, 3), 0],
+        ['know', state(1, 0, 3), 1],
+    ];
+
+    it('каждый шаг даёт тот же уровень, счёт, след падения и срок, что на сервере', () => {
+        let current: IProgress | undefined = undefined;
+
+        LIFE.forEach(([verdict, expected, days]) => {
+            current = predict(current, verdict, rules, NOW);
+
+            expect(current).toEqual({ ...expected, dueAt: NOW + days * DAY });
+        });
     });
 });

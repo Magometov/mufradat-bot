@@ -1,9 +1,10 @@
 // #region Imports
 // Types
-import type { ISessionCard } from '../types/progress';
+import type { ISessionCard, TVerdict } from '../types/progress';
 
 // Utils
 import { GAP_AFTER_KNOW, GAP_AFTER_MISS, MIN_AHEAD, answer, isReversedAt } from './session';
+import { shuffle } from './shuffle';
 
 // Vitest
 import { describe, expect, it } from 'vitest';
@@ -59,7 +60,7 @@ function found(next: ISessionCard[], id: string): ISessionCard | undefined {
 /**
  * Куда падает первая карточка очереди после оценки, много раз подряд.
  */
-function places(head: ISessionCard, verdict: 'know' | 'forgot', size = LONG): number[] {
+function places(head: ISessionCard, verdict: TVerdict, size = LONG): number[] {
     const tail = queue(size).slice(1);
 
     return Array.from({ length: 1500 }, () =>
@@ -70,7 +71,7 @@ function places(head: ISessionCard, verdict: 'know' | 'forgot', size = LONG): nu
 /**
  * Средний зазор до возврата: место разбрасывается, поэтому проверяется среднее.
  */
-function gapOf(head: ISessionCard, verdict: 'know' | 'forgot', size = LONG): number {
+function gapOf(head: ISessionCard, verdict: TVerdict, size = LONG): number {
     const drawn = places(head, verdict, size);
 
     return drawn.reduce((sum, value) => sum + value, 0) / drawn.length;
@@ -238,5 +239,61 @@ describe('очередь сеанса', () => {
         const next = answer([card('w1', 0, 1), ...queue().slice(1)], 'know', 3);
 
         expect(found(next, 'w1')).toEqual(returned('w1', 0, 2, 0));
+    });
+});
+
+describe('сеанс целиком', () => {
+    // Столько карточек человек проходит за длинный вечер: на этом размере и видно,
+    // сходится ли очередь вообще.
+    const BIG = 250;
+    // Потолок нажатий: сеанс, который в него упёрся, не кончается сам.
+    const ENDLESS = BIG * 20;
+
+    /**
+     * Прогоняет сеанс до конца, отвечая по правилу. Отдаёт, чем каждую карточку
+     * спрашивали и сколько всего было нажатий.
+     */
+    function play(verdictAt: (shown: number) => TVerdict): {
+        sides: Map<string, Set<boolean>>;
+        presses: number;
+    } {
+        const sides = new Map<string, Set<boolean>>();
+        let queue = shuffle(Array.from({ length: BIG }, (_, index) => card(`w${index + 1}`, null)));
+        let presses = 0;
+
+        while (queue.length > 0 && presses < ENDLESS) {
+            const shown = queue[0]!;
+            const seen = sides.get(shown.id) ?? new Set<boolean>();
+
+            seen.add(shown.isReversed);
+            sides.set(shown.id, seen);
+
+            queue = answer(queue, verdictAt(seen.size), NEEDED);
+            presses += 1;
+        }
+
+        return { sides, presses };
+    }
+
+    it('сеанс на две с половиной сотни карточек кончается сам', () => {
+        const { sides, presses } = play(() => 'know');
+
+        expect(presses).toBe(BIG * NEEDED);
+        expect(sides.size).toBe(BIG);
+    });
+
+    it('каждая карточка спрашивается обеими сторонами', () => {
+        // Иначе лестница растёт вхолостую: узнать написанное легче, чем вспомнить самому.
+        const { sides } = play(() => 'know');
+
+        expect([...sides.values()].every((seen) => seen.size === 2)).toBe(true);
+    });
+
+    it('промахи сеанс не зацикливают', () => {
+        // Первый показ каждой карточки — промах: очередь от этого растёт, но сходится.
+        const { sides, presses } = play((shown) => (shown === 1 ? 'forgot' : 'know'));
+
+        expect(presses).toBeLessThan(ENDLESS);
+        expect(sides.size).toBe(BIG);
     });
 });
