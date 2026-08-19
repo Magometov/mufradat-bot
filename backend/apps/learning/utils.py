@@ -1,6 +1,6 @@
 """Проверки, которым база не нужна."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.utils.timezone import localtime
@@ -21,9 +21,21 @@ def enabled(learner: Learner | None) -> bool:
     return settings.SCHEDULING_FOR_ALL or (learner.telegram_id is not None and learner.scheduling)
 
 
-def pressed(at: datetime, now: datetime) -> datetime:
-    """Время нажатия, каким его можно засчитать: вперёд своих часов не верим."""
-    return min(at, now)
+def presses(times: list[datetime], now: datetime) -> list[datetime]:
+    """Времена нажатий по часам сервера: убежавшая вперёд пачка сдвигается целиком.
+
+    Обрезать каждое нажатие по отдельности нельзя: у соседних получилось бы одно время,
+    и вторая сторона карточки в той же пачке сошла бы за повтор первой.
+    """
+    if not times:
+        return []
+
+    ahead = max(times) - now
+
+    if ahead <= timedelta():
+        return list(times)
+
+    return [at - ahead for at in times]
 
 
 def is_awake(now: datetime) -> bool:

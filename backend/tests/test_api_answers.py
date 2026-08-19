@@ -117,6 +117,28 @@ class TestAnswers:
         assert CardState.objects.get().answered_at < ahead
 
     @signature
+    def test_future_batch_still_closes_the_card(self, client, form, django_assert_num_queries):
+        """Пачка с убежавших вперёд часов закрывает карточку так же, как всякая другая.
+
+        Обрезка каждого нажатия по отдельности слепила бы их в одно время, и вторая
+        сторона сошла бы за повтор первой: карточка застряла бы в изучении навсегда.
+        """
+        card_id = f"w{form.pk}"
+        ahead = datetime(2030, 1, 1, tzinfo=UTC)
+
+        with django_assert_num_queries(11):
+            sent = send(
+                client,
+                [
+                    answer(card_id, "know", at=ahead),
+                    answer(card_id, "know", at=ahead + timedelta(seconds=20)),
+                ],
+            )
+
+        assert [(state["level"], state["step"]) for state in sent.json()] == [(0, 1), (3, 0)]
+        assert CardState.objects.get().level == 3
+
+    @signature
     def test_unknown_card_is_skipped(self, client, form, django_assert_num_queries):
         """Номер удалённой карточки не валит пачку целиком."""
         with django_assert_num_queries(9):

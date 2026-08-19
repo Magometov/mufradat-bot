@@ -11,7 +11,7 @@ from apps.common.constants import INIT_DATA_HEADER
 from apps.common.services import visitor
 from apps.learning.constants import Verdict
 from apps.learning.services import apply
-from apps.learning.utils import pressed
+from apps.learning.utils import presses
 from apps.vocabulary.services import cards_by_id
 
 
@@ -34,7 +34,7 @@ class AnswerCreateView(APIView):
         # Номер мог остаться от карточки, удалённой из колоды: такую оценку пропускаем,
         # а остальную пачку применяем.
         cards = cards_by_id(answer["card_id"] for answer in answers)
-        now = timezone.now()
+        moments = presses([answer["answered_at"] for answer in answers], timezone.now())
 
         with transaction.atomic():
             states = [
@@ -42,9 +42,9 @@ class AnswerCreateView(APIView):
                     learner=learner,
                     card=cards[answer["card_id"]],
                     knows=answer["verdict"] == Verdict.KNOW,
-                    now=pressed(answer["answered_at"], now),
+                    now=moment,
                 )
-                for answer in answers
+                for answer, moment in zip(answers, moments, strict=True)
                 if answer["card_id"] in cards
             ]
 
