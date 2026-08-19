@@ -1,4 +1,4 @@
-import type { Ref } from 'vue';
+import type { ComputedRef, Ref } from 'vue';
 
 /** Состояние карточки, каким его отдаёт сервер: имена полей его, время строкой. */
 export interface IServerState {
@@ -82,7 +82,8 @@ export interface IUseProgress {
     /** Видит ли человек новую логику. */
     enabled: Ref<boolean>;
     rules: Ref<IRules | null>;
-    progress: Ref<Map<string, IProgress>>;
+    /** Состояния сервера вместе с оценками, что ещё не уехали. */
+    progress: ComputedRef<Map<string, IProgress>>;
     /** Время сервера по часам устройства: сроки считаются по нему. */
     now: () => number;
     fetchState: () => Promise<void>;

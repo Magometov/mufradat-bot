@@ -11,11 +11,11 @@ import type {
 
 // Utils
 import { API_URL } from '../utils/api';
-import { predict } from '../utils/predict';
+import { isTimeToSend, pauseFor, replay } from '../utils/outbox';
 import { readAnswers, writeAnswers } from '../utils/storage';
 
 // Vue
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 // #endregion
 
 const STATE_URL = `${API_URL}/api/v1/state/`;
@@ -25,9 +25,12 @@ const INIT_DATA_HEADER = 'X-Init-Data';
 // Длина пачки на случай, когда правила ещё не приехали: обычно предел берётся из них.
 const ANSWERS_BATCH = 100;
 
-// Как часто очередь пробует уехать. Реже — и оценки дольше висят в браузере; чаще — и
-// отменять промах становится некогда.
-const FLUSH_EVERY = 8000;
+// Как часто очередь проверяет, не пора ли ей уехать. Сама проверка в сеть не ходит —
+// решает `isTimeToSend`.
+const TICK = 5000;
+
+// Дольше запрос не ждёт: подвисший `fetch` иначе запер бы отправку до перезагрузки.
+const TIMEOUT = 15_000;
 
 /**
  * Прогресс человека: правила с сервера, очередь оценок и её отправка.
@@ -38,15 +41,27 @@ const FLUSH_EVERY = 8000;
 export function useProgress(initData: string): IUseProgress {
     const enabled = ref(false);
     const rules = ref<IRules | null>(null);
-    const progress = ref<Map<string, IProgress>>(new Map());
+    // Что известно серверу. Показывать это как есть нельзя: пока очередь не уехала, он
+    // не знает про последние оценки.
+    const server = ref<Map<string, IProgress>>(new Map());
     const queue = ref<IAnswer[]>(readAnswers());
 
     // Разница между часами сервера и устройства: сроки считаются по серверным.
     let shift = 0;
-    // Что было до последней оценки — для отмены в тосте.
-    let before: { id: string; state: IProgress | undefined } | null = null;
+    // Когда нажали в последний раз: по тишине после нажатия очередь и уезжает.
+    let pressedAt = 0;
+    // До этого времени ручку не трогаем: она просила подождать.
+    let mutedUntil = 0;
+    // Сколько оценок из головы очереди сейчас в пути: их уже не снять.
+    let inFlight = 0;
     let timer = 0;
     let sending: Promise<void> | null = null;
+
+    // Состояния сервера плюс всё, что ещё не уехало. Иначе застрявшая очередь
+    // возвращает в сеанс карточки, которые человек уже закрыл.
+    const progress = computed<Map<string, IProgress>>(() =>
+        replay(server.value, queue.value, rules.value),
+    );
 
     /**
      * Время сервера по нашим часам.
@@ -63,10 +78,10 @@ export function useProgress(initData: string): IUseProgress {
     }
 
     /**
-     * Складывает состояния карточек в карту по номерам.
+     * Складывает состояния карточек в карту сервера по номерам.
      */
     function collect(cards: IServerState[]): void {
-        const fresh = new Map(progress.value);
+        const fresh = new Map(server.value);
 
         cards.forEach((card) => {
             fresh.set(card.id, {
@@ -78,7 +93,7 @@ export function useProgress(initData: string): IUseProgress {
             });
         });
 
-        progress.value = fresh;
+        server.value = fresh;
     }
 
     /**
@@ -103,7 +118,7 @@ export function useProgress(initData: string): IUseProgress {
                 lapseDrop: body.lapse_drop,
                 answersLimit: body.answers_limit,
             };
-            progress.value = new Map();
+            server.value = new Map();
             collect(body.cards);
         } catch {
             // Прогресс не доехал: колода откроется без цифр и без оценок.
@@ -111,55 +126,57 @@ export function useProgress(initData: string): IUseProgress {
     }
 
     /**
-     * Кладёт оценку в очередь и сразу считает, куда карточка уедет.
+     * Кладёт оценку в очередь и отдаёт срок, который карточку ждёт.
      */
     function record(id: string, verdict: TVerdict): IProgress | null {
         if (rules.value === null) return null;
 
-        const pressed = now();
-        const state = predict(progress.value.get(id), verdict, rules.value, pressed);
-
-        before = { id, state: progress.value.get(id) };
+        pressedAt = Date.now();
         queue.value = [
             ...queue.value,
-            { card_id: id, verdict, answered_at: new Date(pressed).toISOString() },
+            { card_id: id, verdict, answered_at: new Date(now()).toISOString() },
         ];
         writeAnswers(queue.value);
 
-        const fresh = new Map(progress.value);
-        fresh.set(id, state);
-        progress.value = fresh;
-
-        return state;
+        return progress.value.get(id) ?? null;
     }
 
     /**
      * Снимает последнюю оценку, пока она не уехала.
      */
     function cancelLast(): boolean {
-        if (before === null || queue.value.length === 0) return false;
+        // Оценка уже в пути — снимать поздно: сервер её применит.
+        if (queue.value.length <= inFlight) return false;
 
         queue.value = queue.value.slice(0, -1);
         writeAnswers(queue.value);
-
-        const fresh = new Map(progress.value);
-
-        if (before.state === undefined) fresh.delete(before.id);
-        else fresh.set(before.id, before.state);
-
-        progress.value = fresh;
-        before = null;
 
         return true;
     }
 
     /**
-     * Отправляет очередь. Не дошло — оценки остаются ждать следующего раза.
+     * Отправляет очередь целиком: конец сеанса и уход из окна.
      */
     async function flush(): Promise<void> {
-        if (queue.value.length === 0 || sending !== null) return;
+        await deliver(true);
+    }
 
-        sending = drain();
+    /**
+     * Отправляет очередь, если ей пора: набралась пачка или человек перестал отвечать.
+     */
+    function flushIfReady(): void {
+        void deliver(false);
+    }
+
+    /**
+     * Одна отправка за раз: пока пачка в пути, вторую не начинаем.
+     */
+    async function deliver(all: boolean): Promise<void> {
+        if (queue.value.length === 0 || sending !== null) return;
+        if (Date.now() < mutedUntil) return;
+        if (!all && !isReady()) return;
+
+        sending = drain(all);
 
         try {
             await sending;
@@ -169,15 +186,29 @@ export function useProgress(initData: string): IUseProgress {
     }
 
     /**
+     * Сколько оценок ручка берёт за раз. Правила ещё не приехали — своё число.
+     */
+    function batchSize(): number {
+        return rules.value?.answersLimit ?? ANSWERS_BATCH;
+    }
+
+    /**
+     * Пора ли очереди уезжать самой.
+     */
+    function isReady(): boolean {
+        return isTimeToSend(queue.value.length, batchSize(), Date.now() - pressedAt);
+    }
+
+    /**
      * Пачка за пачкой, пока очередь не кончится или пока пачка не застрянет.
      *
      * Целиком отправлять нельзя: очередь длиннее серверного предела не уехала бы никогда.
+     * Хвост короче пачки ждёт своего часа — иначе на каждой сотне уходило бы два запроса.
      */
-    async function drain(): Promise<void> {
-        const batch = rules.value?.answersLimit ?? ANSWERS_BATCH;
-
+    async function drain(all: boolean): Promise<void> {
         while (queue.value.length > 0) {
-            if (!(await send(queue.value.slice(0, batch)))) return;
+            if (!all && !isReady()) return;
+            if (!(await send(queue.value.slice(0, batchSize())))) return;
         }
     }
 
@@ -185,18 +216,29 @@ export function useProgress(initData: string): IUseProgress {
      * Одна попытка отправки: успех убирает уехавшее из очереди. `false` — не уехало.
      */
     async function send(answers: IAnswer[]): Promise<boolean> {
+        inFlight = answers.length;
+
         try {
             const response = await fetch(ANSWERS_URL, {
                 method: 'POST',
                 headers: { ...headers(), 'Content-Type': 'application/json' },
                 body: JSON.stringify({ answers }),
+                // Старому webview `timeout` неизвестен: там запрос уедет без срока.
+                signal: AbortSignal.timeout?.(TIMEOUT),
             });
 
-            // Оценки нас не касаются: писать их некуда, и повторять попытки незачем.
+            // Подпись не годится: в этом заходе слать некуда. Оценки при этом остаются —
+            // следующий заход придёт со свежей подписью и увезёт их.
             if (response.status === 403) {
                 enabled.value = false;
-                queue.value = [];
-                writeAnswers(queue.value);
+                mutedUntil = Number.POSITIVE_INFINITY;
+
+                return false;
+            }
+
+            // Слишком часто: ждём, сколько просят, а не стучимся каждый тик.
+            if (response.status === 429) {
+                mutedUntil = Date.now() + pauseFor(response.headers.get('Retry-After'));
 
                 return false;
             }
@@ -205,33 +247,43 @@ export function useProgress(initData: string): IUseProgress {
 
             queue.value = queue.value.slice(answers.length);
             writeAnswers(queue.value);
-            before = null;
             collect(await response.json());
 
             return true;
         } catch {
-            // Связи нет: очередь остаётся, уедет со следующей попыткой.
+            // Связи нет или запрос завис: очередь остаётся, уедет со следующей попыткой.
             return false;
+        } finally {
+            inFlight = 0;
         }
     }
 
     /**
-     * Отправляет очередь, когда окно закрывают или прячут.
+     * Отправляет очередь, когда окно прячут: там уже не до пачек.
      */
-    function onHide(): void {
+    function onHidden(): void {
+        if (document.visibilityState === 'visible') return;
+
+        void flush();
+    }
+
+    /**
+     * То же при закрытии окна: `visibilitychange` в этот момент срабатывает не везде.
+     */
+    function onLeave(): void {
         void flush();
     }
 
     onMounted(() => {
-        timer = window.setInterval(() => void flush(), FLUSH_EVERY);
-        window.addEventListener('pagehide', onHide);
-        document.addEventListener('visibilitychange', onHide);
+        timer = window.setInterval(flushIfReady, TICK);
+        window.addEventListener('pagehide', onLeave);
+        document.addEventListener('visibilitychange', onHidden);
     });
 
     onBeforeUnmount(() => {
         window.clearInterval(timer);
-        window.removeEventListener('pagehide', onHide);
-        document.removeEventListener('visibilitychange', onHide);
+        window.removeEventListener('pagehide', onLeave);
+        document.removeEventListener('visibilitychange', onHidden);
     });
 
     return { enabled, rules, progress, now, fetchState, record, cancelLast, flush };
