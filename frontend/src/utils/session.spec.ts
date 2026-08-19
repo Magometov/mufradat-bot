@@ -3,17 +3,18 @@
 import type { ISessionCard } from '../types/progress';
 
 // Utils
-import { MIN_GAP, RETURN_STEPS, SPREAD, answer, isReversedAt } from './session';
+import { GAP_AFTER_KNOW, GAP_AFTER_MISS, MIN_AHEAD, answer, isReversedAt } from './session';
 
 // Vitest
 import { describe, expect, it } from 'vitest';
 // #endregion
 
 const NEEDED = 2;
-const [FIRST, SECOND, THIRD] = RETURN_STEPS;
+// Очередь, на которой доли остатка превращаются в заметные расстояния.
+const LONG = 300;
 
 /**
- * Карточка очереди: номер, уровень, счёт верных, число промахов и сторона.
+ * Карточка очереди: номер, уровень, счёт верных сторон, число промахов и сторона.
  */
 function card(
     id: string,
@@ -35,9 +36,9 @@ function returned(id: string, level: number | null = 0, step = 0, misses = 0): I
 const ids = (queue: ISessionCard[]): string[] => queue.map((item) => item.id);
 
 /**
- * Длинная очередь: в короткой карточка встаёт в конец и шаг не проверить.
+ * Очередь заданной длины из ни разу не оценённых карточек.
  */
-function queue(size = 80): ISessionCard[] {
+function queue(size = LONG): ISessionCard[] {
     return Array.from({ length: size }, (_, index) => card(`w${index + 1}`));
 }
 
@@ -56,12 +57,23 @@ function found(next: ISessionCard[], id: string): ISessionCard | undefined {
 }
 
 /**
- * Легла ли карточка в вилку своего шага: не ближе порога и не дальше разброса.
+ * Куда падает первая карточка очереди после оценки, много раз подряд.
  */
-function within(next: ISessionCard[], id: string, floor: number): boolean {
-    const place = placeOf(next, id);
+function places(head: ISessionCard, verdict: 'know' | 'forgot', size = LONG): number[] {
+    const tail = queue(size).slice(1);
 
-    return place >= floor && place <= floor + floor * SPREAD;
+    return Array.from({ length: 1500 }, () =>
+        placeOf(answer([head, ...tail], verdict, NEEDED), head.id),
+    );
+}
+
+/**
+ * Средний зазор до возврата: место разбрасывается, поэтому проверяется среднее.
+ */
+function gapOf(head: ISessionCard, verdict: 'know' | 'forgot', size = LONG): number {
+    const drawn = places(head, verdict, size);
+
+    return drawn.reduce((sum, value) => sum + value, 0) / drawn.length;
 }
 
 describe('сторона карточки', () => {
@@ -83,57 +95,9 @@ describe('сторона карточки', () => {
         },
     );
 
-    it('изучение начинается арабской стороной, а возврат даёт русскую', () => {
-        const next = answer(
-            [{ ...card('w1'), isReversed: isReversedAt(0, 0) }, ...queue().slice(1)],
-            'forgot',
-            NEEDED,
-        );
-
-        expect(isReversedAt(0, 0)).toBe(false);
-        expect(found(next, 'w1')?.isReversed).toBe(true);
-    });
-
     it('новая карточка показывается арабской стороной', () => {
         // Русским вперёд её не вспомнить: слово ещё ни разу не видели.
         expect(isReversedAt(null, 0)).toBe(false);
-    });
-});
-
-describe('очередь сеанса', () => {
-    it('первый промах возвращает через полтора десятка карточек', () => {
-        const next = answer(queue(), 'forgot', NEEDED);
-
-        expect(within(next, 'w1', FIRST!)).toBe(true);
-        expect(next).toHaveLength(80);
-    });
-
-    it('одна и та же карточка возвращается на разные места', () => {
-        const places = new Set(
-            Array.from({ length: 20 }, () => placeOf(answer(queue(), 'forgot', NEEDED), 'w1')),
-        );
-
-        // Ритма быть не должно: шаг мажется разбросом, а не отсчитывается ровно.
-        expect(places.size).toBeGreaterThan(1);
-    });
-
-    it('с каждым промахом карточка уходит дальше', () => {
-        const once = answer(queue(), 'forgot', NEEDED);
-        const twice = answer(once, 'forgot', NEEDED);
-
-        // Второй промах считается по той карточке, что теперь первая, — берём её же.
-        const again = answer([card('w1', 0, 0, 1), ...queue().slice(1)], 'forgot', NEEDED);
-        const third = answer([card('w1', 0, 0, 2), ...queue().slice(1)], 'forgot', NEEDED);
-
-        expect(within(again, 'w1', SECOND!)).toBe(true);
-        expect(within(third, 'w1', THIRD!)).toBe(true);
-        expect(twice).toHaveLength(80);
-    });
-
-    it('дальше последнего шага не отодвигает', () => {
-        const far = answer([card('w1', 0, 0, 9), ...queue().slice(1)], 'forgot', NEEDED);
-
-        expect(within(far, 'w1', THIRD!)).toBe(true);
     });
 
     it('возврат спрашивает слово другой стороной', () => {
@@ -143,7 +107,77 @@ describe('очередь сеанса', () => {
         expect(found(once, 'w1')?.isReversed).toBe(true);
         expect(found(twice, 'w1')?.isReversed).toBe(false);
     });
+});
 
+describe('куда возвращается карточка', () => {
+    it.each([
+        [1, GAP_AFTER_MISS[0]!],
+        [2, GAP_AFTER_MISS[1]!],
+        [3, GAP_AFTER_MISS[2]!],
+        [9, GAP_AFTER_MISS[2]!],
+    ])('промах номер %i возвращает слово через свой зазор', (misses, gap) => {
+        // Промахов больше, чем зазоров, — дальше последнего не отодвигает.
+        expect(gapOf(card('w1', 0, 0, misses - 1), 'forgot')).toBeCloseTo(MIN_AHEAD + gap, -1);
+    });
+
+    it('вторая сторона слова, которое далось, уезжает дальше всякого промаха', () => {
+        expect(gapOf(card('w1'), 'know')).toBeCloseTo(MIN_AHEAD + GAP_AFTER_KNOW, -1);
+    });
+
+    it('вспомнил после промаха — подтверждение спрашивается скорее, а не дальше', () => {
+        expect(gapOf(card('w1', 0, 0, 1), 'know')).toBeCloseTo(MIN_AHEAD + GAP_AFTER_MISS[0]!, -1);
+    });
+
+    it('зазор не зависит от размера колоды', () => {
+        // Память не знает, сколько слов в разделе: ей важно, сколько чужих прошло между
+        // двумя показами. Доля остатка давала бы шесть карточек на полутора десятках.
+        const small = gapOf(card('w1'), 'know', 150);
+        const large = gapOf(card('w1'), 'know', 800);
+
+        expect(Math.abs(small - large) / large).toBeLessThan(0.15);
+    });
+
+    it('места возврата разбросаны широко, а не жмутся к одному числу', () => {
+        // Узкий разброс сбивает возвраты в кучу: за первым десятком новых слов идёт
+        // десяток повторов подряд, и так на любой колоде.
+        const drawn = places(card('w1'), 'know');
+
+        expect(Math.min(...drawn)).toBeLessThan(MIN_AHEAD + GAP_AFTER_KNOW / 2);
+        expect(Math.max(...drawn)).toBeGreaterThan(MIN_AHEAD + GAP_AFTER_KNOW * 2);
+    });
+
+    it('на короткой очереди зазор ужимается, а не упирается в конец', () => {
+        // Иначе сеанс из полутора десятков слов распадается на круг новых и круг повторов.
+        const short = gapOf(card('w1'), 'know', 20);
+
+        expect(short).toBeLessThan(MIN_AHEAD + GAP_AFTER_KNOW / 2);
+        expect(short).toBeGreaterThan(MIN_AHEAD);
+    });
+
+    it('ближе порога слово не возвращается даже в короткой очереди', () => {
+        expect(Math.min(...places(card('w1', 0, 0, 1), 'forgot', 20))).toBeGreaterThanOrEqual(
+            MIN_AHEAD,
+        );
+    });
+
+    it('дальше конца очереди слово не уезжает', () => {
+        expect(ids(answer([card('w1'), card('w2'), card('w3')], 'know', NEEDED))).toEqual([
+            'w2',
+            'w3',
+            'w1',
+        ]);
+    });
+
+    it('в короткой очереди возврат не роняет карточки', () => {
+        expect(answer(queue(4), 'forgot', NEEDED)).toHaveLength(4);
+    });
+
+    it('последняя карточка, оценённая промахом, остаётся одна', () => {
+        expect(ids(answer([card('w1')], 'forgot', NEEDED))).toEqual(['w1']);
+    });
+});
+
+describe('очередь сеанса', () => {
     it('промахи помнятся в самой карточке', () => {
         const next = answer(queue(), 'forgot', NEEDED);
 
@@ -156,19 +190,13 @@ describe('очередь сеанса', () => {
         expect(found(next, 'w1')).toEqual(returned('w1', 0, 1, 0));
     });
 
-    it('вспомнил — подтверждение спрашивается скорее, а не дальше', () => {
-        const next = answer([card('w1', 0, 0, 1), ...queue().slice(1)], 'know', NEEDED);
-
-        expect(within(next, 'w1', FIRST!)).toBe(true);
-    });
-
     it('вторая верная сторона закрывает карточку', () => {
         const next = answer([card('w1', 0, 1), card('w2')], 'know', NEEDED);
 
         expect(ids(next)).toEqual(['w2']);
     });
 
-    it('промах обнуляет счёт верных', () => {
+    it('промах обнуляет счёт верных сторон', () => {
         const next = answer([card('w1', 0, 1), card('w2')], 'forgot', NEEDED);
 
         expect(next.at(-1)).toEqual(returned('w1', 0, 0, 1));
@@ -196,29 +224,6 @@ describe('очередь сеанса', () => {
         const next = answer([card('w1', null), card('w2')], 'forgot', NEEDED);
 
         expect(next.at(-1)).toEqual(returned('w1', 0, 0, 1));
-    });
-
-    it('промахи подряд не возвращаются кучей', () => {
-        const first = answer(queue(), 'forgot', NEEDED);
-        const second = answer(first, 'forgot', NEEDED);
-        const third = answer(second, 'forgot', NEEDED);
-
-        // Порядок возвратов разбросом не задан — важно, что они не встали вплотную.
-        const places = ['w1', 'w2', 'w3']
-            .map((id) => placeOf(third, id))
-            .sort((first, second) => first - second);
-        const gaps = [places[1]! - places[0]!, places[2]! - places[1]!];
-
-        expect(places[0]).toBeGreaterThanOrEqual(FIRST! - 3);
-        expect(gaps.every((gap) => gap > MIN_GAP)).toBe(true);
-    });
-
-    it('в короткой очереди карточка встаёт в конец', () => {
-        expect(ids(answer([card('w1'), card('w2')], 'forgot', NEEDED))).toEqual(['w2', 'w1']);
-    });
-
-    it('последняя карточка, оценённая промахом, остаётся одна', () => {
-        expect(ids(answer([card('w1')], 'forgot', NEEDED))).toEqual(['w1']);
     });
 
     it('последняя закрытая карточка кончает сеанс', () => {

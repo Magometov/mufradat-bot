@@ -6,17 +6,25 @@ import type { ISessionCard, TVerdict } from '../types/progress';
 import { LEARNING } from './levels';
 // #endregion
 
-// Через сколько других карточек возвращается забытая: с каждым промахом дальше. Первый
-// возврат — за полтора десятка: раньше слово ещё висит в голове, и «помню» говорится
+// Средний зазор до возврата, в карточках. Число, а не доля колоды: память не знает,
+// сколько слов в разделе, — ей важно, сколько чужих прошло между двумя показами. Доля
+// давала бы шесть карточек на колоде в полтора десятка и тысячу на колоде в две с
+// половиной.
+
+// Слово, которое далось: вторую сторону спрашиваем далеко.
+export const GAP_AFTER_KNOW = 40;
+
+// Слово, которое не далось: близко, но с каждым промахом дальше — иначе оно мелькает
+// перед глазами. Промахов больше, чем зазоров, — берётся последний.
+export const GAP_AFTER_MISS = [10, 20, 40];
+
+// Ближе слово не вернётся ни при каком зазоре: на таком расстоянии «помню» ещё говорится
 // памятью о прошлой карточке, а не о самом слове.
-export const RETURN_STEPS = [15, 30, 60];
+export const MIN_AHEAD = 6;
 
-// Сколько чужих карточек обязано лежать между двумя возвращёнными.
-export const MIN_GAP = 3;
-
-// Разброс вверх от шага: возврат перестаёт быть отсчитываемым ритмом, но ближе шага
-// карточка не подходит. Тот же приём, что и у лестницы сроков на сервере.
-export const SPREAD = 0.3;
+// Дальше половины остатка не отодвигаем: на короткой очереди зазор в четыре десятка
+// значит «в самый конец», и сеанс распадается на круг новых и круг повторов.
+const FURTHEST = 0.5;
 
 /**
  * Спрашивать ли карточку русским вперёд.
@@ -59,46 +67,32 @@ export function answer<TCard extends ISessionCard>(
 }
 
 /**
- * Ставит карточку дальше по очереди или в конец, если та короче нужного шага.
- *
- * Шаг берётся по числу уже случившихся промахов: первый возврат — первый шаг. Сторона
- * при возврате меняется: иначе слово весь сеанс спрашивается одним и тем же письмом.
+ * Ставит карточку дальше по очереди, перевернув её другой стороной: иначе слово весь
+ * сеанс спрашивается одним и тем же письмом.
  */
 function back<TCard extends ISessionCard>(queue: TCard[], card: TCard): TCard[] {
-    const at = free(queue, Math.min(step(card.misses), queue.length));
+    const at = ahead(card.misses, queue.length);
     const turned = { ...card, isReversed: !card.isReversed };
 
     return [...queue.slice(0, at), turned, ...queue.slice(at)];
 }
 
 /**
- * Через сколько карточек возвращать: порог по числу промахов плюс разброс вверх.
- */
-function step(misses: number): number {
-    const index = Math.min(Math.max(misses - 1, 0), RETURN_STEPS.length - 1);
-    const floor = RETURN_STEPS[index]!;
-
-    return floor + Math.floor(Math.random() * floor * SPREAD);
-}
-
-/**
- * Ближайшее с этого место, рядом с которым нет другой возвращённой карточки.
+ * Через сколько карточек слово вернётся: свой зазор, но не ближе порога и не дальше
+ * конца очереди.
  *
- * Без него промахи, сделанные подряд, встают на одно и то же место остатка очереди и
- * возвращаются кучей: шаг у них общий, а очередь к каждому следующему короче ровно на
- * предыдущий.
+ * Зазор — среднее, а не расстояние: место берётся показательным распределением. Узкий
+ * разброс вокруг числа сбивает возвраты в кучу — за первым десятком новых слов идёт
+ * десяток повторов подряд, — а у показательного разброс равен самому среднему, и куча
+ * не собирается ни при каком размере колоды.
  */
-function free<TCard extends ISessionCard>(queue: TCard[], at: number): number {
-    let place = at;
+function ahead(misses: number, length: number): number {
+    const wanted =
+        misses === 0
+            ? GAP_AFTER_KNOW
+            : GAP_AFTER_MISS[Math.min(misses, GAP_AFTER_MISS.length) - 1]!;
+    const gap = Math.min(wanted, length * FURTHEST);
+    const drawn = MIN_AHEAD + Math.round(-gap * Math.log(1 - Math.random()));
 
-    while (place < queue.length && crowded(queue, place)) place += 1;
-
-    return place;
-}
-
-/**
- * Есть ли возвращённая карточка в зазоре вокруг места.
- */
-function crowded<TCard extends ISessionCard>(queue: TCard[], at: number): boolean {
-    return queue.slice(Math.max(at - MIN_GAP, 0), at + MIN_GAP).some((item) => item.misses > 0);
+    return Math.min(Math.max(drawn, MIN_AHEAD), length);
 }
