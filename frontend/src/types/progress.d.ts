@@ -5,6 +5,7 @@ export interface IServerState {
     id: string;
     level: number;
     step: number;
+    lapses: number;
     lapsed_from: number;
     due_at: string;
 }
@@ -12,8 +13,10 @@ export interface IServerState {
 /** Что человек помнит про одну карточку. Приходит из `GET /api/v1/state/`. */
 export interface IProgress {
     level: number;
-    /** Верных ответов подряд в изучении: 0 или 1. */
+    /** Сколько сторон подряд подтверждено: карточка закрывается, когда их нужное число. */
     step: number;
+    /** Сколько раз слово забывалось за свою жизнь. */
+    lapses: number;
     /** Ступень, с которой карточка упала: на неё же и вернётся, только ниже. */
     lapsedFrom: number;
     /** Срок показа в миллисекундах — сравнивать дешевле, чем строки. */
@@ -28,7 +31,7 @@ export interface IRules {
     sessionLimit: number;
     newLimit: number;
     firstSightLevel: number;
-    /** Столько верных ответов подряд закрывает изучение. */
+    /** Столько верных сторон подряд закрывает карточку. */
     needed: number;
     /** На столько ступеней опускается забытая карточка. */
     lapseDrop: number;

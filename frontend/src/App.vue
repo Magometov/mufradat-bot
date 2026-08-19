@@ -10,12 +10,9 @@
 
     // Utils
     import { API_URL } from './utils/api';
-    import { countDue, nextDueAt, soonText, summarize } from './utils/due';
-    import { LEARNING } from './utils/levels';
+    import { countDue, nextDueAt, pillText, soonText, summarize } from './utils/due';
     import { MODE_TITLES } from './utils/modes';
-    import { dayWord } from './utils/plural';
     import { buildPortion } from './utils/portion';
-    import { days } from './utils/predict';
     import { isTipsSeen, markTipsSeen } from './utils/storage';
     import { logVisit } from './utils/visit';
 
@@ -210,14 +207,7 @@
             void flush();
         }
 
-        // Пилюля обещает срок, а карточке в изучении обещать нечего: она ещё вернётся.
-        if (state === null || rules.value === null || state.level === LEARNING) {
-            pill.value = '';
-            return;
-        }
-
-        const span = days(state.level, rules.value);
-        pill.value = `через ${span} ${dayWord(span)}`;
+        pill.value = pillText(state, rules.value);
     }
 
     /**

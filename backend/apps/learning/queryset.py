@@ -2,6 +2,7 @@
 
 from django.db import models
 
+from apps.learning.constants import LEARNING
 from apps.vocabulary.models import Phrase, WordForm
 
 # Карточка колоды: форма слова или фраза. Имя `Card` занято абстрактной моделью колоды.
@@ -19,6 +20,13 @@ class CardStateQuerySet(models.QuerySet):
     def for_card(self, card: AnyCard) -> "CardStateQuerySet":
         """Состояние одной карточки, какой бы таблице она ни принадлежала."""
         return self.filter(**link(card))
+
+    def struggling(self) -> "CardStateQuerySet":
+        """Слова, которые не даются: лежат в изучении и хоть раз забывались.
+
+        Одного изучения мало: там же ждёт карточка, у которой верна пока одна сторона.
+        """
+        return self.filter(level=LEARNING, lapses__gt=0)
 
 
 class GroupPostQuerySet(models.QuerySet):

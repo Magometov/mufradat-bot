@@ -13,7 +13,7 @@ NOW = datetime(2026, 8, 17, 12, 0, tzinfo=UTC)
 LADDER = [1, 3, 7, 16, 35]
 
 settings = override_settings(
-    LADDER=LADDER, JITTER_PERCENT=10, FIRST_SIGHT_LEVEL=3, LAPSE_DROP=2, LEARNING_NEEDED=2
+    LADDER=LADDER, JITTER_PERCENT=10, FIRST_SIGHT_LEVEL=3, LAPSE_DROP=2, SIDES_NEEDED=2
 )
 
 
@@ -26,9 +26,23 @@ class TestNextState:
     """Правило расписания: уровень, счёт верных, след промахов и срок после оценки."""
 
     @settings
-    def test_first_sight_goes_far(self):
-        """Узнал с первого взгляда — знал заранее: сразу третий уровень, неделя."""
-        state, due = next_state(None, knows=True, now=NOW)
+    @pytest.mark.parametrize(
+        "current",
+        [None, State(level=3), State(level=0, step=0, lapses=1, lapsed_from=5)],
+        ids=["новая", "знакомая", "в изучении"],
+    )
+    def test_first_correct_side_only_counts(self, current):
+        """Верная сторона срок не двигает на любой ступени: нужна и вторая."""
+        state, due = next_state(current, knows=True, now=NOW)
+
+        assert state.step == 1
+        assert due == NOW
+
+    @settings
+    def test_both_sides_of_a_new_card_go_far(self):
+        """Обе стороны с первого взгляда — знал заранее: сразу третий уровень, неделя."""
+        first, _ = next_state(None, knows=True, now=NOW)
+        state, due = next_state(first, knows=True, now=NOW)
 
         assert state == State(level=3, step=0)
         assert days_between(due) == pytest.approx(7, rel=0.1)
@@ -42,19 +56,11 @@ class TestNextState:
         assert due == NOW
 
     @settings
-    def test_first_correct_in_learning_only_counts(self):
-        """Первый верный в изучении срок не двигает: нужен второй подряд."""
-        state, due = next_state(State(level=0, step=0), knows=True, now=NOW)
-
-        assert state == State(level=0, step=1)
-        assert due == NOW
-
-    @settings
     def test_second_correct_closes_learning(self):
-        """Второй верный подряд закрывает изучение — на завтра."""
-        state, due = next_state(State(level=0, step=1), knows=True, now=NOW)
+        """Вторая верная сторона закрывает изучение — на завтра."""
+        state, due = next_state(State(level=0, step=1, lapses=1), knows=True, now=NOW)
 
-        assert state == State(level=1, step=0)
+        assert state == State(level=1, step=0, lapses=1)
         assert days_between(due) == pytest.approx(1, rel=0.1)
 
     @settings
@@ -75,7 +81,7 @@ class TestNextState:
     @settings
     def test_miss_remembers_the_step_it_fell_from(self):
         """Промах помнит ступень падения и считает себя в счёте промахов."""
-        state, _ = next_state(State(level=4, lapses=1), knows=False, now=NOW)
+        state, _ = next_state(State(level=4, step=1, lapses=1), knows=False, now=NOW)
 
         assert state == State(level=0, step=0, lapses=2, lapsed_from=4)
 
@@ -91,15 +97,15 @@ class TestNextState:
     @settings
     def test_miss_in_learning_resets_the_count_of_correct_answers(self):
         """Промах в изучении обнуляет счёт верных, а промахи считает дальше."""
-        state, due = next_state(State(level=0, step=1), knows=False, now=NOW)
+        state, due = next_state(State(level=0, step=1, lapses=1), knows=False, now=NOW)
 
-        assert state == State(level=0, step=0, lapses=1)
+        assert state == State(level=0, step=0, lapses=2)
         assert due == NOW
 
     @settings
     def test_known_card_climbs_one_step(self):
         """Знакомая карточка поднимается на уровень, не забывая счёт промахов."""
-        state, due = next_state(State(level=3, lapses=2), knows=True, now=NOW)
+        state, due = next_state(State(level=3, step=1, lapses=2), knows=True, now=NOW)
 
         assert state == State(level=4, step=0, lapses=2)
         assert days_between(due) == pytest.approx(16, rel=0.1)
@@ -107,7 +113,7 @@ class TestNextState:
     @settings
     def test_top_level_stays_on_top(self):
         """С последнего уровня подниматься некуда."""
-        state, due = next_state(State(level=len(LADDER)), knows=True, now=NOW)
+        state, due = next_state(State(level=len(LADDER), step=1), knows=True, now=NOW)
 
         assert state == State(level=len(LADDER), step=0)
         assert days_between(due) == pytest.approx(35, rel=0.1)
@@ -124,7 +130,8 @@ class TestNextState:
     def test_intervals_are_spread(self):
         """Разброс работает и держится в пределах: одинаковых сроков подряд не бывает."""
         spans = {
-            days_between(next_state(State(level=3), knows=True, now=NOW)[1]) for _ in range(20)
+            days_between(next_state(State(level=3, step=1), knows=True, now=NOW)[1])
+            for _ in range(20)
         }
 
         assert len(spans) > 1
@@ -134,7 +141,7 @@ class TestNextState:
 class TestRulesFromSettings:
     """Числа расписания приходят из настроек, а не зашиты в правило."""
 
-    @override_settings(LADDER=[2, 9], JITTER_PERCENT=0, FIRST_SIGHT_LEVEL=1)
+    @override_settings(LADDER=[2, 9], JITTER_PERCENT=0, FIRST_SIGHT_LEVEL=1, SIDES_NEEDED=1)
     def test_ladder_and_first_sight_come_from_settings(self):
         """Лестница и уровень первого взгляда берутся из настроек."""
         first, due = next_state(None, knows=True, now=NOW)
@@ -147,19 +154,19 @@ class TestRulesFromSettings:
         assert second == State(level=2)
         assert days_between(due) == 9
 
-    @override_settings(LADDER=LADDER, JITTER_PERCENT=0, LEARNING_NEEDED=3)
-    def test_strictness_of_learning_comes_from_settings(self):
-        """Сколько верных закрывают изучение — настройка: с тремя нужен третий ответ."""
-        second, _ = next_state(State(level=0, step=1), knows=True, now=NOW)
+    @override_settings(LADDER=LADDER, JITTER_PERCENT=0, SIDES_NEEDED=3)
+    def test_number_of_sides_comes_from_settings(self):
+        """Сколько верных сторон закрывают карточку — настройка: с тремя нужен третий ответ."""
+        second, _ = next_state(State(level=1, step=1), knows=True, now=NOW)
         third, due = next_state(second, knows=True, now=NOW)
 
-        assert second == State(level=0, step=2)
-        assert third == State(level=1)
-        assert days_between(due) == 1
+        assert second == State(level=1, step=2)
+        assert third == State(level=2)
+        assert days_between(due) == 3
 
-    @override_settings(LADDER=LADDER, JITTER_PERCENT=0, LAPSE_DROP=4)
+    @override_settings(LADDER=LADDER, JITTER_PERCENT=0, LAPSE_DROP=4, SIDES_NEEDED=2)
     def test_lapse_drop_comes_from_settings(self):
         """На сколько ступеней опускать забытую — настройка: с четырьмя падение глубже."""
-        state, _ = next_state(State(level=0, step=1, lapsed_from=5), knows=True, now=NOW)
+        state, _ = next_state(State(level=0, step=1, lapses=1, lapsed_from=5), knows=True, now=NOW)
 
-        assert state == State(level=1)
+        assert state == State(level=1, lapses=1)

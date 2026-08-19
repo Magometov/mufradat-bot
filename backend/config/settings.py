@@ -137,8 +137,8 @@ ADMIN_TELEGRAM_ID = int(getenv("ADMIN_TELEGRAM_ID") or 0)
 LADDER = [int(days) for days in (getenv("LADDER") or "1,3,7,16,35,90,180").split(",")]
 # Разброс к каждому сроку в процентах, чтобы раздел не возвращался лавиной.
 JITTER_PERCENT = int(getenv("JITTER_PERCENT") or 10)
-# Столько верных ответов подряд закрывает изучение: строже — надёжнее, но дольше.
-LEARNING_NEEDED = int(getenv("LEARNING_NEEDED") or 2)
+# Столько верных сторон подряд закрывает карточку: строже — надёжнее, но дольше.
+SIDES_NEEDED = int(getenv("SIDES_NEEDED") or 2)
 # На столько ступеней опускается забытая карточка вместо сброса в самый низ: слово,
 # которое держалось месяц, знают лучше нового, и переучивать его с нуля — тратить сеансы.
 LAPSE_DROP = int(getenv("LAPSE_DROP") or 2)

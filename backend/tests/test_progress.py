@@ -12,7 +12,7 @@ from apps.learning.services import apply, states
 # Сроки здесь не проверяются, поэтому лестница условная: важны только уровни и то, что
 # без разброса даты предсказуемы.
 settings = override_settings(
-    LADDER=[1, 2, 3, 4, 5], JITTER_PERCENT=0, FIRST_SIGHT_LEVEL=3, LAPSE_DROP=2
+    LADDER=[1, 2, 3, 4, 5], JITTER_PERCENT=0, FIRST_SIGHT_LEVEL=3, LAPSE_DROP=2, SIDES_NEEDED=2
 )
 
 
@@ -25,7 +25,7 @@ class TestApply:
         """Первая оценка заводит строку: до неё карточка «новая»."""
         state = apply(learner=learner, card=form, knows=True)
 
-        assert state.level == 3
+        assert (state.level, state.step) == (0, 1)
         assert state.form_id == form.pk
         assert state.phrase_id is None
         assert CardState.objects.count() == 1
@@ -36,12 +36,13 @@ class TestApply:
         apply(learner=learner, card=form, knows=True)
         state = apply(learner=learner, card=form, knows=True)
 
-        assert state.level == 4
+        assert state.level == 3
         assert CardState.objects.count() == 1
 
     @settings
     def test_forgetting_drops_to_learning(self, learner, form):
         """Забыл знакомое — карточка падает в изучение, помня, откуда упала."""
+        apply(learner=learner, card=form, knows=True)
         apply(learner=learner, card=form, knows=True)
         state = apply(learner=learner, card=form, knows=False)
 
@@ -49,12 +50,14 @@ class TestApply:
         assert (state.lapses, state.lapsed_from) == (1, 3)
         assert state.due_at == state.answered_at
 
-    @override_settings(LADDER=[1, 2, 3, 4, 5], JITTER_PERCENT=0, FIRST_SIGHT_LEVEL=5, LAPSE_DROP=2)
+    @override_settings(
+        LADDER=[1, 2, 3, 4, 5], JITTER_PERCENT=0, FIRST_SIGHT_LEVEL=5, LAPSE_DROP=2, SIDES_NEEDED=2
+    )
     def test_relearning_returns_below_the_old_step(self, learner, form):
         """Забытая и переученная карточка встаёт ниже прежней ступени, а не в самый низ."""
-        apply(learner=learner, card=form, knows=True)
-        apply(learner=learner, card=form, knows=False)
-        apply(learner=learner, card=form, knows=True)
+        for knows in (True, True, False, True):
+            apply(learner=learner, card=form, knows=knows)
+
         state = apply(learner=learner, card=form, knows=True)
 
         assert (state.level, state.step) == (3, 0)

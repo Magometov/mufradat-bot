@@ -1,10 +1,12 @@
 // #region Imports
 // Types
 import type { IEntry } from '../types/entry';
-import type { IProgress } from '../types/progress';
+import type { IProgress, IRules } from '../types/progress';
 
 // Utils
+import { LEARNING } from './levels';
 import { dayWord, wordWord } from './plural';
+import { days } from './predict';
 // #endregion
 
 const DAY = 86_400_000;
@@ -29,6 +31,21 @@ export function nextDueAt(entries: IEntry[], progress: Map<string, IProgress>): 
         .filter((dueAt): dueAt is number => dueAt !== undefined);
 
     return dates.length === 0 ? null : Math.min(...dates);
+}
+
+/**
+ * Что обещает пилюля после оценки. Пусто — обещать нечего.
+ *
+ * Карточка, которая ещё вернётся в этом заходе, срока не получила: она либо упала в
+ * изучение, либо ждёт остальные стороны.
+ */
+export function pillText(state: IProgress | null, rules: IRules | null): string {
+    if (state === null || rules === null) return '';
+    if (state.level === LEARNING || state.step > 0) return '';
+
+    const span = days(state.level, rules);
+
+    return `через ${span} ${dayWord(span)}`;
 }
 
 /**

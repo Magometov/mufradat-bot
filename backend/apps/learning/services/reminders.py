@@ -7,7 +7,7 @@ from django.db.models import F, Max, QuerySet
 from django.utils import timezone
 
 from apps.common.models import Learner
-from apps.learning.constants import LEARNING, REMINDER_STEP
+from apps.learning.constants import REMINDER_STEP
 from apps.learning.models import CardState
 from apps.learning.services.progress import states
 from apps.learning.utils import is_awake
@@ -54,7 +54,7 @@ def take_reminders(*, now: datetime | None = None) -> list[CardState]:
 
         card = (
             states(learner)
-            .filter(level=LEARNING)
+            .struggling()
             .select_related("form", "phrase")
             .order_by(F("reminded_at").asc(nulls_first=True), "due_at")
             .first()

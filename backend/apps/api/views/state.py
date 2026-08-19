@@ -25,7 +25,7 @@ class StateView(APIView):
             "session_limit": settings.SESSION_LIMIT,
             "new_limit": settings.NEW_LIMIT,
             "first_sight_level": settings.FIRST_SIGHT_LEVEL,
-            "needed": settings.LEARNING_NEEDED,
+            "needed": settings.SIDES_NEEDED,
             "lapse_drop": settings.LAPSE_DROP,
             "answers_limit": settings.ANSWERS_LIMIT,
             "cards": states(learner) if learner is not None else [],

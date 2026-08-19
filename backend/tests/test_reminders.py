@@ -15,7 +15,9 @@ from apps.learning.services import apply, take_reminders
 NOON = make_aware(datetime(2026, 8, 17, 12, 0))
 NIGHT = make_aware(datetime(2026, 8, 17, 3, 0))
 
-settings = override_settings(LADDER=[1, 2, 3, 4, 5], JITTER_PERCENT=0, FIRST_SIGHT_LEVEL=3)
+settings = override_settings(
+    LADDER=[1, 2, 3, 4, 5], JITTER_PERCENT=0, FIRST_SIGHT_LEVEL=3, SIDES_NEEDED=2
+)
 
 
 @pytest.fixture
@@ -40,6 +42,16 @@ def test_learning_card_goes_to_chat(student, form):
 @pytest.mark.django_db
 def test_scheduled_card_stays_out(student, form):
     """Знакомое слово в чат не присылается: оно и так вернётся по сроку."""
+    apply(learner=student, card=form, knows=True, now=NOON)
+    apply(learner=student, card=form, knows=True, now=NOON + timedelta(minutes=1))
+
+    assert take_reminders(now=NOON) == []
+
+
+@settings
+@pytest.mark.django_db
+def test_card_waiting_for_its_other_side_stays_out(student, form):
+    """Слово с одной верной стороной в чат не идёт: оно не забывалось, а недоспрошено."""
     apply(learner=student, card=form, knows=True, now=NOON)
 
     assert take_reminders(now=NOON) == []

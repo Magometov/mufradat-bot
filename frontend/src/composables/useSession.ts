@@ -59,12 +59,13 @@ export function useSession(entries: Ref<IEntry[]>, needed: Ref<number>): IUseSes
         const items = portion.map((entry) => {
             const state = progress.get(entry.id);
             const level = state?.level ?? null;
+            const step = state?.step ?? 0;
 
             return {
                 id: entry.id,
-                isReversed: isReversedAt(level),
+                isReversed: isReversedAt(level, step),
                 level,
-                step: state?.step ?? 0,
+                step,
                 misses: 0,
             };
         });

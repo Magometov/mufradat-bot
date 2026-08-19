@@ -1,10 +1,10 @@
 // #region Imports
 // Types
 import type { IEntry } from '../types/entry';
-import type { IProgress } from '../types/progress';
+import type { IProgress, IRules } from '../types/progress';
 
 // Utils
-import { countDue, nextDueAt, soonText, summarize } from './due';
+import { countDue, nextDueAt, pillText, soonText, summarize } from './due';
 
 // Vitest
 import { describe, expect, it } from 'vitest';
@@ -32,7 +32,7 @@ function entry(id: string): IEntry {
 }
 
 function state(dueAt: number): IProgress {
-    return { level: 3, step: 0, lapsedFrom: 0, dueAt };
+    return { level: 3, step: 0, lapses: 0, lapsedFrom: 0, dueAt };
 }
 
 const deck = ['w1', 'w2', 'w3'].map(entry);
@@ -115,5 +115,38 @@ describe('итог сеанса', () => {
 
     it('сеанс без оценок так и говорит', () => {
         expect(summarize(['w1'], new Map(), NOON)).toBe('Оценок в этом сеансе не было.');
+    });
+});
+
+describe('обещание пилюли', () => {
+    const rules: IRules = {
+        ladder: [1, 3, 7, 16, 35],
+        jitter: 10,
+        sessionLimit: 20,
+        newLimit: 10,
+        firstSightLevel: 3,
+        needed: 2,
+        lapseDrop: 2,
+        answersLimit: 100,
+    };
+
+    it('закрытая карточка получает срок словами', () => {
+        expect(pillText({ level: 3, step: 0, lapses: 0, lapsedFrom: 0, dueAt: NOON }, rules)).toBe(
+            'через 7 дней',
+        );
+    });
+
+    it.each([
+        ['упала в изучение', 0, 0],
+        ['ждёт вторую сторону', 4, 1],
+    ])('карточке, которая ещё вернётся (%s), обещать нечего', (_name, level, step) => {
+        expect(pillText({ level, step, lapses: 1, lapsedFrom: 0, dueAt: NOON }, rules)).toBe('');
+    });
+
+    it('без оценки и без правил обещать тоже нечего', () => {
+        expect(pillText(null, rules)).toBe('');
+        expect(pillText({ level: 3, step: 0, lapses: 0, lapsedFrom: 0, dueAt: NOON }, null)).toBe(
+            '',
+        );
     });
 });

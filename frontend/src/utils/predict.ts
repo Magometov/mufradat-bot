@@ -21,45 +21,54 @@ export function predict(
     rules: IRules,
     now: number,
 ): IProgress {
-    if (verdict === 'forgot') {
-        return { level: LEARNING, step: 0, lapsedFrom: fellFrom(current), dueAt: now };
-    }
+    // Новая карточка — это состояние по умолчанию: дальше правило одно на всех.
+    const state = current ?? { level: LEARNING, step: 0, lapses: 0, lapsedFrom: 0, dueAt: now };
 
-    if (current === undefined) return scheduled(rules.firstSightLevel, rules, now);
+    if (verdict === 'forgot') return forgotten(state, now);
 
-    if (current.level !== LEARNING) {
-        return scheduled(Math.min(current.level + 1, rules.ladder.length), rules, now);
-    }
+    const step = state.step + 1;
 
-    const step = current.step + 1;
+    // Подтверждена не всякая сторона — карточка вернётся в этом же сеансе за остальными.
+    if (step < rules.needed) return { ...state, step, dueAt: now };
 
-    if (step < rules.needed) return { ...current, step, dueAt: now };
+    const level = closedLevel(state, rules);
 
-    return scheduled(relearned(current.lapsedFrom, rules), rules, now);
-}
-
-/**
- * С какой ступени карточка упала. Промах в изучении прежнее падение не стирает.
- */
-function fellFrom(current: IProgress | undefined): number {
-    if (current === undefined) return LEARNING;
-
-    return current.level === LEARNING ? current.lapsedFrom : current.level;
-}
-
-/**
- * Куда возвращается переученная карточка: ниже прежней ступени, но не в самый низ.
- */
-function relearned(lapsedFrom: number, rules: IRules): number {
-    return Math.max(FIRST_SCHEDULED, lapsedFrom - rules.lapseDrop);
-}
-
-/**
- * Состояние карточки, уехавшей в расписание на свой уровень.
- */
-function scheduled(level: number, rules: IRules, now: number): IProgress {
     // След падения потрачен: карточка снова на лестнице.
-    return { level, step: 0, lapsedFrom: 0, dueAt: now + days(level, rules) * DAY };
+    return {
+        level,
+        step: 0,
+        lapses: state.lapses,
+        lapsedFrom: 0,
+        dueAt: now + days(level, rules) * DAY,
+    };
+}
+
+/**
+ * Изучение с начала, но со следом падения: промах в изучении прежний след не стирает.
+ */
+function forgotten(state: IProgress, now: number): IProgress {
+    const fellFrom = state.level === LEARNING ? state.lapsedFrom : state.level;
+
+    return {
+        level: LEARNING,
+        step: 0,
+        lapses: state.lapses + 1,
+        lapsedFrom: fellFrom,
+        dueAt: now,
+    };
+}
+
+/**
+ * На какую ступень встаёт карточка, подтвердившая все стороны.
+ */
+function closedLevel(state: IProgress, rules: IRules): number {
+    if (state.level !== LEARNING) return Math.min(state.level + 1, rules.ladder.length);
+
+    // Ни разу не забывалась — знал заранее, а не вспомнил с третьего раза.
+    if (state.lapses === 0) return rules.firstSightLevel;
+
+    // Переученная возвращается ниже прежней ступени, но не в самый низ.
+    return Math.max(FIRST_SCHEDULED, state.lapsedFrom - rules.lapseDrop);
 }
 
 /**

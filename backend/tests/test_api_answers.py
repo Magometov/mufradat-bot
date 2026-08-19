@@ -20,7 +20,7 @@ URL = "/api/v1/answers/"
 PRESSED = datetime(2026, 8, 18, 12, 0, tzinfo=UTC)
 
 signature = override_settings(
-    BOT_TOKEN=TOKEN, LADDER=[1, 2, 3, 4, 5], JITTER_PERCENT=0, FIRST_SIGHT_LEVEL=3
+    BOT_TOKEN=TOKEN, LADDER=[1, 2, 3, 4, 5], JITTER_PERCENT=0, FIRST_SIGHT_LEVEL=3, SIDES_NEEDED=2
 )
 
 
@@ -59,12 +59,12 @@ class TestAnswers:
         state = CardState.objects.get()
         card = sent.json()[0]
 
-        assert (card["id"], card["level"], card["step"]) == (f"w{form.pk}", 3, 0)
+        assert (card["id"], card["level"], card["step"]) == (f"w{form.pk}", 0, 1)
         assert parse_datetime(card["due_at"]) == state.due_at
 
     @signature
     def test_batch_is_applied_in_order(self, client, form, django_assert_num_queries):
-        """Пачка применяется по порядку: два «помню» поднимают на два уровня."""
+        """Пачка применяется по порядку: вторая сторона закрывает карточку."""
         card_id = f"w{form.pk}"
 
         with django_assert_num_queries(11):
@@ -76,18 +76,21 @@ class TestAnswers:
                 ],
             )
 
-        assert [state["level"] for state in sent.json()] == [3, 4]
-        assert CardState.objects.get().level == 4
+        assert [(state["level"], state["step"]) for state in sent.json()] == [(0, 1), (3, 0)]
+        assert CardState.objects.get().level == 3
 
     @signature
     def test_due_counts_from_the_moment_of_the_press(self, client, form, django_assert_num_queries):
         """Срок считается от времени нажатия, а не от того, когда пачка доехала."""
-        with django_assert_num_queries(9):
-            sent = send(client, [answer(f"w{form.pk}", "know")])
+        card_id = f"w{form.pk}"
+        closed = PRESSED + timedelta(seconds=20)
 
-        # Лестница без разброса, третий уровень — три дня от нажатия.
-        assert parse_datetime(sent.json()[0]["due_at"]) == PRESSED + timedelta(days=3)
-        assert CardState.objects.get().answered_at == PRESSED
+        with django_assert_num_queries(11):
+            sent = send(client, [answer(card_id, "know"), answer(card_id, "know", at=closed)])
+
+        # Лестница без разброса, третий уровень — три дня от нажатия, закрывшего карточку.
+        assert parse_datetime(sent.json()[1]["due_at"]) == closed + timedelta(days=3)
+        assert CardState.objects.get().answered_at == closed
 
     @signature
     def test_repeated_batch_changes_nothing(self, client, form, django_assert_num_queries):
@@ -99,7 +102,9 @@ class TestAnswers:
             again = send(client, answers)
 
         assert again.status_code == status.HTTP_200_OK
-        assert CardState.objects.get().level == 3
+        state = CardState.objects.get()
+
+        assert (state.level, state.step) == (0, 1)
 
     @signature
     def test_press_from_the_future_is_trimmed(self, client, form, django_assert_num_queries):

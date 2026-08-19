@@ -72,6 +72,7 @@ export function useProgress(initData: string): IUseProgress {
             fresh.set(card.id, {
                 level: card.level,
                 step: card.step,
+                lapses: card.lapses,
                 lapsedFrom: card.lapsed_from,
                 dueAt: Date.parse(card.due_at),
             });

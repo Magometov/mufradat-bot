@@ -72,23 +72,31 @@ describe('сторона карточки', () => {
         [4, false],
         [5, true],
     ])('ступень %i спрашивается своей стороной', (level, isReversed) => {
-        expect(isReversedAt(level)).toBe(isReversed);
+        expect(isReversedAt(level, 0)).toBe(isReversed);
     });
+
+    it.each([[null], [0], [3], [4]])(
+        'подтверждённая сторона ступени %s не спрашивается снова',
+        (level) => {
+            // Сеанс могли бросить между сторонами: вторая ждёт в следующем заходе.
+            expect(isReversedAt(level, 1)).toBe(!isReversedAt(level, 0));
+        },
+    );
 
     it('изучение начинается арабской стороной, а возврат даёт русскую', () => {
         const next = answer(
-            [{ ...card('w1'), isReversed: isReversedAt(0) }, ...queue().slice(1)],
+            [{ ...card('w1'), isReversed: isReversedAt(0, 0) }, ...queue().slice(1)],
             'forgot',
             NEEDED,
         );
 
-        expect(isReversedAt(0)).toBe(false);
+        expect(isReversedAt(0, 0)).toBe(false);
         expect(found(next, 'w1')?.isReversed).toBe(true);
     });
 
     it('новая карточка показывается арабской стороной', () => {
         // Русским вперёд её не вспомнить: слово ещё ни разу не видели.
-        expect(isReversedAt(null)).toBe(false);
+        expect(isReversedAt(null, 0)).toBe(false);
     });
 });
 
@@ -142,7 +150,7 @@ describe('очередь сеанса', () => {
         expect(found(next, 'w1')).toEqual(returned('w1', 0, 0, 1));
     });
 
-    it('первый верный ответ в изучении только считается', () => {
+    it('первая верная сторона в изучении только считается', () => {
         const next = answer(queue(), 'know', NEEDED);
 
         expect(found(next, 'w1')).toEqual(returned('w1', 0, 1, 0));
@@ -154,7 +162,7 @@ describe('очередь сеанса', () => {
         expect(within(next, 'w1', FIRST!)).toBe(true);
     });
 
-    it('второй верный подряд закрывает карточку', () => {
+    it('вторая верная сторона закрывает карточку', () => {
         const next = answer([card('w1', 0, 1), card('w2')], 'know', NEEDED);
 
         expect(ids(next)).toEqual(['w2']);
@@ -166,8 +174,10 @@ describe('очередь сеанса', () => {
         expect(next.at(-1)).toEqual(returned('w1', 0, 0, 1));
     });
 
-    it('знакомая карточка закрывается с первого ответа', () => {
-        expect(ids(answer([card('w1', 3), card('w2')], 'know', NEEDED))).toEqual(['w2']);
+    it('знакомая карточка ждёт вторую сторону, как и всякая другая', () => {
+        const next = answer([card('w1', 3), ...queue().slice(1)], 'know', NEEDED);
+
+        expect(found(next, 'w1')).toEqual(returned('w1', 3, 1, 0));
     });
 
     it('забытая знакомая падает в изучение и возвращается', () => {
@@ -176,8 +186,10 @@ describe('очередь сеанса', () => {
         expect(next.at(-1)).toEqual(returned('w1', 0, 0, 1));
     });
 
-    it('узнанная с первого взгляда уходит сразу', () => {
-        expect(ids(answer([card('w1', null), card('w2')], 'know', NEEDED))).toEqual(['w2']);
+    it('узнанная с первого взгляда возвращается за второй стороной', () => {
+        const next = answer([card('w1', null), ...queue().slice(1)], 'know', NEEDED);
+
+        expect(found(next, 'w1')).toEqual(returned('w1', null, 1, 0));
     });
 
     it('незнакомая новая падает в изучение и возвращается', () => {
@@ -210,14 +222,14 @@ describe('очередь сеанса', () => {
     });
 
     it('последняя закрытая карточка кончает сеанс', () => {
-        expect(answer([card('w1', 2)], 'know', NEEDED)).toEqual([]);
+        expect(answer([card('w1', 2, 1)], 'know', NEEDED)).toEqual([]);
     });
 
     it('пустую очередь оценивать нечем', () => {
         expect(answer([], 'know', NEEDED)).toEqual([]);
     });
 
-    it('число верных ответов задаётся снаружи, а не зашито', () => {
+    it('число верных сторон задаётся снаружи, а не зашито', () => {
         const next = answer([card('w1', 0, 1), ...queue().slice(1)], 'know', 3);
 
         expect(found(next, 'w1')).toEqual(returned('w1', 0, 2, 0));

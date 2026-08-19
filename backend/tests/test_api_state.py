@@ -80,7 +80,7 @@ class TestStateContents:
         SESSION_LIMIT=7,
         NEW_LIMIT=3,
         FIRST_SIGHT_LEVEL=2,
-        LEARNING_NEEDED=3,
+        SIDES_NEEDED=3,
         LAPSE_DROP=3,
         ANSWERS_LIMIT=5,
     )
@@ -98,18 +98,23 @@ class TestStateContents:
         assert body["answers_limit"] == 5
         assert body["now"]
 
-    @signature
+    # Ступеней взято ровно столько, сколько закрывает карточку: иначе тест зависел бы
+    # от строгости, заданной в окружении.
+    @override_settings(BOT_TOKEN=TOKEN, SIDES_NEEDED=2)
     def test_cards_carry_level_fall_and_due(self, client, form, phrase):
-        """Карточки приезжают с уровнем, ступенью падения и сроком — под номерами приложения."""
+        """Карточки приезжают с уровнем, промахами, падением и сроком — под номерами приложения."""
         ask(client, signed=True)
         learner = Learner.objects.get()
+        apply(learner=learner, card=form, knows=True)
         apply(learner=learner, card=form, knows=True)
         apply(learner=learner, card=phrase, knows=False)
 
         cards = {card["id"]: card for card in ask(client, signed=True).json()["cards"]}
 
         assert cards[f"w{form.pk}"]["level"] > 0
+        assert cards[f"w{form.pk}"]["lapses"] == 0
         assert cards[f"p{phrase.pk}"]["level"] == 0
+        assert cards[f"p{phrase.pk}"]["lapses"] == 1
         assert cards[f"p{phrase.pk}"]["lapsed_from"] == 0
         assert cards[f"p{phrase.pk}"]["due_at"]
 

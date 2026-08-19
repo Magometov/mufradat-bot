@@ -10,7 +10,9 @@ class CardStateSerializer(serializers.Serializer):
     id = serializers.SerializerMethodField()
     level = serializers.IntegerField()
     step = serializers.IntegerField()
-    # Ступень падения: по ней приложение предсказывает срок переученной карточки.
+    # Промахи и ступень падения: по ним приложение предсказывает срок карточки, которая
+    # закрывается. Без промахов не отличить забытую от той, что знали заранее.
+    lapses = serializers.IntegerField()
     lapsed_from = serializers.IntegerField()
     due_at = serializers.DateTimeField()
 
