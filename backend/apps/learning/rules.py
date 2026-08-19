@@ -56,9 +56,18 @@ def _forgotten(state: State) -> State:
 
 
 def _closed_level(state: State) -> int:
-    """На какую ступень встаёт карточка, подтвердившая все стороны."""
+    """На какую ступень встаёт карточка, подтвердившая все стороны. Выше лестницы некуда.
+
+    Потолок общий на все ветки: ступень первого взгляда могли выкрутить за край лестницы,
+    а саму лестницу — укоротить при уже расставленных уровнях.
+    """
+    return min(_wanted_level(state), len(settings.LADDER))
+
+
+def _wanted_level(state: State) -> int:
+    """Куда карточка метит: на следующую ступень, на ступень первого взгляда или ниже прежней."""
     if state.level != LEARNING:
-        return min(state.level + 1, len(settings.LADDER))
+        return state.level + 1
 
     # Ни разу не забывалась — знал заранее, а не вспомнил с третьего раза.
     if state.lapses == 0:

@@ -59,10 +59,20 @@ function forgotten(state: IProgress, now: number): IProgress {
 }
 
 /**
- * На какую ступень встаёт карточка, подтвердившая все стороны.
+ * На какую ступень встаёт карточка, подтвердившая все стороны. Выше лестницы некуда.
+ *
+ * Потолок общий на все ветки: ступень первого взгляда могли выкрутить за край лестницы,
+ * а саму лестницу — укоротить при уже расставленных уровнях.
  */
 function closedLevel(state: IProgress, rules: IRules): number {
-    if (state.level !== LEARNING) return Math.min(state.level + 1, rules.ladder.length);
+    return Math.min(wantedLevel(state, rules), rules.ladder.length);
+}
+
+/**
+ * Куда карточка метит: на следующую ступень, на ступень первого взгляда или ниже прежней.
+ */
+function wantedLevel(state: IProgress, rules: IRules): number {
+    if (state.level !== LEARNING) return state.level + 1;
 
     // Ни разу не забывалась — знал заранее, а не вспомнил с третьего раза.
     if (state.lapses === 0) return rules.firstSightLevel;
