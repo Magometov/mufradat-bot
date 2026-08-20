@@ -77,8 +77,6 @@ class TestStateContents:
     @override_settings(
         LADDER=[2, 9],
         JITTER_PERCENT=4,
-        SESSION_LIMIT=7,
-        NEW_LIMIT=3,
         FIRST_SIGHT_LEVEL=2,
         SIDES_NEEDED=3,
         LAPSE_DROP=3,
@@ -90,8 +88,6 @@ class TestStateContents:
 
         assert body["ladder"] == [2, 9]
         assert body["jitter"] == 4
-        assert body["session_limit"] == 7
-        assert body["new_limit"] == 3
         assert body["first_sight_level"] == 2
         assert body["needed"] == 3
         assert body["lapse_drop"] == 3

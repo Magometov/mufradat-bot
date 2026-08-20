@@ -27,9 +27,6 @@ export interface IProgress {
 export interface IRules {
     ladder: number[];
     jitter: number;
-    /** Потолок сеанса у кнопки «Повторить»; в разделе потолка нет. */
-    sessionLimit: number;
-    newLimit: number;
     firstSightLevel: number;
     /** Столько верных сторон подряд закрывает карточку. */
     needed: number;
@@ -46,12 +43,6 @@ export interface IState {
     now: number;
     rules: IRules;
     progress: Map<string, IProgress>;
-}
-
-/** Потолки набора. `null` — заход в раздел, там их нет. */
-export interface ILimits {
-    sessionLimit: number;
-    newLimit: number;
 }
 
 /** Карточка в очереди сеанса: сторона и то, что нужно для решения о возврате. */

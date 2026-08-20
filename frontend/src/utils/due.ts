@@ -12,14 +12,36 @@ import { days } from './predict';
 const DAY = 86_400_000;
 
 /**
- * Сколько карточек назначено на сегодня: изучение, просроченные и ни разу не виденные.
+ * Карточки на сегодня: ни разу не виденные, изучение и созревшие по расписанию.
+ *
+ * Порядок не задаём — сеанс всё равно перемешивает очередь. Изучение попадает сюда само:
+ * у него срок — момент оценки.
  */
-export function countDue(entries: IEntry[], progress: Map<string, IProgress>, now: number): number {
+export function dueCards(
+    entries: IEntry[],
+    progress: Map<string, IProgress>,
+    now: number,
+): IEntry[] {
     return entries.filter((entry) => {
         const state = progress.get(entry.id);
 
-        return state === undefined || state.dueAt <= now;
-    }).length;
+        return state === undefined || isDue(state, now);
+    });
+}
+
+/**
+ * Сколько их: цифра на кнопке и есть длина порции, которая по ней откроется.
+ */
+export function countDue(entries: IEntry[], progress: Map<string, IProgress>, now: number): number {
+    return dueCards(entries, progress, now).length;
+}
+
+/**
+ * Пора ли карточку показывать. Единица расписания — сутки, поэтому слово, созревающее
+ * вечером, доступно с утра: иначе повторить его можно было бы только в тот самый час.
+ */
+export function isDue(state: IProgress, now: number): boolean {
+    return midnight(state.dueAt) <= midnight(now);
 }
 
 /**

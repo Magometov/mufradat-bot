@@ -15,8 +15,6 @@ const DAY = 86_400_000;
 const rules: IRules = {
     ladder: [1, 3, 7, 16, 35],
     jitter: 10,
-    sessionLimit: 20,
-    newLimit: 10,
     firstSightLevel: 3,
     needed: 2,
     lapseDrop: 2,

@@ -4,7 +4,7 @@ import type { IEntry } from '../types/entry';
 import type { IProgress, IRules } from '../types/progress';
 
 // Utils
-import { countDue, nextDueAt, pillText, soonText, summarize } from './due';
+import { countDue, dueCards, nextDueAt, pillText, soonText, summarize } from './due';
 
 // Vitest
 import { describe, expect, it } from 'vitest';
@@ -42,17 +42,41 @@ describe('сколько на сегодня', () => {
         expect(countDue(deck, new Map(), NOON)).toBe(3);
     });
 
-    it('срок в будущем не считается', () => {
+    it('созревающее к вечеру считается с утра, а следующие сутки — нет', () => {
+        const morning = new Date(2026, 7, 17, 9).getTime();
         const progress = new Map([
-            ['w1', state(NOON + DAY)],
-            ['w2', state(NOON - DAY)],
+            ['w1', state(NOON + 8 * 3600_000)],
+            ['w2', state(morning - DAY)],
+            ['w3', state(NOON + DAY)],
         ]);
 
-        expect(countDue(deck, progress, NOON)).toBe(2);
+        expect(countDue(deck, progress, morning)).toBe(2);
     });
 
     it('пустая колода даёт нуль', () => {
         expect(countDue([], new Map(), NOON)).toBe(0);
+    });
+});
+
+describe('порция на сегодня', () => {
+    it('берёт новые, изучение и созревшие, но не будущие', () => {
+        const progress = new Map([
+            ['w1', state(NOON + 3 * DAY)],
+            ['w2', { level: 0, step: 1, lapses: 0, lapsedFrom: 0, dueAt: NOON }],
+        ]);
+
+        const portion = dueCards(deck, progress, NOON);
+
+        expect(portion.map((card) => card.id)).toEqual(['w2', 'w3']);
+    });
+
+    it('цифра на кнопке равна длине порции', () => {
+        const progress = new Map([
+            ['w1', state(NOON - DAY)],
+            ['w2', state(NOON + DAY)],
+        ]);
+
+        expect(countDue(deck, progress, NOON)).toBe(dueCards(deck, progress, NOON).length);
     });
 });
 
@@ -89,7 +113,7 @@ describe('когда это словами', () => {
         expect(soonText(morning, NOON)).toBe('завтра');
     });
 
-    it('просроченное — сегодня', () => {
+    it('просроченное названо сегодняшним: повторить его пора именно сегодня', () => {
         expect(soonText(NOON - 5 * DAY, NOON)).toBe('сегодня');
     });
 });
@@ -122,8 +146,6 @@ describe('обещание пилюли', () => {
     const rules: IRules = {
         ladder: [1, 3, 7, 16, 35],
         jitter: 10,
-        sessionLimit: 20,
-        newLimit: 10,
         firstSightLevel: 3,
         needed: 2,
         lapseDrop: 2,

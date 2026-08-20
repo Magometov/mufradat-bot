@@ -22,8 +22,6 @@ class StateView(APIView):
             "now": timezone.now(),
             "ladder": settings.LADDER,
             "jitter": settings.JITTER_PERCENT,
-            "session_limit": settings.SESSION_LIMIT,
-            "new_limit": settings.NEW_LIMIT,
             "first_sight_level": settings.FIRST_SIGHT_LEVEL,
             "needed": settings.SIDES_NEEDED,
             "lapse_drop": settings.LAPSE_DROP,

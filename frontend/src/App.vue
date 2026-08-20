@@ -10,9 +10,8 @@
 
     // Utils
     import { API_URL } from './utils/api';
-    import { countDue, nextDueAt, pillText, soonText, summarize } from './utils/due';
+    import { countDue, dueCards, nextDueAt, pillText, soonText, summarize } from './utils/due';
     import { MODE_TITLES } from './utils/modes';
-    import { buildPortion } from './utils/portion';
     import { isTipsSeen, markTipsSeen } from './utils/storage';
     import { logVisit } from './utils/visit';
 
@@ -154,8 +153,7 @@
             return;
         }
 
-        // Потолков в разделе нет: пришёл сам — получай всё, что на сегодня.
-        const portion = buildPortion(selected, progress.value, now(), null);
+        const portion = dueCards(selected, progress.value, now());
 
         // Пустой сеанс не открываем: вместо него экран с ближайшим сроком.
         if (portion.length === 0) {
@@ -168,18 +166,11 @@
     }
 
     /**
-     * Ежедневная доза по всей колоде: с потолком, в отличие от захода в раздел.
+     * Всё, что назначено на сегодня по всей колоде.
      */
     function handleRepeat(): void {
-        if (rules.value === null) return;
-
-        const limits = {
-            sessionLimit: rules.value.sessionLimit,
-            newLimit: rules.value.newLimit,
-        };
-
         summary.value = '';
-        session.start(buildPortion(entries.value, progress.value, now(), limits), progress.value);
+        session.start(dueCards(entries.value, progress.value, now()), progress.value);
     }
 
     /**

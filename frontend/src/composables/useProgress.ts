@@ -111,8 +111,6 @@ export function useProgress(initData: string): IUseProgress {
             rules.value = {
                 ladder: body.ladder,
                 jitter: body.jitter,
-                sessionLimit: body.session_limit,
-                newLimit: body.new_limit,
                 firstSightLevel: body.first_sight_level,
                 needed: body.needed,
                 lapseDrop: body.lapse_drop,

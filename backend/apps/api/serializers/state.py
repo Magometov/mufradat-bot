@@ -28,8 +28,6 @@ class StateSerializer(serializers.Serializer):
     now = serializers.DateTimeField()
     ladder = serializers.ListField(child=serializers.IntegerField())
     jitter = serializers.IntegerField()
-    session_limit = serializers.IntegerField()
-    new_limit = serializers.IntegerField()
     first_sight_level = serializers.IntegerField()
     needed = serializers.IntegerField()
     lapse_drop = serializers.IntegerField()

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from random import uniform
 
 from django.conf import settings
+from django.utils import timezone
 
 from apps.learning.constants import FIRST_SCHEDULED, LEARNING
 
@@ -45,7 +46,7 @@ def next_state(current: State | None, *, knows: bool, now: datetime) -> tuple[St
 
     level = _closed_level(state)
 
-    return State(level=level, lapses=state.lapses), now + interval(level)
+    return State(level=level, lapses=state.lapses), _ripens(now, level)
 
 
 def _forgotten(state: State) -> State:
@@ -75,3 +76,16 @@ def _wanted_level(state: State) -> int:
 
     # Переученная возвращается ниже прежней ступени, но не в самый низ.
     return max(FIRST_SCHEDULED, state.lapsed_from - settings.LAPSE_DROP)
+
+
+def _ripens(now: datetime, level: int) -> datetime:
+    """Когда карточка созреет. Единица расписания — сутки, поэтому раньше следующих срок
+    не бывает: слово, закрытое после полуночи, иначе вернулось бы в тот же вечер."""
+    return max(now + interval(level), _next_day(now))
+
+
+def _next_day(now: datetime) -> datetime:
+    """Начало следующих суток по местному времени."""
+    return (timezone.localtime(now) + timedelta(days=1)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )

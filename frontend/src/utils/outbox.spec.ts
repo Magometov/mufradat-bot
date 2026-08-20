@@ -5,7 +5,7 @@ import type { IAnswer, IProgress, IRules, TVerdict } from '../types/progress';
 
 // Utils
 import { IDLE_PAUSE, PAUSE_DEFAULT, PAUSE_LONGEST, isTimeToSend, pauseFor, replay } from './outbox';
-import { buildPortion } from './portion';
+import { dueCards } from './due';
 
 // Vitest
 import { describe, expect, it } from 'vitest';
@@ -18,8 +18,6 @@ const BATCH = 100;
 const rules: IRules = {
     ladder: [1, 3, 7, 16, 35, 90, 180],
     jitter: 10,
-    sessionLimit: 20,
-    newLimit: 10,
     firstSightLevel: 3,
     needed: 2,
     lapseDrop: 2,
@@ -88,8 +86,8 @@ describe('прогресс с неуехавшими оценками', () => {
         const server = new Map([['w1', state(2, NOW - DAY)]]);
         const queue = [answer('w1', 'know'), answer('w1', 'know', NOW + 20_000)];
 
-        const stale = buildPortion(deck, server, NOW + 30_000, null);
-        const actual = buildPortion(deck, replay(server, queue, rules), NOW + 30_000, null);
+        const stale = dueCards(deck, server, NOW + 30_000);
+        const actual = dueCards(deck, replay(server, queue, rules), NOW + 30_000);
 
         expect(stale.map((card) => card.id)).toEqual(['w1', 'w2']);
         expect(actual.map((card) => card.id)).toEqual(['w2']);

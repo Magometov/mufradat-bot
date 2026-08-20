@@ -1,6 +1,7 @@
 """Лестница сроков: что делает оценка с уровнем и сроком."""
 
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 from django.test import override_settings
@@ -125,6 +126,20 @@ class TestNextState:
 
         assert state == State(level=0, step=0, lapses=1, lapsed_from=5)
         assert due == NOW
+
+    @override_settings(LADDER=[1], JITTER_PERCENT=50, FIRST_SIGHT_LEVEL=1, SIDES_NEEDED=2)
+    def test_card_closed_after_midnight_ripens_next_day(self):
+        """Закрытая ночью не возвращается тем же вечером: срок не раньше следующих суток.
+
+        Разброс в половину срока сам по себе дал бы «через двенадцать часов» — то есть
+        тот же день.
+        """
+        night = datetime(2026, 8, 17, 0, 30, tzinfo=ZoneInfo("Europe/Moscow"))
+        next_day = datetime(2026, 8, 18, 0, 0, tzinfo=ZoneInfo("Europe/Moscow"))
+
+        dues = {next_state(State(level=0, step=1), knows=True, now=night)[1] for _ in range(20)}
+
+        assert all(due >= next_day for due in dues)
 
     @settings
     def test_intervals_are_spread(self):
