@@ -12,6 +12,7 @@ from apps.api.internal.permissions import HEADER
 from apps.common.models import Learner
 from apps.learning.constants import LEARNING
 from apps.learning.models import CardState
+from apps.vocabulary.services import postcard_url
 
 URL = "/api/v1/internal/reminders/take/"
 
@@ -63,7 +64,7 @@ class TestRemindersTake:
                 "arabic": form.arabic,
                 "translation_ru": form.translation_ru,
                 "transliteration": "",
-                "image": None,
+                "image": postcard_url(form),
             }
         ]
         assert state.reminded_at == NOON

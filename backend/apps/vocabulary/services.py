@@ -37,7 +37,6 @@ def _attach(card: Card, name: str, image: File | None) -> None:
         return
 
     card.image.save(f"{name}{card.pk}.webp", to_webp(image), save=True)
-    refresh_pictures(card)
 
 
 def forms() -> QuerySet[WordForm]:
@@ -103,14 +102,20 @@ def _ready(card: Card, kind: str) -> str:
     return f"{READY}/{kind}-{card_id(card)}-{stamp}.jpg"
 
 
-def _drawn(card: Card, original: bytes) -> ContentFile:
+def _drawn(card: Card) -> ContentFile:
     """Собранная карточка: слово, перевод, иллюстрация и транслитерация одной картинкой."""
+    illustration = None
+
+    if card.image:
+        with card.image.open("rb") as source:
+            illustration = BytesIO(source.read())
+
     return ContentFile(
         render(
             arabic=card.arabic,
             translation=card.translation_ru,
             transliteration=card.transliteration,
-            illustration=BytesIO(original),
+            illustration=illustration,
         )
     )
 
@@ -118,24 +123,20 @@ def _drawn(card: Card, original: bytes) -> ContentFile:
 def refresh_pictures(card: Card) -> None:
     """Готовит карточку для чата, если её ещё нет.
 
-    Зовётся после сохранения карточки, а не по запросу: инлайн показывает полсотни
-    результатов разом, и собирать их в этот момент уже поздно.
+    Собирается и без иллюстрации: в чат такая карточка уезжает тем же способом, что
+    остальные, только внутри картинки один текст.
     """
-    if not card.image:
-        return
-
     postcard = _ready(card, POSTCARD)
 
     if default_storage.exists(postcard):
         return
 
-    with card.image.open("rb") as source:
-        default_storage.save(postcard, _drawn(card, source.read()))
+    default_storage.save(postcard, _drawn(card))
 
 
-def postcard_url(card: Card) -> str | None:
-    """Адрес собранной карточки. `None` — картинки нет, и собирать нечего."""
-    return default_storage.url(_ready(card, POSTCARD)) if card.image else None
+def postcard_url(card: Card) -> str:
+    """Адрес собранной карточки: она есть у каждой, даже у той, что без иллюстрации."""
+    return default_storage.url(_ready(card, POSTCARD))
 
 
 def add_form(
@@ -169,6 +170,7 @@ def add_form(
             transliteration=transliteration,
         )
         _attach(form, "w", image)
+        refresh_pictures(form)
 
         return form
 
@@ -192,6 +194,7 @@ def add_phrase(
             transliteration=transliteration,
         )
         _attach(phrase, "p", image)
+        refresh_pictures(phrase)
 
         return phrase
 

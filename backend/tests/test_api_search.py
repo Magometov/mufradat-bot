@@ -63,7 +63,7 @@ class TestSearch:
                 "arabic": form.arabic,
                 "translation_ru": "книга",
                 "transliteration": "",
-                "image": None,
+                "image": postcard_url(form),
             }
         ]
 

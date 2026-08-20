@@ -92,12 +92,12 @@ class TestPostcard:
         with BUCKET:
             assert postcard_url(drawn).startswith("https://pub-test.r2.dev/telegram/card-")
 
-    def test_a_card_without_a_picture_has_no_address(self, form):
-        """Собирать нечего — и адреса нет, бот отправит карточку текстом."""
+    def test_a_card_without_an_illustration_is_prepared_too(self, form):
+        """Без иллюстрации карточка уезжает в чат так же — картинкой с одним текстом."""
         refresh_pictures(form)
 
-        assert postcard_url(form) is None
-        assert not default_storage.exists("telegram")
+        assert postcard_url(form).endswith(ready()[0])
+        assert len(ready()) == 1
 
 
 @pytest.mark.django_db

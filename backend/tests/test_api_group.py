@@ -61,7 +61,7 @@ class TestGroupCard:
             "arabic": form.arabic,
             "translation_ru": form.translation_ru,
             "transliteration": "",
-            "image": None,
+            "image": postcard_url(form),
         }
 
     def test_nothing_to_send_is_no_content(self, client, monkeypatch, django_assert_num_queries):
