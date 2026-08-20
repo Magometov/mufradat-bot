@@ -10,6 +10,7 @@ APP := backend bot
 # Аргументы целей: `make logs S=bot N=100`, `make backup OUT=db.sql`.
 S ?=
 N ?= 50
+AGAIN ?=
 OUT ?= backup-$(shell date +%F-%H%M).sql
 
 .DEFAULT_GOAL := help
@@ -90,6 +91,10 @@ superuser: ## Создать суперпользователя админки
 .PHONY: shell
 shell: ## Django shell в контейнере
 	$(COMPOSE) exec backend python manage.py shell
+
+.PHONY: postcards
+postcards: ## Собрать карточки для чата: make postcards [AGAIN=--again]
+	$(COMPOSE) exec backend python manage.py postcards $(AGAIN)
 
 .PHONY: word
 word: ## Отправить слово в группу сейчас, не дожидаясь часа
