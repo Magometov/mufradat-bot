@@ -7,13 +7,19 @@ from rest_framework.views import APIView
 
 from apps.api.internal.permissions import IsBot
 from apps.api.internal.serializers import MoveSerializer
-from apps.vocabulary import services
 from apps.vocabulary.models import Word
+from apps.vocabulary.services import (
+    UNITS,
+    lesson_phrases,
+    lesson_words,
+    move_from_lesson,
+    move_targets,
+)
 
 logger = logging.getLogger(__name__)
 
 
-def word_title(word: Word) -> str:
+def _word_title(word: Word) -> str:
     """Подпись слова для бота: переводы всех форм по порядку числа."""
     return " / ".join(form.translation_ru for form in word.forms.all()) or str(word)
 
@@ -26,15 +32,15 @@ class LessonView(APIView):
     def get(self, _: Request) -> Response:
         units = [
             *(
-                {"kind": "word", "id": word.pk, "title": word_title(word)}
-                for word in services.lesson_words()
+                {"kind": "word", "id": word.pk, "title": _word_title(word)}
+                for word in lesson_words()
             ),
             *(
                 {"kind": "phrase", "id": phrase.pk, "title": phrase.translation_ru}
-                for phrase in services.lesson_phrases()
+                for phrase in lesson_phrases()
             ),
         ]
-        themes = [{"slug": slug, "name": name} for slug, name in services.move_targets()]
+        themes = [{"slug": slug, "name": name} for slug, name in move_targets()]
 
         return Response({"units": units, "themes": themes})
 
@@ -49,8 +55,8 @@ class LessonMoveView(APIView):
         data.is_valid(raise_exception=True)
         fields = data.validated_data
 
-        unit = get_object_or_404(services.UNITS[fields["kind"]], pk=fields["id"])
-        themes = services.move_from_lesson(unit, fields["themes"])
+        unit = get_object_or_404(UNITS[fields["kind"]], pk=fields["id"])
+        themes = move_from_lesson(unit, fields["themes"])
         logger.info("бот разложил %s %s → %s", fields["kind"], unit.pk, themes or "без темы")
 
         return Response({"themes": themes})

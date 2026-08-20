@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 
 from apps.api.internal.permissions import IsBot
 from apps.api.internal.serializers import FormSerializer, PhraseSerializer
-from apps.vocabulary import services
+from apps.vocabulary.services import Occupied, add_form, add_phrase
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +24,8 @@ class FormCreateView(APIView):
         data.is_valid(raise_exception=True)
 
         try:
-            form = services.add_form(**data.validated_data)
-        except services.Occupied as error:
+            form = add_form(**data.validated_data)
+        except Occupied as error:
             return Response({"detail": str(error)}, status=status.HTTP_409_CONFLICT)
 
         logger.info("бот добавил форму %s к слову %s", form.pk, form.word_id)
@@ -44,8 +44,8 @@ class PhraseCreateView(APIView):
         data.is_valid(raise_exception=True)
 
         try:
-            phrase = services.add_phrase(**data.validated_data)
-        except services.Occupied as error:
+            phrase = add_phrase(**data.validated_data)
+        except Occupied as error:
             return Response({"detail": str(error)}, status=status.HTTP_409_CONFLICT)
 
         logger.info("бот добавил фразу %s", phrase.pk)

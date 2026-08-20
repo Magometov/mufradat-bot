@@ -9,6 +9,7 @@ from apps.common.models import Learner
 from apps.learning.models import CardState
 from apps.learning.queryset import AnyCard, link
 from apps.learning.rules import State, next_state
+from apps.learning.utils import enabled
 
 
 def states(learner: Learner) -> QuerySet[CardState]:
@@ -19,6 +20,15 @@ def states(learner: Learner) -> QuerySet[CardState]:
 def count_states(learner: Learner) -> int:
     """Сколько карточек человек уже оценивал."""
     return states(learner).count()
+
+
+def summary(learner: Learner) -> dict:
+    """Сводка по человеку: ею бот отвечает на команды."""
+    return {
+        "reminders_on": learner.reminders_on,
+        "scheduling": enabled(learner),
+        "cards": count_states(learner),
+    }
 
 
 def apply(

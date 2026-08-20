@@ -5,9 +5,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.api.internal.permissions import IsBot
-from apps.api.internal.serializers import LearnerSerializer, ReminderSerializer
-from apps.api.internal.views.progress import learner_from, progress_of
-from apps.learning.services import switch_reminders, take_reminders
+from apps.api.internal.serializers import (
+    LearnerSerializer,
+    ProgressSerializer,
+    ReminderSerializer,
+)
+from apps.common.services import identify
+from apps.learning.services import summary, switch_reminders, take_reminders
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +45,8 @@ class RemindersSwitchView(APIView):
     def post(self, request: Request) -> Response:
         data = LearnerSerializer(data=request.data)
         data.is_valid(raise_exception=True)
-        learner = learner_from(data.validated_data)
+        learner = identify(**data.validated_data)
         learner = switch_reminders(learner, on=not learner.reminders_on)
         logger.info("напоминания у %s: %s", learner.telegram_id, learner.reminders_on)
 
-        return progress_of(learner)
+        return Response(ProgressSerializer(summary(learner)).data)
