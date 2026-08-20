@@ -68,6 +68,33 @@ class Parsed:
     problems: list[Problem]
 
 
+def without_known(
+    groups: list[Group], known: set[tuple[str, str]]
+) -> tuple[list[Group], list[str]]:
+    """Убирает из вставки карточки, которые уже в колоде.
+
+    Отдаёт остаток и переводы убранных. Единица, у которой не осталось карточек,
+    из вставки уходит целиком.
+    """
+    left: list[Group] = []
+    dropped: list[str] = []
+
+    for group in groups:
+        keep: list[Card] = []
+
+        for card in group.cards:
+            if (card.arabic, card.translation_ru) in known:
+                dropped.append(card.translation_ru)
+                continue
+
+            keep.append(card)
+
+        if keep:
+            left.append(Group(cards=keep))
+
+    return left, dropped
+
+
 def _rows(text: str) -> list[tuple[int, list[str]]]:
     """Нумерует непустые строки и режет их по разделителю."""
     numbered = enumerate(text.splitlines(), start=1)

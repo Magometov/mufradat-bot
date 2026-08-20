@@ -230,6 +230,21 @@ async def handle_kind(callback: CallbackQuery, state: FSMContext) -> None:
     )
 
 
+async def _fresh(message: Message, groups: list[Group]) -> tuple[list[Group], list[str]]:
+    """Отсеивает то, что уже в колоде. Бэкенд не ответил — идём как есть, с оговоркой."""
+    pairs = [(card.arabic, card.translation_ru) for group in groups for card in group.cards]
+
+    try:
+        known = await api.known(pairs)
+    except api.BackendError as error:
+        logger.warning("колода не проверилась: %s", error)
+        await message.answer(texts.DECK_UNREAD.format(reason=escape(str(error))))
+
+        return groups, []
+
+    return parsing.without_known(groups, known)
+
+
 @router.message(Add.lines, ~CommandStart())
 async def handle_lines(message: Message, state: FSMContext) -> None:
     """Разбирает вставку и показывает, что понял."""
@@ -248,9 +263,19 @@ async def handle_lines(message: Message, state: FSMContext) -> None:
         await message.answer(texts.NOTHING)
         return
 
-    await state.update_data(groups=parsed.groups)
+    groups, known = await _fresh(message, parsed.groups)
+
+    if not groups:
+        await state.clear()
+        await message.answer(texts.ALL_KNOWN)
+        return
+
+    if known:
+        await message.answer(texts.KNOWN.format(known=_names(known)))
+
+    await state.update_data(groups=groups)
     await state.set_state(Add.confirm)
-    await message.answer(_preview(data["kind"], parsed.groups), reply_markup=keyboards.confirm())
+    await message.answer(_preview(data["kind"], groups), reply_markup=keyboards.confirm())
 
 
 @router.callback_query(Add.confirm, F.data == keyboards.ADD_GO)

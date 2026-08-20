@@ -139,6 +139,26 @@ def postcard_url(card: Card) -> str:
     return default_storage.url(_ready(card, POSTCARD))
 
 
+def known_cards(pairs: Iterable[tuple[str, str]]) -> list[tuple[str, str]]:
+    """Какие из пар «арабское — перевод» уже лежат в колоде, в том же порядке.
+
+    Спрашивается до записи: рисовать картинку тому, что уже есть, — впустую.
+    """
+    asked = list(pairs)
+    arabic = {pair[0] for pair in asked}
+    translations = {pair[1] for pair in asked}
+
+    stored = set()
+    for model in (WordForm, Phrase):
+        stored.update(
+            model.objects.filter(arabic__in=arabic, translation_ru__in=translations).values_list(
+                "arabic", "translation_ru"
+            )
+        )
+
+    return [pair for pair in asked if pair in stored]
+
+
 def add_form(
     *,
     number: int,

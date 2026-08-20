@@ -3,6 +3,7 @@ from django.urls import path
 from apps.api.internal.views import (
     FormCreateView,
     GroupCardView,
+    KnownView,
     LessonMoveView,
     LessonView,
     PhraseCreateView,
@@ -16,6 +17,7 @@ from apps.api.internal.views import (
 urlpatterns = [
     path("forms/", FormCreateView.as_view(), name="bot-forms"),
     path("phrases/", PhraseCreateView.as_view(), name="bot-phrases"),
+    path("known/", KnownView.as_view(), name="bot-known"),
     path("lesson/", LessonView.as_view(), name="bot-lesson"),
     path("lesson/move/", LessonMoveView.as_view(), name="bot-lesson-move"),
     path("group/take/", GroupCardView.as_view(), name="bot-group"),

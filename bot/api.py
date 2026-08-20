@@ -11,6 +11,7 @@ TIMEOUT = 30
 
 FORMS = "/api/v1/internal/forms/"
 PHRASES = "/api/v1/internal/phrases/"
+KNOWN = "/api/v1/internal/known/"
 LESSON = "/api/v1/internal/lesson/"
 MOVE = "/api/v1/internal/lesson/move/"
 REMINDERS = "/api/v1/internal/reminders/take/"
@@ -207,6 +208,24 @@ async def add_phrase(
 async def log_visit(*, telegram_id: int, username: str) -> None:
     """Отмечает вход в журнал. Ручка та же, что у приложения: источник для нас один."""
     await _send("POST", VISITS, json={"telegram_id": telegram_id, "username": username})
+
+
+async def known(pairs: list[tuple[str, str]]) -> set[tuple[str, str]]:
+    """Какие из пар «арабское — перевод» уже в колоде. Спрашиваем до рисования картинок."""
+    if not pairs:
+        return set()
+
+    body = await _send(
+        "POST",
+        KNOWN,
+        json={
+            "cards": [
+                {"arabic": arabic, "translation_ru": translation} for arabic, translation in pairs
+            ]
+        },
+    )
+
+    return {(card["arabic"], card["translation_ru"]) for card in body["known"]}
 
 
 async def lesson() -> Lesson:
