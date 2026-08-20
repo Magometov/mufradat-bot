@@ -84,10 +84,12 @@ queryset по флагу»). Имена файлов, классов и функ
 ```python
 # так
 from apps.common.services import visitor
+
 source, learner = visitor(init_data=...)
 
 # не так
 from apps.common.services import learners
+
 source, learner = learners.visitor(init_data=...)
 ```
 
