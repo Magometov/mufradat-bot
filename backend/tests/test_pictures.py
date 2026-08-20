@@ -5,6 +5,7 @@ from io import BytesIO
 import pytest
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
+from django.core.management import call_command
 from django.test import override_settings
 from PIL import Image
 from rest_framework import status
@@ -177,3 +178,37 @@ class TestWhoPreparesThem:
         assert answer.status_code == status.HTTP_302_FOUND
         assert postcard_url(phrase) != before
         assert len(ready()) == 2
+
+
+@pytest.mark.django_db
+class TestPostcardsCommand:
+    """Разовая сборка всей колоды: ею карточки пересобирают после правок рисования."""
+
+    def test_command_prepares_what_is_missing(self, form, phrase):
+        """Каждая карточка колоды получает свою открытку, включая ту, что без иллюстрации."""
+        call_command("postcards")
+
+        assert len(ready()) == 2
+
+    def test_command_leaves_prepared_cards_alone(self, form):
+        """Без просьбы переписать готовое не пересобирается: имя файла то же."""
+        refresh_pictures(form)
+        before = ready()
+
+        call_command("postcards")
+
+        assert ready() == before
+
+    def test_again_rewrites_in_place(self, form):
+        """С `--again` файл переписывается под тем же именем, а не кладётся рядом вторым."""
+        refresh_pictures(form)
+        name = f"telegram/{ready()[0]}"
+        default_storage.delete(name)
+        default_storage.save(name, ContentFile(b"stale"))
+
+        call_command("postcards", again=True)
+
+        with default_storage.open(name) as file:
+            assert file.read(2) == b"\xff\xd8"
+
+        assert len(ready()) == 1

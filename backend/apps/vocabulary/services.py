@@ -120,16 +120,22 @@ def _drawn(card: Card) -> ContentFile:
     )
 
 
-def refresh_pictures(card: Card) -> None:
+def refresh_pictures(card: Card, *, again: bool = False) -> None:
     """Готовит карточку для чата, если её ещё нет.
 
     Собирается и без иллюстрации: в чат такая карточка уезжает тем же способом, что
     остальные, только внутри картинки один текст.
+
+    `again` — переписать готовую. Имя файла — слепок текста и картинки, поэтому после
+    правок самого рисования оно не меняется, и старый файл иначе остался бы лежать.
     """
     postcard = _ready(card, POSTCARD)
 
     if default_storage.exists(postcard):
-        return
+        if not again:
+            return
+
+        default_storage.delete(postcard)
 
     default_storage.save(postcard, _drawn(card))
 
