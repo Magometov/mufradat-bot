@@ -7,6 +7,7 @@ from django.contrib import admin
 from django.contrib.admin.widgets import AdminTextInputWidget
 from django.db import models
 from django.db.models import QuerySet
+from django.forms.models import BaseInlineFormSet
 from django.http import HttpRequest
 from django.utils.html import format_html
 
@@ -14,6 +15,7 @@ from apps.vocabulary.admin.base import CardAdmin, ImageForm
 from apps.vocabulary.admin.filters import ThemeFilter
 from apps.vocabulary.constants import Number
 from apps.vocabulary.models import Word, WordForm
+from apps.vocabulary.services import refresh_pictures
 
 
 class WordFormInline(admin.StackedInline):
@@ -72,6 +74,17 @@ class WordAdmin(CardAdmin):
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Word]:
         return super().get_queryset(request).prefetch_related("forms")
+
+    def save_formset(
+        self,
+        request: HttpRequest,
+        form: forms.ModelForm,
+        formset: BaseInlineFormSet,
+        change: bool,
+    ) -> None:
+        """Собирает для чата те формы, которые в админке правили: на карточке их текст."""
+        for card in formset.save():
+            refresh_pictures(card)
 
     @admin.display(description="Слово")
     def title(self, obj: Word) -> str:

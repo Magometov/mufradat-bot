@@ -37,6 +37,7 @@ def _attach(card: Card, name: str, image: File | None) -> None:
         return
 
     card.image.save(f"{name}{card.pk}.webp", to_webp(image), save=True)
+    refresh_pictures(card)
 
 
 def forms() -> QuerySet[WordForm]:
@@ -117,8 +118,8 @@ def _drawn(card: Card, original: bytes) -> ContentFile:
 def refresh_pictures(card: Card) -> None:
     """Готовит карточку для чата, если её ещё нет.
 
-    Зовётся при каждом сохранении карточки, а не по запросу: инлайн показывает
-    полсотни результатов разом, и собирать их в этот момент уже поздно.
+    Зовётся после сохранения карточки, а не по запросу: инлайн показывает полсотни
+    результатов разом, и собирать их в этот момент уже поздно.
     """
     if not card.image:
         return
