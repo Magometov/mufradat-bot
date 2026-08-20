@@ -3,6 +3,8 @@
 Собирается на сервере, потому что в сообщении Telegram сам решает, каким кеглем
 показать арабское, и решает мелко.
 
+Арабское рисуется как есть: Pillow собран с raqm и вязь с огласовками строит сам.
+
 Карточка складывается из кусков сверху вниз. Каждый знает свою высоту до того, как
 что-то нарисовано, — поэтому холст заводится сразу нужного размера, и подрезать снизу
 ничего не приходится.
@@ -16,8 +18,6 @@ from pathlib import Path
 
 from django.core.files.base import File
 from PIL import Image, ImageChops, ImageDraw, ImageFont
-
-from apps.vocabulary.utils.arabic import for_drawing
 
 FONTS = Path(__file__).resolve().parent.parent / "fonts"
 NASKH = FONTS / "NotoNaskhArabic-Regular.ttf"
@@ -58,9 +58,6 @@ ACCENT = "#29356b"
 
 QUALITY = 88
 
-# Как готовить строку к рисованию: арабскую — вязью, остальные оставлять как есть.
-Shape = Callable[[str], str]
-
 
 @dataclass(frozen=True, slots=True)
 class Part:
@@ -82,7 +79,7 @@ def _room() -> int:
     return WIDTH - MARGIN_X * 2
 
 
-def _wrapped(text: str, font: ImageFont.FreeTypeFont, shape: Shape) -> list[str]:
+def _wrapped(text: str, font: ImageFont.FreeTypeFont) -> list[str]:
     """Разбивает строку по словам, чтобы каждая влезала в ширину карточки."""
     lines: list[str] = []
     current = ""
@@ -90,7 +87,7 @@ def _wrapped(text: str, font: ImageFont.FreeTypeFont, shape: Shape) -> list[str]
     for word in text.split():
         candidate = f"{current} {word}".strip()
 
-        if current and font.getlength(shape(candidate)) > _room():
+        if current and font.getlength(candidate) > _room():
             lines.append(current)
             current = word
             continue
@@ -100,7 +97,7 @@ def _wrapped(text: str, font: ImageFont.FreeTypeFont, shape: Shape) -> list[str]
     return [*lines, current] if current else lines
 
 
-def _fitted(text: str, path: Path, size: int, shape: Shape) -> ImageFont.FreeTypeFont:
+def _fitted(text: str, path: Path, size: int) -> ImageFont.FreeTypeFont:
     """Подбирает кегль под самое длинное слово, но ужимает не больше чем вдвое.
 
     Дальше строку переносят: длинная фраза целиком в строку не влезет никаким кеглем.
@@ -110,7 +107,7 @@ def _fitted(text: str, path: Path, size: int, shape: Shape) -> ImageFont.FreeTyp
     while size > floor:
         font = _font(path, size)
 
-        if all(font.getlength(shape(word)) <= _room() for word in text.split()):
+        if all(font.getlength(word) <= _room() for word in text.split()):
             return font
 
         size -= 6
@@ -118,10 +115,10 @@ def _fitted(text: str, path: Path, size: int, shape: Shape) -> ImageFont.FreeTyp
     return _font(path, size)
 
 
-def _words(text: str, path: Path, size: int, fill: str, gap: int, shape: Shape = str) -> Part:
+def _words(text: str, path: Path, size: int, fill: str, gap: int) -> Part:
     """Кусок из строк текста: подбирает кегль, переносит и считает высоту."""
-    font = _fitted(text, path, size, shape)
-    lines = [shape(line) for line in _wrapped(text, font, shape)]
+    font = _fitted(text, path, size)
+    lines = _wrapped(text, font)
     boxes = [font.getbbox(line) for line in lines]
     step = int(size * LINE_GAP)
 
@@ -183,7 +180,7 @@ def render(
 ) -> bytes:
     """Собирает карточку и отдаёт её джипегом: инлайн Telegram другого не принимает."""
     parts = [
-        _words(arabic, NASKH, ARABIC, INK, gap=0, shape=for_drawing),
+        _words(arabic, NASKH, ARABIC, INK, gap=0),
         _words(translation, SANS, TRANSLATION, INK, gap=GAP),
         _rule(gap=GAP),
     ]

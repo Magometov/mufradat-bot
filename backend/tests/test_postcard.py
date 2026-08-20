@@ -2,11 +2,12 @@
 
 from io import BytesIO
 
+import PIL.features as features
 import pytest
 from PIL import Image, ImageDraw, ImageFont
 
-from apps.vocabulary.utils import for_drawing, render
-from apps.vocabulary.utils.postcard import NASKH, SANS, WIDTH
+from apps.vocabulary.utils import render
+from apps.vocabulary.utils.postcard import ARABIC, NASKH, SANS, WIDTH
 
 # Огласовка фатха: ради неё колода и хранит арабское с огласовками.
 FATHA = "َ"
@@ -30,19 +31,19 @@ def drawn(char: str, font: ImageFont.FreeTypeFont) -> bytes:
     return canvas.tobytes()
 
 
-class TestForDrawing:
-    """Подготовка арабского к рисованию: Pillow сам вязь не соединяет."""
+class TestShaping:
+    """Вязь строит сам Pillow, и делает это только собранный с raqm."""
 
-    def test_letters_are_joined_and_reversed(self):
-        """Без обработки Pillow рисует буквы порознь и слева направо."""
-        ready = for_drawing(WORD)
+    def test_pillow_can_shape_arabic(self):
+        """Без raqm буквы рисуются порознь, а огласовки — рядом с буквой, а не над ней."""
+        assert features.check_feature("raqm")
 
-        assert ready != WORD
-        assert ready[::-1] != WORD
+    def test_letters_are_joined(self):
+        """Буквы соединяются в вязь: слитное слово уже, чем те же буквы порознь."""
+        font = ImageFont.truetype(str(NASKH), ARABIC)
+        bare = "نظارة"
 
-    def test_harakat_survive(self):
-        """Огласовки не выбрасываются: ради них слово и читают."""
-        assert FATHA in for_drawing(WORD)
+        assert font.getlength(bare) < sum(font.getlength(letter) for letter in bare)
 
 
 class TestRender:
