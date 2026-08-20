@@ -2,7 +2,6 @@
 
 import pytest
 from rest_framework import status
-from rest_framework.test import APIClient
 
 from apps.api.internal.permissions import HEADER
 from apps.vocabulary.constants import Number, Theme
@@ -12,11 +11,6 @@ LESSON = "/api/v1/internal/lesson/"
 MOVE = "/api/v1/internal/lesson/move/"
 
 TOKEN = "bot-secret"
-
-
-@pytest.fixture
-def client() -> APIClient:
-    return APIClient()
 
 
 def lesson_word(*, forms: dict[int, str] | None = None) -> Word:

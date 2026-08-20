@@ -11,11 +11,6 @@ URL = "/api/v1/internal/known/"
 TOKEN = "bot-secret"
 
 
-@pytest.fixture
-def client() -> APIClient:
-    return APIClient()
-
-
 def ask(client: APIClient, pairs: list[tuple[str, str]], *, token: str = TOKEN):
     """Спрашивает про пачку пар «арабское — перевод»."""
     headers = {HEADER: token} if token else {}

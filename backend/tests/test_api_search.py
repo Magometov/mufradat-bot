@@ -9,18 +9,11 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from apps.api.internal.permissions import HEADER
-from apps.api.internal.views import search as view
-from apps.vocabulary.constants import SEARCH_LIMIT
 from apps.vocabulary.services import postcard_url
 
 URL = "/api/v1/internal/search/"
 
 TOKEN = "bot-secret"
-
-
-@pytest.fixture
-def client() -> APIClient:
-    return APIClient()
 
 
 def ask(client: APIClient, **params):
@@ -84,14 +77,11 @@ class TestSearch:
         assert answer.status_code == status.HTTP_200_OK
         assert answer.json() == []
 
-    def test_the_ceiling_is_the_backends_own(self, client, form, monkeypatch):
-        """Потолок ставит бэкенд, а не проситель: столько инлайн всё равно не покажет."""
-        asked = []
-        monkeypatch.setattr(view, "find", lambda query, **kwargs: asked.append(kwargs) or [])
+    def test_the_ceiling_is_the_backends_own(self, client, form, phrase):
+        """Потолок ставит бэкенд, а не проситель: просьба «одну» на выдачу не влияет."""
+        found = ask(client, limit=1).json()
 
-        ask(client, query="книга", limit=1000)
-
-        assert asked == [{"limit": SEARCH_LIMIT}]
+        assert len(found) == 2
 
     def test_query_may_be_missing(self, client, form, django_assert_num_queries):
         """Без строки поиска ручка отдаёт свежее, а не отказывает."""

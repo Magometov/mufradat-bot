@@ -5,6 +5,9 @@ import pytest
 from apps.common.models import Learner
 from apps.vocabulary.models import Phrase, Word, WordForm
 
+# Клиент ручек — общий на все файлы, поэтому живёт отдельно.
+pytest_plugins = ["tests.fixtures.api"]
+
 
 @pytest.fixture(autouse=True)
 def media(tmp_path, settings) -> None:

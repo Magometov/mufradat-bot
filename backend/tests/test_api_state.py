@@ -15,11 +15,6 @@ URL = "/api/v1/state/"
 signature = override_settings(BOT_TOKEN=TOKEN)
 
 
-@pytest.fixture
-def client() -> APIClient:
-    return APIClient()
-
-
 def ask(client: APIClient, *, signed: bool = False):
     """Спрашивает состояние. С подписью — от опознанного человека."""
     headers = {INIT_DATA_HEADER: init_data()} if signed else {}

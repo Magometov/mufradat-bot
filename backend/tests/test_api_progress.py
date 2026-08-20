@@ -17,11 +17,6 @@ SWITCH = "/api/v1/internal/reminders/switch/"
 TOKEN = "bot-secret"
 
 
-@pytest.fixture
-def client() -> APIClient:
-    return APIClient()
-
-
 def ask(client: APIClient, url: str, *, telegram_id: int = 777, token: str = TOKEN):
     """Запрос от бота: кто спрашивает — в теле, общий секрет — в заголовке."""
     headers = {HEADER: token} if token else {}

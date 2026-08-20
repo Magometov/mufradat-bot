@@ -1,22 +1,12 @@
 """Ручка входов: предел частоты и связь с человеком."""
 
 import pytest
-from django.core.cache import cache
 from rest_framework import status
-from rest_framework.test import APIClient
 from rest_framework.throttling import ScopedRateThrottle
 
 from apps.common.models import Visit
 
 URL = "/api/v1/visits/"
-
-
-@pytest.fixture
-def client() -> APIClient:
-    # Пределы считаются в кэше, поэтому между тестами он чистится.
-    cache.clear()
-
-    return APIClient()
 
 
 @pytest.fixture

@@ -3,7 +3,6 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from django.core.cache import cache
 from django.test import override_settings
 from django.utils.dateparse import parse_datetime
 from rest_framework import status
@@ -22,14 +21,6 @@ PRESSED = datetime(2026, 8, 18, 12, 0, tzinfo=UTC)
 signature = override_settings(
     BOT_TOKEN=TOKEN, LADDER=[1, 2, 3, 4, 5], JITTER_PERCENT=0, FIRST_SIGHT_LEVEL=3, SIDES_NEEDED=2
 )
-
-
-@pytest.fixture
-def client() -> APIClient:
-    """Клиент с чистым кэшем: в нём живёт счётчик ограничителя запросов."""
-    cache.clear()
-
-    return APIClient()
 
 
 def answer(card_id: str, verdict: str, *, at: datetime = PRESSED) -> dict:

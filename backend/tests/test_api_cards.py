@@ -18,11 +18,6 @@ PHRASES = "/api/v1/internal/phrases/"
 TOKEN = "bot-secret"
 
 
-@pytest.fixture
-def client() -> APIClient:
-    return APIClient()
-
-
 def picture() -> SimpleUploadedFile:
     """Картинка, какую бот прикладывает к карточке."""
     buffer = BytesIO()

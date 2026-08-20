@@ -6,7 +6,6 @@ import pytest
 from django.utils import timezone
 from django.utils.timezone import make_aware
 from rest_framework import status
-from rest_framework.test import APIClient
 
 from apps.api.internal.permissions import HEADER
 from apps.common.models import Learner
@@ -19,11 +18,6 @@ URL = "/api/v1/internal/reminders/take/"
 TOKEN = "bot-secret"
 # Полдень по Москве — внутри окна, когда бот пишет; часы в настройках проекта московские.
 NOON = make_aware(datetime(2026, 8, 17, 12, 0))
-
-
-@pytest.fixture
-def client() -> APIClient:
-    return APIClient()
 
 
 @pytest.mark.django_db
