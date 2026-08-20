@@ -16,31 +16,31 @@ CARD = Found(
 )
 
 
-def test_card_with_a_picture_goes_as_a_photo():
-    """С картинкой карточка уезжает картинкой без подписи: слова нарисованы на ней."""
-    item = as_result(CARD)
+class TestAsResult:
+    """Строка инлайна: картинкой или текстом, со своим номером и целой разметкой."""
 
-    assert isinstance(item, InlineQueryResultPhoto)
-    assert item.photo_url == CARD.image
-    assert item.thumbnail_url == CARD.image
-    assert item.caption is None
+    def test_card_with_a_picture_goes_as_a_photo(self):
+        """С картинкой карточка уезжает картинкой без подписи: слова нарисованы на ней."""
+        item = as_result(CARD)
 
+        assert isinstance(item, InlineQueryResultPhoto)
+        assert item.photo_url == CARD.image
+        assert item.thumbnail_url == CARD.image
+        assert item.caption is None
 
-def test_card_without_a_picture_goes_as_text():
-    """Без картинки — текстом, с тем же содержимым."""
-    item = as_result(replace(CARD, image=None))
+    def test_card_without_a_picture_goes_as_text(self):
+        """Без картинки — текстом, с тем же содержимым."""
+        item = as_result(replace(CARD, image=None))
 
-    assert isinstance(item, InlineQueryResultArticle)
-    assert item.input_message_content.message_text == "قَلَم\n\nручка\nqalam"
+        assert isinstance(item, InlineQueryResultArticle)
+        assert item.input_message_content.message_text == "قَلَم\n\nручка\nqalam"
 
+    def test_the_number_becomes_the_result_id(self):
+        """Номер карточки и есть номер результата: он должен быть свой у каждой строки."""
+        assert as_result(CARD).id == "w12"
 
-def test_the_number_becomes_the_result_id():
-    """Номер карточки и есть номер результата: он должен быть свой у каждой строки."""
-    assert as_result(CARD).id == "w12"
+    def test_markup_characters_are_escaped(self):
+        """«&» и «<» в переводе не должны ломать разметку сообщения."""
+        item = as_result(replace(CARD, image=None, translation_ru="сложно & просто"))
 
-
-def test_markup_characters_are_escaped():
-    """«&» и «<» в переводе не должны ломать разметку сообщения."""
-    item = as_result(replace(CARD, image=None, translation_ru="сложно & просто"))
-
-    assert "&amp;" in item.input_message_content.message_text
+        assert "&amp;" in item.input_message_content.message_text

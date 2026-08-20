@@ -4,8 +4,8 @@ from io import BytesIO
 
 import pytest
 from django.core.files.base import ContentFile
-from django.test import override_settings
 from PIL import Image
+from rest_framework import status
 from rest_framework.test import APIClient
 
 from apps.api.internal.permissions import HEADER
@@ -17,15 +17,14 @@ URL = "/api/v1/internal/search/"
 
 TOKEN = "bot-secret"
 
-signed = override_settings(BOT_API_TOKEN=TOKEN)
-
 
 @pytest.fixture
 def client() -> APIClient:
     return APIClient()
 
 
-def ask(client: APIClient, **params) -> object:
+def ask(client: APIClient, **params):
+    """Спрашивает поиск от имени бота."""
     return client.get(URL, params, headers={HEADER: TOKEN})
 
 
@@ -37,63 +36,66 @@ def picture() -> ContentFile:
     return ContentFile(buffer.getvalue(), name="probe.png")
 
 
-@signed
 @pytest.mark.django_db
-def test_stranger_gets_nothing(client, form):
-    """Без общего секрета ручка не отвечает: наружу она не выпускается вовсе."""
-    assert client.get(URL, {"query": "книга"}).status_code == 403
+class TestSearch:
+    """Поиск для инлайна: доступ, номера карточек, картинка и потолок выдачи."""
 
+    @pytest.fixture(autouse=True)
+    def bot_token(self, settings) -> None:
+        """Секрет бота задаёт тест: с пустым ручка не пустила бы никого."""
+        settings.BOT_API_TOKEN = TOKEN
 
-@signed
-@pytest.mark.django_db
-def test_card_comes_with_its_number(client, form):
-    """Номер тот же, что у приложения: им инлайн различает свои результаты."""
-    found = ask(client, query="книга").json()
+    def test_stranger_gets_nothing(self, client, form, django_assert_num_queries):
+        """Без общего секрета ручка не отвечает: наружу она не выпускается вовсе."""
+        with django_assert_num_queries(0):
+            response = client.get(URL, {"query": "книга"})
 
-    assert found == [
-        {
-            "id": f"w{form.pk}",
-            "arabic": form.arabic,
-            "translation_ru": "книга",
-            "transliteration": "",
-            "image": None,
-        }
-    ]
+        assert response.status_code == status.HTTP_403_FORBIDDEN
 
+    def test_card_comes_with_its_number(self, client, form, django_assert_num_queries):
+        """Номер тот же, что у приложения: им инлайн различает свои результаты."""
+        with django_assert_num_queries(2):
+            found = ask(client, query="книга").json()
 
-@signed
-@pytest.mark.django_db
-def test_inline_gets_the_postcard(client, form):
-    """В инлайн уезжает адрес собранной карточки, а не иллюстрации."""
-    form.image.save("probe.png", picture(), save=True)
+        assert found == [
+            {
+                "id": f"w{form.pk}",
+                "arabic": form.arabic,
+                "translation_ru": "книга",
+                "transliteration": "",
+                "image": None,
+            }
+        ]
 
-    assert ask(client, query="книга").json()[0]["image"] == postcard_url(form)
+    def test_inline_gets_the_postcard(self, client, form, django_assert_num_queries):
+        """В инлайн уезжает адрес собранной карточки, а не иллюстрации."""
+        form.image.save("probe.png", picture(), save=True)
 
+        with django_assert_num_queries(2):
+            found = ask(client, query="книга").json()
 
-@signed
-@pytest.mark.django_db
-def test_nothing_found_is_an_empty_list(client, form):
-    """Ничего не нашлось — пустой список, а не отказ."""
-    answer = ask(client, query="самолёт")
+        assert found[0]["image"] == postcard_url(form)
 
-    assert answer.status_code == 200
-    assert answer.json() == []
+    def test_nothing_found_is_an_empty_list(self, client, form, django_assert_num_queries):
+        """Ничего не нашлось — пустой список, а не отказ."""
+        with django_assert_num_queries(2):
+            answer = ask(client, query="самолёт")
 
+        assert answer.status_code == status.HTTP_200_OK
+        assert answer.json() == []
 
-@signed
-@pytest.mark.django_db
-def test_the_ceiling_is_the_backends_own(client, form, monkeypatch):
-    """Потолок ставит бэкенд, а не проситель: столько инлайн всё равно не покажет."""
-    asked = []
-    monkeypatch.setattr(view, "find", lambda query, **kwargs: asked.append(kwargs) or [])
+    def test_the_ceiling_is_the_backends_own(self, client, form, monkeypatch):
+        """Потолок ставит бэкенд, а не проситель: столько инлайн всё равно не покажет."""
+        asked = []
+        monkeypatch.setattr(view, "find", lambda query, **kwargs: asked.append(kwargs) or [])
 
-    ask(client, query="книга", limit=1000)
+        ask(client, query="книга", limit=1000)
 
-    assert asked == [{"limit": SEARCH_LIMIT}]
+        assert asked == [{"limit": SEARCH_LIMIT}]
 
+    def test_query_may_be_missing(self, client, form, django_assert_num_queries):
+        """Без строки поиска ручка отдаёт свежее, а не отказывает."""
+        with django_assert_num_queries(2):
+            answer = ask(client)
 
-@signed
-@pytest.mark.django_db
-def test_query_may_be_missing(client, form):
-    """Без строки поиска ручка отдаёт свежее, а не отказывает."""
-    assert ask(client).status_code == 200
+        assert answer.status_code == status.HTTP_200_OK

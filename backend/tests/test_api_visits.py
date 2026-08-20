@@ -2,6 +2,7 @@
 
 import pytest
 from django.core.cache import cache
+from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework.throttling import ScopedRateThrottle
 
@@ -25,16 +26,24 @@ def tight_limit(monkeypatch) -> None:
 
 
 @pytest.mark.django_db
-def test_visit_is_logged(client):
-    assert client.post(URL, {}, format="json").status_code == 204
-    assert Visit.objects.count() == 1
+class TestVisits:
+    """Журнал входов: заход пишется, а частота ограничена."""
 
+    def test_visit_is_logged(self, client, django_assert_num_queries):
+        """Заход из приложения попадает в журнал."""
+        with django_assert_num_queries(1):
+            response = client.post(URL, {}, format="json")
 
-@pytest.mark.django_db
-def test_too_many_visits_are_refused(client, tight_limit):
-    """Журнал нельзя засорять сколько угодно: сверх предела ручка отвечает 429."""
-    assert client.post(URL, {}, format="json").status_code == 204
-    assert client.post(URL, {}, format="json").status_code == 204
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert Visit.objects.count() == 1
 
-    assert client.post(URL, {}, format="json").status_code == 429
-    assert Visit.objects.count() == 2
+    def test_too_many_visits_are_refused(self, client, tight_limit, django_assert_num_queries):
+        """Журнал нельзя засорять сколько угодно: сверх предела ручка отвечает 429."""
+        allowed = [client.post(URL, {}, format="json") for _ in range(2)]
+
+        with django_assert_num_queries(0):
+            refused = client.post(URL, {}, format="json")
+
+        assert [answer.status_code for answer in allowed] == [status.HTTP_204_NO_CONTENT] * 2
+        assert refused.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+        assert Visit.objects.count() == 2
