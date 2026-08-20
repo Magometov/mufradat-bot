@@ -89,6 +89,14 @@ class Lesson:
     units: list[Unit]
     themes: list[tuple[str, str]]
 
+    def of_kind(self, kind: str) -> "Lesson":
+        """Только слова или только фразы.
+
+        Разбор предлагается по тому виду, который добавляли: менять темы у слов,
+        добавив фразы, — не то, о чём просили.
+        """
+        return Lesson(units=[unit for unit in self.units if unit.kind == kind], themes=self.themes)
+
 
 def _headers() -> dict[str, str]:
     """Заголовок с секретом. Не-латиница в токене — промах в настройках, а не в сети."""

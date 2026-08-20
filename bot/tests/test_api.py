@@ -3,6 +3,7 @@
 import pytest
 
 from bot import api, config
+from bot.api import Lesson, Unit
 
 
 @pytest.fixture(autouse=True)
@@ -27,3 +28,25 @@ class TestImageUrl:
         monkeypatch.setattr(config, "WEBAPP_URL", None)
 
         assert api._image_url("/m/cards/w12.webp") is None
+
+
+class TestLessonOfKind:
+    """Разбор раздела идёт по одному виду: партия слов — слова, партия фраз — фразы."""
+
+    LESSON = Lesson(
+        units=[Unit("word", 1, "книга"), Unit("phrase", 2, "привет"), Unit("word", 3, "дом")],
+        themes=[("family", "Семья")],
+    )
+
+    def test_only_units_of_the_asked_kind_are_left(self):
+        """Добавляли фразы — слова в разбор не попадают, и наоборот."""
+        assert [unit.title for unit in self.LESSON.of_kind("phrase").units] == ["привет"]
+        assert [unit.title for unit in self.LESSON.of_kind("word").units] == ["книга", "дом"]
+
+    def test_themes_stay_whole(self):
+        """Темы не режутся: раскладывают по тем же, что и раньше."""
+        assert self.LESSON.of_kind("phrase").themes == self.LESSON.themes
+
+    def test_kind_without_units_leaves_nothing_to_sort(self):
+        """Своего вида в разделе нет — разбирать нечего, и предложения не будет."""
+        assert Lesson(units=[Unit("word", 1, "книга")], themes=[]).of_kind("phrase").units == []

@@ -29,6 +29,8 @@ FORMATS = {WORDS: texts.WORDS_FORMAT, PHRASES: texts.PHRASES_FORMAT}
 PARSERS = {WORDS: parsing.parse_words, PHRASES: parsing.parse_phrases}
 SINGLE = {WORDS: parsing.one_word, PHRASES: parsing.one_phrase}
 UNITS = {WORDS: "слов", PHRASES: "фраз"}
+# Вид единицы разбора у бэкенда свой: партия слов разбирает слова, партия фраз — фразы.
+KINDS_OF_UNIT = {WORDS: "word", PHRASES: "phrase"}
 NUMBERS = {parsing.SINGULAR: "единственное", parsing.PLURAL: "множественное"}
 
 
@@ -291,7 +293,7 @@ async def handle_go(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
 
     try:
-        lesson = await api.lesson()
+        lesson = (await api.lesson()).of_kind(KINDS_OF_UNIT[data["kind"]])
     except api.BackendError as error:
         lesson = api.Lesson(units=[], themes=[])
         logger.warning("раздел не прочитался: %s", error)
