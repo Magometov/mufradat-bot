@@ -6,12 +6,14 @@ import pytest
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import override_settings
-from PIL import Image
+from PIL import Image, features
 from rest_framework import status
 
 from apps.vocabulary.constants import Number
 from apps.vocabulary.services import add_form, add_phrase, postcard_url, refresh_pictures
+from apps.vocabulary.utils import DRAWING_VERSION
 
 # Бакет как на сервере, только адрес выдуманный: `url()` строит строку, никуда не ходя.
 BUCKET = override_settings(
@@ -92,6 +94,13 @@ class TestPostcard:
         """С бакетом адрес абсолютный и ведёт в Cloudflare — до нас Telegram не доходит."""
         with BUCKET:
             assert postcard_url(drawn).startswith("https://pub-test.r2.dev/telegram/card-")
+
+    def test_the_name_carries_the_drawing_version(self, drawn):
+        """Версия рисования — в имени файла: поправили рисунок, подняли её, и адреса новые.
+
+        Иначе Telegram отдаёт ту картинку, которую скачал по этому адресу когда-то.
+        """
+        assert f"-v{DRAWING_VERSION}-" in postcard_url(drawn)
 
     def test_a_card_without_an_illustration_is_prepared_too(self, form):
         """Без иллюстрации карточка уезжает в чат так же — картинкой с одним текстом."""
@@ -212,3 +221,26 @@ class TestPostcardsCommand:
             assert file.read(2) == b"\xff\xd8"
 
         assert len(ready()) == 1
+
+    def test_command_removes_what_the_deck_no_longer_waits_for(self, form):
+        """Файл прежнего имени убирается: его никто не спросит и никто не перепишет."""
+        stale = "telegram/card-w1-v1-deadbeef.jpg"
+        default_storage.save(stale, ContentFile(b"stale"))
+
+        call_command("postcards")
+
+        assert not default_storage.exists(stale)
+        assert len(ready()) == 1
+
+    def test_command_on_an_empty_deck_does_not_fall(self):
+        """Пустая колода: собирать нечего, убирать тоже — каталога готового ещё и нет."""
+        call_command("postcards")
+
+    def test_command_refuses_without_shaping(self, monkeypatch, form):
+        """Pillow без raqm рисует ломаную вязь: испортить молча всю колоду хуже, чем упасть."""
+        monkeypatch.setattr(features, "check", lambda name: False)
+
+        with pytest.raises(CommandError):
+            call_command("postcards")
+
+        assert not default_storage.exists("telegram")

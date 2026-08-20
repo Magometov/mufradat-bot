@@ -11,7 +11,7 @@ from django.db.models import QuerySet
 
 from apps.vocabulary.constants import Theme
 from apps.vocabulary.models import Phrase, Word, WordForm
-from apps.vocabulary.utils import card_id, parse, render, to_id, to_webp
+from apps.vocabulary.utils import DRAWING_VERSION, card_id, parse, render, to_id, to_webp
 
 # Единицы, которыми колоду разбирают: слово со всеми формами и отдельная фраза.
 UNITS = {"word": Word, "phrase": Phrase}
@@ -95,11 +95,15 @@ def cards_by_id(card_ids: Iterable[str]) -> dict[str, Card]:
 
 
 def _ready(card: Card, kind: str) -> str:
-    """Имя готового файла. В нём слепок текста и картинки: правка карточки даёт новое имя."""
+    """Имя готового файла: номер карточки, версия рисования и слепок текста с картинкой.
+
+    Всё, от чего карточка выглядит так, а не иначе, — в имени. Поменялось что-то одно,
+    и адрес новый: по прежнему Telegram отдаёт ту картинку, которую скачал когда-то.
+    """
     parts = (card.arabic, card.translation_ru, card.transliteration, card.image.name or "")
     stamp = sha1("|".join(parts).encode()).hexdigest()[:8]
 
-    return f"{READY}/{kind}-{card_id(card)}-{stamp}.jpg"
+    return f"{READY}/{kind}-{card_id(card)}-v{DRAWING_VERSION}-{stamp}.jpg"
 
 
 def _drawn(card: Card) -> ContentFile:
@@ -126,8 +130,8 @@ def refresh_pictures(card: Card, *, again: bool = False) -> None:
     Собирается и без иллюстрации: в чат такая карточка уезжает тем же способом, что
     остальные, только внутри картинки один текст.
 
-    `again` — переписать готовую. Имя файла — слепок текста и картинки, поэтому после
-    правок самого рисования оно не меняется, и старый файл иначе остался бы лежать.
+    `again` — переписать готовую: пригодится, если файл побился, а имя ему причитается
+    то же самое.
     """
     postcard = _ready(card, POSTCARD)
 
@@ -138,6 +142,28 @@ def refresh_pictures(card: Card, *, again: bool = False) -> None:
         default_storage.delete(postcard)
 
     default_storage.save(postcard, _drawn(card))
+
+
+def sweep_pictures(cards: Iterable[Card]) -> int:
+    """Убирает собранное, чего колода больше не ждёт, и говорит сколько убрала.
+
+    Карточка сменила имя файла — прежний остался бы в бакете навсегда: его никто больше
+    не спросит и никто не перепишет.
+    """
+    wanted = {_ready(card, POSTCARD) for card in cards}
+
+    try:
+        _, found = default_storage.listdir(READY)
+    except FileNotFoundError:
+        # Каталога ещё нет: ни одной карточки не собрано, убирать нечего.
+        return 0
+
+    stale = [f"{READY}/{name}" for name in found if f"{READY}/{name}" not in wanted]
+
+    for name in stale:
+        default_storage.delete(name)
+
+    return len(stale)
 
 
 def postcard_url(card: Card) -> str:

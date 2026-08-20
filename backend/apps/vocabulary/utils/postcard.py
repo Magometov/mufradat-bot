@@ -17,11 +17,16 @@ from io import BytesIO
 from pathlib import Path
 
 from django.core.files.base import File
-from PIL import Image, ImageChops, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFont, features
 
 FONTS = Path(__file__).resolve().parent.parent / "fonts"
 NASKH = FONTS / "NotoNaskhArabic-Regular.ttf"
 SANS = FONTS / "NotoSans-Regular.ttf"
+
+# Версия рисования: поднимаем на единицу всякий раз, когда карточка стала выглядеть иначе.
+# Она в имени готового файла, поэтому Telegram и CDN приходят за карточкой заново — по
+# прежнему адресу они отдают ту картинку, что скачали когда-то.
+DRAWING_VERSION = 2
 
 # Ширина карточки постоянная, высота — по содержимому.
 WIDTH = 1000
@@ -57,6 +62,11 @@ MUTED = "#6d7684"
 ACCENT = "#29356b"
 
 QUALITY = 88
+
+
+def shaped() -> bool:
+    """Умеет ли Pillow вязь: без raqm арабское рассыпается на буквы, а огласовки съезжают."""
+    return features.check("raqm")
 
 
 @dataclass(frozen=True, slots=True)
