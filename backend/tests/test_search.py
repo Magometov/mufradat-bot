@@ -37,9 +37,7 @@ class TestFind:
 
     def test_phrases_are_found_too(self, deck):
         """Фразы ищутся наравне со словами: колода одна."""
-        Phrase.objects.create(
-            themes=["greetings"], arabic="كَيْفَ حَالُك", translation_ru="Как дела?"
-        )
+        Phrase.objects.create(themes=["greetings"], arabic="كَيْفَ حَالُك", translation_ru="Как дела?")
 
         assert [card.translation_ru for card in find("дела", limit=10)] == ["Как дела?"]
 
@@ -57,8 +55,6 @@ class TestFind:
 
     def test_limit_holds_across_both_tables(self, deck):
         """Потолок общий на слова и фразы, а не по потолку на каждую таблицу."""
-        Phrase.objects.create(
-            themes=["greetings"], arabic="بَيْت كَبِير", translation_ru="большой дом"
-        )
+        Phrase.objects.create(themes=["greetings"], arabic="بَيْت كَبِير", translation_ru="большой дом")
 
         assert len(find("дом", limit=1)) == 1
